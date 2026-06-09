@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 :::tip 本章要点
 - 理解**隐变量模型**：为什么普通自编码器不能生成新图像
-- 推导 **ELBO**（证据下界）：最大似然估计的可解析替代目标
+- 推导 **ELBO**（证据下界）：将难以直接计算的似然转化为可优化目标
 - 掌握**重参数化技巧**：让采样操作可微分
 - 读懂 [`dldemos/VAE/model.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/VAE/model.py) 的核心实现
 :::
@@ -50,7 +50,7 @@ $$
 \log p_\theta(x) = \log \int p_\theta(x \mid z)\, p(z)\, dz
 $$
 
-但这个积分**无法解析**（$z$ 的维度很高）。
+对于使用神经网络参数化的解码器，这个积分通常难以直接计算。
 
 ### 2.2 引入变分分布，推导 ELBO
 
@@ -60,7 +60,7 @@ $$
 \log p_\theta(x) \geq \underbrace{\mathbb{E}_{q_\phi(z|x)}\!\left[\log p_\theta(x \mid z)\right]}_{\text{重建项}} - \underbrace{D_{\mathrm{KL}}\!\left(q_\phi(z \mid x) \,\|\, p(z)\right)}_{\text{KL 正则项}}
 $$
 
-这个下界称为 **ELBO（Evidence Lower BOund）**。最大化 ELBO 等效于：
+这个下界称为 **ELBO（Evidence Lower BOund）**。重建期望通常通过采样估计，而高斯 KL 项可以解析计算。最大化标准 ELBO 等效于：
 - **重建项**↑：编码后解码的输出应尽量接近原始输入
 - **KL 项**↓：编码器输出的分布应尽量接近先验 $\mathcal{N}(0, I)$
 
@@ -109,7 +109,7 @@ $\varepsilon$ 是与参数无关的随机噪声，梯度现在可以通过 $\mu$
 
 两个关键设计：
 1. **双头输出**：编码器用两个独立的 Linear 层分别输出 $\mu$ 和 $\log\sigma^2$（而不是 $\sigma^2$，数值更稳定）
-2. **KL 权重**：损失函数中 KL 项乘以很小的权重（0.00025），防止 KL 项过强导致「后验崩溃」
+2. **KL 权重**：本项目将 KL 项乘以很小的权重（0.00025），优化的是加权 VAE 目标，而非标准 ELBO
 
 ---
 

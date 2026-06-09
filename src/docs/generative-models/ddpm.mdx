@@ -14,7 +14,7 @@ import FormulaCode from '@site/src/components/FormulaCode';
 
 :::tip 本章要点
 - 理解**前向过程**：如何用固定方差逐步给图像加噪
-- 推导**训练目标**：为什么训练网络预测噪声等价于优化 ELBO
+- 推导**训练目标**：如何从变分下界得到常用的噪声预测目标
 - 掌握**逆向采样**：从纯噪声逐步去噪生成图像
 - 读懂 [`dldemos/ddpm/ddpm.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddpm/ddpm.py) 和 [`dldemos/ddpm/network.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddpm/network.py)
 :::
@@ -72,7 +72,7 @@ $$
 \mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar\alpha_t}}\,\varepsilon_\theta(x_t, t)\right)
 $$
 
-其中 $\varepsilon_\theta(x_t, t)$ 是网络预测的噪声。最终训练目标简化为：
+其中 $\varepsilon_\theta(x_t, t)$ 是网络预测的噪声。实践中常用重新加权后的简化目标：
 
 $$
 \mathcal{L} = \mathbb{E}_{x_0, \varepsilon, t}\!\left[\left\|\varepsilon - \varepsilon_\theta(x_t, t)\right\|^2\right]
@@ -270,7 +270,7 @@ for x_0 in dataloader:
 
 | 超参数 | 值 | 说明 |
 |--------|-----|------|
-| `n_steps` | 100 | 扩散步数（论文用 1000，此处精简）|
+| `n_steps` | 1000 | 扩散步数 |
 | `min_beta` | 0.0001 | 噪声调度起始值 |
 | `max_beta` | 0.02 | 噪声调度终止值 |
 | 网络配置 | `unet_res_cfg` | UNet + 残差连接 |

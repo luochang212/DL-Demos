@@ -28,7 +28,7 @@ class MaskConv2d(nn.Module):
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, h, bn=True):
+    def __init__(self, h, bn=False):
         super().__init__()
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv2d(2 * h, h, 1)
@@ -54,8 +54,11 @@ class ResidualBlock(nn.Module):
 
 class PixelCNN(nn.Module):
 
-    def __init__(self, n_blocks, h, linear_dim, bn=True, color_level=256):
+    def __init__(self, n_blocks, h, linear_dim, bn=False, color_level=256):
         super().__init__()
+        if bn:
+            raise ValueError(
+                'BatchNorm leaks future pixels and cannot be used in PixelCNN')
         self.conv1 = MaskConv2d('A', 1, 2 * h, 7, 1, 3)
         self.bn1 = nn.BatchNorm2d(2 * h) if bn else nn.Identity()
         self.residual_blocks = nn.ModuleList()
@@ -121,7 +124,7 @@ class HorizontalMaskConv2d(nn.Module):
 
 class GatedBlock(nn.Module):
 
-    def __init__(self, conv_type, in_channels, p, bn=True):
+    def __init__(self, conv_type, in_channels, p, bn=False):
         super().__init__()
         self.conv_type = conv_type
         self.p = p
@@ -164,8 +167,11 @@ class GatedBlock(nn.Module):
 
 class GatedPixelCNN(nn.Module):
 
-    def __init__(self, n_blocks, p, linear_dim, bn=True, color_level=256):
+    def __init__(self, n_blocks, p, linear_dim, bn=False, color_level=256):
         super().__init__()
+        if bn:
+            raise ValueError(
+                'BatchNorm leaks future pixels and cannot be used in PixelCNN')
         self.block1 = GatedBlock('A', 1, p, bn)
         self.blocks = nn.ModuleList()
         for _ in range(n_blocks):

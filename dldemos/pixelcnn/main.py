@@ -71,8 +71,8 @@ def sample(model, device, model_path, output_path, n_sample=81):
 
 
 models = [
-    PixelCNN(15, 128, 32, True, color_level),
-    GatedPixelCNN(15, 128, 32, True, color_level)
+    PixelCNN(15, 128, 32, False, color_level),
+    GatedPixelCNN(15, 128, 32, False, color_level)
 ]
 
 if __name__ == '__main__':

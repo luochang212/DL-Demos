@@ -11,7 +11,7 @@ keywords: [DDIM, 扩散模型, 加速采样, 隐式模型, ODE, 生成模型]
 :::tip 本章要点
 - 理解 DDIM 与 DDPM 的核心差异：**非马尔可夫逆向过程**
 - 掌握 **子序列采样**：用 20 步跳步采样达到 1000 步的效果
-- 理解 **eta 参数**：$\eta=0$ 确定性采样，$\eta=1$ 退化为 DDPM
+- 理解 **eta 参数**：$\eta=0$ 确定性采样；使用完整相邻时间步时，$\eta=1$ 对应 DDPM
 - 读懂 [`dldemos/ddim/ddim.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddim/ddim.py) 的 57 行实现
 :::
 
@@ -54,7 +54,7 @@ $$
 $$
 
 - **$\eta = 0$**：第三项消失，变成确定性 ODE 采样——同样的起点一定生成同样的图像
-- **$\eta = 1$**：退化为 DDPM 的马尔可夫采样
+- **$\eta = 1$**：使用完整、相邻的时间步序列时，对应 DDPM 的马尔可夫采样；跳步采样时不等价于原始的完整 DDPM 采样
 
 这就是代码中 `first_term` / `second_term` / `third_term` 的来源。
 
@@ -100,8 +100,8 @@ class DDIM(DDPM):
                                     dtype=torch.long).to(device).unsqueeze(1)
             eps = net(x, t_tensor)
             # key-start
-            # eta 控制的方差（与 DDPM 的 simple_var 对应）
-            var = eta * (1 - ab_prev) / (1 - ab_cur) * (1 - ab_cur / ab_prev)
+            # eta 控制的标准 DDIM 方差
+            var = eta**2 * (1 - ab_prev) / (1 - ab_cur) * (1 - ab_cur / ab_prev)
 
             # 三项更新公式，与论文公式一一对应
             first_term  = (ab_prev / ab_cur)**0.5 * x
@@ -122,12 +122,16 @@ class DDIM(DDPM):
 | 维度 | DDPM | DDIM |
 |------|------|------|
 | 逆向过程 | 马尔可夫，严格 $x_t → x_{t-1}$ | 非马尔可夫，跳步 $x_{\tau_i} → x_{\tau_{i-1}}$ |
-| 采样步数 | 1000 步（不可跳） | 20 步（可调 `ddim_step`）|
-| 随机性 | 每步都加随机噪声 | $\eta$ 控制：0=确定性，1=等价 DDPM |
+| 采样步数 | 标准采样使用全部 1000 步 | 20 步（可调 `ddim_step`）|
+| 随机性 | 除最后一步外加入随机噪声 | $\eta$ 控制：0=确定性；完整相邻时间步下，1 对应 DDPM |
 | 训练方式 | 完全相同 | **完全相同**（只改采样，不改训练）|
 | 生成速度 | 慢 | 快 50×（20步 vs 1000步）|
 
 **关键结论**：DDIM 不需要重新训练模型。任何 DDPM 训练好的权重都可以直接用 DDIM 采样——只需把 `sample_backward` 替换为 DDIM 版本。
+
+:::warning 项目中的 `simple_var`
+源码默认参数 `simple_var=True` 是项目提供的简化方差模式：它会强制 `eta=1`，并使用与标准 DDIM 公式不同的噪声方差。要使用本节介绍的标准 $\eta$ 控制，请传入 `simple_var=False`。
+:::
 
 ---
 

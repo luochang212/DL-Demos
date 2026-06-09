@@ -5,7 +5,7 @@ from dldemos.pixelcnn.model import GatedBlock, GatedPixelCNN
 
 class PixelCNNWithEmbedding(GatedPixelCNN):
 
-    def __init__(self, n_blocks, p, linear_dim, bn=True, color_level=256):
+    def __init__(self, n_blocks, p, linear_dim, bn=False, color_level=256):
         super().__init__(n_blocks, p, linear_dim, bn, color_level)
         self.embedding = nn.Embedding(color_level, p)
         self.block1 = GatedBlock('A', p, p, bn)

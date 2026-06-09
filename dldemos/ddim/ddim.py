@@ -41,7 +41,8 @@ class DDIM(DDPM):
             t_tensor = torch.tensor([cur_t] * batch_size,
                                     dtype=torch.long).to(device).unsqueeze(1)
             eps = net(x, t_tensor)
-            var = eta * (1 - ab_prev) / (1 - ab_cur) * (1 - ab_cur / ab_prev)
+            var = eta**2 * (1 - ab_prev) / (1 - ab_cur) * (
+                1 - ab_cur / ab_prev)
             noise = torch.randn_like(x)
 
             first_term = (ab_prev / ab_cur)**0.5 * x

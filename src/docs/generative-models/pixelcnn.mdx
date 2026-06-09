@@ -36,13 +36,13 @@ $$
 
 ### 2.1 条件概率链
 
-对于灰度图像（256 个颜色等级），每个像素 $x_i$ 的条件分布是 256 类的分类分布：
+对于量化为 `color_level` 个颜色等级的灰度图像，每个像素 $x_i$ 的条件分布是 `color_level` 类的分类分布：
 
 $$
 p(x_i \mid x_{<i}) = \text{Categorical}(\pi_i), \quad \pi_i = f_\theta(x_{<i})
 $$
 
-网络 $f_\theta$ 输入已生成的所有像素，输出 256 维的 softmax 概率。
+网络 $f_\theta$ 输入已生成的所有像素，输出 `color_level` 维的 softmax 概率。标准灰度建模通常使用 256 类；本项目入口默认使用 8 类以降低演示训练成本。
 
 ### 2.2 掩码卷积
 
@@ -72,6 +72,10 @@ Gated PixelCNN 用**双分支结构**解决：
 - 垂直栈的信息通过 1×1 卷积注入水平栈
 
 同时引入**门控激活**（$\tanh \odot \sigma$），比 ReLU 更适合建模像素间复杂依赖。
+
+:::warning 不要使用 BatchNorm
+自回归模型不能使用跨空间位置统计均值和方差的 BatchNorm，否则当前位置会通过统计量间接读取未来像素。本项目的 PixelCNN 因此固定禁用 BatchNorm。
+:::
 
 ---
 
@@ -111,7 +115,7 @@ class MaskConv2d(nn.Module):
 ```python title="dldemos/pixelcnn/model.py" showLineNumbers
 class GatedBlock(nn.Module):
 
-    def __init__(self, conv_type, in_channels, p, bn=True):
+    def __init__(self, conv_type, in_channels, p, bn=False):
         super().__init__()
         self.conv_type = conv_type
         self.p = p
@@ -157,14 +161,14 @@ class GatedBlock(nn.Module):
 <Tabs>
   <TabItem value="loss" label="损失函数" default>
 
-分类交叉熵损失，对每个像素的 256 类分布计算：
+分类交叉熵损失，对每个像素的 `color_level` 类分布计算：
 
 ```python
 # 每个像素独立计算交叉熵，再求平均
 loss = F.cross_entropy(output, target)
 ```
 
-其中 `output` 形状为 `(N, 256, H, W)`，`target` 形状为 `(N, H, W)`（像素值 0-255 作为类别索引）。
+其中 `output` 形状为 `(N, color_level, H, W)`，`target` 形状为 `(N, H, W)`，量化后的像素值作为类别索引。
 
   </TabItem>
   <TabItem value="hyperparams" label="超参数">
@@ -174,7 +178,7 @@ loss = F.cross_entropy(output, target)
 | `n_blocks` | 可调 | 残差/门控块数量 |
 | `h` / `p` | 可调 | 隐藏通道数（PixelCNN 用 `2h`，Gated 用 `2p`）|
 | `linear_dim` | 可调 | 输出前两层 1×1 卷积通道数 |
-| `color_level` | 256 | 颜色级别（灰度图像）|
+| `color_level` | 8 | 演示入口的默认颜色级别；可设置为 2 到 256 |
 | 数据集 | MNIST | 28×28 单通道 |
 
   </TabItem>

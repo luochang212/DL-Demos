@@ -171,7 +171,7 @@ if __name__ == '__main__':
     vqvae = VQVAE(img_shape[0], cfg['dim'], cfg['n_embedding'])
     gen_model = PixelCNNWithEmbedding(cfg['pixelcnn_n_blocks'],
                                       cfg['pixelcnn_dim'],
-                                      cfg['pixelcnn_linear_dim'], True,
+                                      cfg['pixelcnn_linear_dim'], False,
                                       cfg['n_embedding'])
     # 1. Train VQVAE
     train_vqvae(vqvae,
