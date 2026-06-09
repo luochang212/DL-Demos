@@ -39,7 +39,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          routeBasePath: 'docs',
+          routeBasePath: '/',
           remarkPlugins: [remarkMath],
           rehypePlugins: [rehypeKatex],
         },
@@ -58,7 +58,7 @@ const config = {
         hashed: true,
         language: ['zh', 'en'],
         highlightSearchTermsOnTargetPage: true,
-        docsRouteBasePath: '/docs',
+        docsRouteBasePath: '/',
       },
     ],
   ],
@@ -93,7 +93,7 @@ const config = {
           {
             title: '教程系列',
             items: [
-              { label: '生成模型', to: '/docs/generative-models/vae' },
+              { label: '生成模型', to: '/generative-models/vae' },
             ],
           },
           {
