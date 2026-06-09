@@ -1,0 +1,45 @@
+/* ── 品牌色（蓝紫，科技感）──────────────────────────────────── */
+:root {
+  --ifm-color-primary: #5c6ac4;
+  --ifm-color-primary-dark: #4959bd;
+  --ifm-color-primary-darker: #4051b9;
+  --ifm-color-primary-darkest: #3343a3;
+  --ifm-color-primary-light: #6f7bcb;
+  --ifm-color-primary-lighter: #7884ce;
+  --ifm-color-primary-lightest: #9aa2dc;
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #8b96d9;
+  --ifm-color-primary-dark: #6e7cd0;
+  --ifm-color-primary-darker: #6070cc;
+  --ifm-color-primary-darkest: #3a50bb;
+  --ifm-color-primary-light: #a8b0e2;
+  --ifm-color-primary-lighter: #b6bce7;
+  --ifm-color-primary-lightest: #d2d6f1;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.12);
+}
+
+/* ── 自定义"关键行"橙色高亮 ──────────────────────────────────── */
+.code-block-key-line {
+  background-color: rgba(255, 165, 0, 0.15);
+  display: block;
+  margin: 0 calc(-1 * var(--ifm-pre-padding));
+  padding: 0 var(--ifm-pre-padding);
+  border-left: 3px solid #ff8c00;
+}
+
+/* ── KaTeX 公式块：横向溢出时滚动 ────────────────────────────── */
+.math-display {
+  overflow-x: auto;
+}
+
+/* ── 代码块标题美化 ───────────────────────────────────────────── */
+.docusaurus-highlight-code-line {
+  background-color: rgba(0, 0, 255, 0.08);
+  display: block;
+  margin: 0 calc(-1 * var(--ifm-pre-padding));
+  padding: 0 var(--ifm-pre-padding);
+}

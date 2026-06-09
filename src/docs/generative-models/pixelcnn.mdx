@@ -1,0 +1,190 @@
+---
+id: pixelcnn
+title: PixelCNN — 自回归像素生成
+sidebar_label: 4. PixelCNN
+description: 理解自回归图像生成模型的条件概率分解，掌握掩码卷积和门控激活的设计，并逐行解析 PyTorch 实现。
+keywords: [PixelCNN, 自回归, 掩码卷积, Gated PixelCNN, 生成模型]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# PixelCNN — 自回归像素生成
+
+:::tip 本章要点
+- 理解**自回归分解**：把图像生成拆解为像素级的条件概率链
+- 掌握**掩码卷积**（A 型/B 型）：如何让卷积只「看到」已生成的像素
+- 理解**门控激活**：Gated PixelCNN 如何解决盲点问题
+- 读懂 [`dldemos/pixelcnn/model.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/pixelcnn/model.py) 的实现
+:::
+
+---
+
+## 1. 核心思想
+
+自回归模型把图像的联合概率分解为像素级的条件概率链：
+
+$$
+p(x) = \prod_{i=1}^{n} p(x_i \mid x_{<i})
+$$
+
+按照光栅扫描顺序（从左到右，从上到下），逐个像素地预测下一个像素的值。已生成的像素作为条件，未生成的像素必须被「遮住」。
+
+---
+
+## 2. 数学原理
+
+### 2.1 条件概率链
+
+对于灰度图像（256 个颜色等级），每个像素 $x_i$ 的条件分布是 256 类的分类分布：
+
+$$
+p(x_i \mid x_{<i}) = \text{Categorical}(\pi_i), \quad \pi_i = f_\theta(x_{<i})
+$$
+
+网络 $f_\theta$ 输入已生成的所有像素，输出 256 维的 softmax 概率。
+
+### 2.2 掩码卷积
+
+普通卷积会「偷看」未来像素，违反自回归约束。**掩码卷积**通过将卷积核的一半权重置零来解决这个问题：
+
+- **A 型掩码**：遮住当前像素自身——只允许看到严格在之前的像素。用于网络的第一层
+- **B 型掩码**：允许看到当前像素——用于后续层，保证信息流不会衰减
+
+```
+A 型掩码（5×5）         B 型掩码（5×5）
+┌─────────────┐         ┌─────────────┐
+│ 1  1  1  1  1│         │ 1  1  1  1  1│
+│ 1  1  1  1  1│         │ 1  1  1  1  1│
+│ 1  1  0  0  0│         │ 1  1  1  0  0│  ← 中心像素可见
+│ 0  0  0  0  0│         │ 0  0  0  0  0│
+│ 0  0  0  0  0│         │ 0  0  0  0  0│
+└─────────────┘         └─────────────┘
+```
+
+### 2.3 Gated PixelCNN 的改进
+
+原始 PixelCNN 有**盲点问题**：由于使用 5×7 控制掩码，某些「上方但偏右」的像素位置无法被看到。
+
+Gated PixelCNN 用**双分支结构**解决：
+- **垂直栈**：只看当前行上方（3×3 控制掩码，无盲点）
+- **水平栈**：只看当前行左侧（1×3 控制掩码）
+- 垂直栈的信息通过 1×1 卷积注入水平栈
+
+同时引入**门控激活**（$\tanh \odot \sigma$），比 ReLU 更适合建模像素间复杂依赖。
+
+---
+
+## 3. 代码解析
+
+### 3.1 掩码卷积
+
+```python title="dldemos/pixelcnn/model.py" showLineNumbers
+class MaskConv2d(nn.Module):
+
+    def __init__(self, conv_type, *args, **kwags):
+        super().__init__()
+        assert conv_type in ('A', 'B')
+        self.conv = nn.Conv2d(*args, **kwags)
+        H, W = self.conv.weight.shape[-2:]
+        mask = torch.zeros((H, W), dtype=torch.float32)
+        # key-start
+        # 上半行全部可见（所有「之前」的像素）
+        mask[0:H // 2] = 1
+        # 当前行左半部分可见
+        mask[H // 2, 0:W // 2] = 1
+        # B 型额外允许看到中心像素（自身）
+        if conv_type == 'B':
+            mask[H // 2, W // 2] = 1
+        # key-end
+        mask = mask.reshape((1, 1, H, W))
+        self.register_buffer('mask', mask, False)
+
+    def forward(self, x):
+        # 掩码直接乘到权重上（不参与梯度更新）
+        self.conv.weight.data *= self.mask
+        return self.conv(x)
+```
+
+### 3.2 门控块（GatedBlock）
+
+```python title="dldemos/pixelcnn/model.py" showLineNumbers
+class GatedBlock(nn.Module):
+
+    def __init__(self, conv_type, in_channels, p, bn=True):
+        super().__init__()
+        self.conv_type = conv_type
+        self.p = p
+        # 垂直栈卷积（只看上方）
+        self.v_conv = VerticalMaskConv2d(in_channels, 2 * p, 3, 1, 1)
+        # 垂直→水平的信息注入（1×1 卷积）
+        self.v_to_h_conv = nn.Conv2d(2 * p, 2 * p, 1)
+        # 水平栈卷积（只看左侧）
+        self.h_conv = HorizontalMaskConv2d(conv_type, in_channels, 2 * p, 3, 1, 1)
+        self.h_output_conv = nn.Conv2d(p, p, 1)
+
+    def forward(self, v_input, h_input):
+        v = self.v_conv(v_input)
+        # key-start
+        # 垂直→水平的信息注入：截断最后一行并下移一行
+        # 这是为了让水平栈「看到」上方行的信息
+        v_to_h = v[:, :, 0:-1]
+        v_to_h = F.pad(v_to_h, (0, 0, 1, 0))
+        v_to_h = self.v_to_h_conv(v_to_h)
+        # key-end
+
+        # 门控激活：tanh ⊙ sigmoid（分别从 2p 通道拆成两半）
+        v1, v2 = v[:, :self.p], v[:, self.p:]
+        v = torch.tanh(v1) * torch.sigmoid(v2)
+
+        h = self.h_conv(h_input)
+        h = h + v_to_h  # 注入垂直信息
+        h1, h2 = h[:, :self.p], h[:, self.p:]
+        h = torch.tanh(h1) * torch.sigmoid(h2)
+        h = self.h_output_conv(h)
+        # key-start
+        # B 型残差连接：水平栈在 B 型时可以加上自身输入
+        if self.conv_type == 'B':
+            h = h + h_input
+        # key-end
+        return v, h
+```
+
+---
+
+## 4. 训练细节
+
+<Tabs>
+  <TabItem value="loss" label="损失函数" default>
+
+分类交叉熵损失，对每个像素的 256 类分布计算：
+
+```python
+# 每个像素独立计算交叉熵，再求平均
+loss = F.cross_entropy(output, target)
+```
+
+其中 `output` 形状为 `(N, 256, H, W)`，`target` 形状为 `(N, H, W)`（像素值 0-255 作为类别索引）。
+
+  </TabItem>
+  <TabItem value="hyperparams" label="超参数">
+
+| 超参数 | 值 | 说明 |
+|--------|-----|------|
+| `n_blocks` | 可调 | 残差/门控块数量 |
+| `h` / `p` | 可调 | 隐藏通道数（PixelCNN 用 `2h`，Gated 用 `2p`）|
+| `linear_dim` | 可调 | 输出前两层 1×1 卷积通道数 |
+| `color_level` | 256 | 颜色级别（灰度图像）|
+| 数据集 | MNIST | 28×28 单通道 |
+
+  </TabItem>
+</Tabs>
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [PixelCNN++（Salimans et al., 2017）](https://arxiv.org/abs/1701.00105)
+- 📄 [Gated PixelCNN（van den Oord et al., 2016）](https://arxiv.org/abs/1606.05328)
+- 🔗 [本章源码：`dldemos/pixelcnn/`](https://github.com/SingleZombie/DL-Demos/tree/master/dldemos/pixelcnn)
+- ➡️ **下一章**：[VQVAE — 向量量化变分自编码器](./vqvae)（其中 PixelCNN 作为先验模型，原理见本章）

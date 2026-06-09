@@ -1,0 +1,127 @@
+.formulaCodeContainer {
+  margin: 1.5rem 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ── 公式区域 ─────────────────────────────────────────── */
+.formulaArea {
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  background: var(--ifm-color-emphasis-50, #f8f9fa);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  min-height: 3.5rem;
+}
+
+[data-theme='dark'] .formulaArea {
+  background: var(--ifm-color-emphasis-100, #1b1b1d);
+}
+
+.formulaPrefix {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.1em;
+}
+
+.formulaPartWrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  margin: 0 1px;
+}
+
+.formulaPart {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: background 0.2s ease;
+}
+
+.formulaPartActive {
+  background: rgba(92, 106, 196, 0.12);
+}
+
+[data-theme='dark'] .formulaPartActive {
+  background: rgba(139, 150, 217, 0.15);
+}
+
+/* ── Tooltip ──────────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ifm-color-emphasis-900);
+  color: white;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.tooltipVisible {
+  opacity: 1;
+}
+
+/* ── 代码区域 ─────────────────────────────────────────── */
+.codeArea {
+  margin: 0;
+}
+
+.codeTitle {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+[data-theme='dark'] .codeTitle {
+  color: var(--ifm-color-emphasis-500);
+}
+
+.codeBlock {
+  padding: 0.75rem 0;
+  margin: 0;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: var(--ifm-code-font-size);
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.codeLine {
+  display: block;
+  padding: 0 1rem;
+  min-height: 1.5em;
+  transition: background 0.15s ease;
+}
+
+.codeLineActive {
+  background: var(--docusaurus-highlighted-code-line-bg);
+  box-shadow: inset 3px 0 0 0 var(--ifm-color-primary);
+}
+
+/* ── 连接指示器 ───────────────────────────────────────── */
+.connector {
+  height: 2px;
+  background: var(--ifm-color-primary);
+  margin: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.connectorVisible {
+  opacity: 0.5;
+}

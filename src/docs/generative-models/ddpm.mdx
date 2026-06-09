@@ -1,0 +1,291 @@
+---
+id: ddpm
+title: DDPM — 去噪扩散概率模型
+sidebar_label: 2. DDPM
+description: 理解扩散模型的前向加噪与逆向去噪过程，掌握 DDPM 的训练目标和采样算法，并逐行解析 PyTorch 实现。
+keywords: [DDPM, 扩散模型, 去噪, UNet, 生成模型, score matching]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import FormulaCode from '@site/src/components/FormulaCode';
+
+# DDPM — 去噪扩散概率模型
+
+:::tip 本章要点
+- 理解**前向过程**：如何用固定方差逐步给图像加噪
+- 推导**训练目标**：为什么训练网络预测噪声等价于优化 ELBO
+- 掌握**逆向采样**：从纯噪声逐步去噪生成图像
+- 读懂 [`dldemos/ddpm/ddpm.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/ddpm/ddpm.py) 和 [`dldemos/ddpm/network.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/ddpm/network.py)
+:::
+
+---
+
+## 1. 核心思想
+
+扩散模型的设计灵感来自非平衡热力学：
+
+- **前向过程**：逐步给图像添加高斯噪声，最终变成纯噪声
+- **逆向过程**：学习如何从噪声中一步步恢复出图像
+
+关键洞察：如果我们能训练一个网络精确预测每一步添加的噪声，就能从纯噪声出发逐步去噪，生成全新图像。
+
+---
+
+## 2. 数学原理
+
+### 2.1 前向过程
+
+给定干净图像 $x_0$，定义 $T$ 步马尔可夫链：
+
+$$
+q(x_t \mid x_{t-1}) = \mathcal{N}(x_t;\, \sqrt{1 - \beta_t}\, x_{t-1},\, \beta_t I)
+$$
+
+其中 $\beta_t$ 是预先设定的噪声调度（线性从 $\beta_{\min}$ 到 $\beta_{\max}$）。
+
+令 $\alpha_t = 1 - \beta_t$，$\bar{\alpha}_t = \prod_{s=1}^{t}\alpha_s$，则可以**一步**从 $x_0$ 得到任意时刻的 $x_t$：
+
+$$
+q(x_t \mid x_0) = \mathcal{N}(x_t;\, \sqrt{\bar\alpha_t}\, x_0,\, (1 - \bar\alpha_t) I)
+$$
+
+即：
+
+$$
+x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1 - \bar\alpha_t}\, \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
+$$
+
+这就是代码中 `sample_forward` 的公式。
+
+### 2.2 训练目标
+
+逆向过程定义为：
+
+$$
+p_\theta(x_{t-1} \mid x_t) = \mathcal{N}(x_{t-1};\, \mu_\theta(x_t, t),\, \sigma_t^2 I)
+$$
+
+DDPM 证明了，当 $\beta_t$ 足够小时，最优均值可以表示为：
+
+$$
+\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar\alpha_t}}\,\varepsilon_\theta(x_t, t)\right)
+$$
+
+其中 $\varepsilon_\theta(x_t, t)$ 是网络预测的噪声。最终训练目标简化为：
+
+$$
+\mathcal{L} = \mathbb{E}_{x_0, \varepsilon, t}\!\left[\left\|\varepsilon - \varepsilon_\theta(x_t, t)\right\|^2\right]
+$$
+
+即：**让网络预测添加的噪声 $\varepsilon$**。训练时随机采样 $t$ 和 $\varepsilon$，构造 $x_t$，然后让网络从 $x_t$ 预测 $\varepsilon$。
+
+### 2.3 逆向采样
+
+从 $x_T \sim \mathcal{N}(0, I)$ 出发，每一步：
+
+$$
+x_{t-1} = \mu_\theta(x_t, t) + \sigma_t\, z, \quad z \sim \mathcal{N}(0, I)
+$$
+
+代码实现了两种方差选择：
+- **simple_var=True**：$\sigma_t^2 = \beta_t$（固定方差）
+- **simple_var=False**：$\sigma_t^2 = \frac{1 - \bar\alpha_{t-1}}{1 - \bar\alpha_t}\,\beta_t$（后验方差）
+
+---
+
+## 3. 模型架构
+
+本项目提供两种去噪网络：
+
+```
+输入: 噪声图像 x_t (1, 28, 28) + 时间步 t
+      │
+      ▼
+ ┌──────────────────────────────────────────┐
+ │              ConvNet                      │
+ │  Conv+BN+ReLU × N → 时间嵌入注入 → 输出   │
+ │  轻量级，适合 MNIST 快速实验               │
+ └──────────────────────────────────────────┘
+
+ ┌──────────────────────────────────────────┐
+ │              UNet                         │
+ │  编码器: 逐步下采样 + 时间嵌入 + skip连接   │
+ │  中间层: 双层残差块                        │
+ │  解码器: 逐步上采样 + skip拼接 + 时间嵌入   │
+ │  更强表达力，适合复杂图像                   │
+ └──────────────────────────────────────────┘
+      │
+      ▼
+输出: 预测噪声 ε (1, 28, 28)
+```
+
+**时间步嵌入**：使用正弦位置编码将整数时间步 $t$ 映射为向量，注入每一层卷积，让网络知道当前去噪到第几步。
+
+---
+
+## 4. 代码解析
+
+### 4.1 前向扩散系数预计算
+
+```python title="dldemos/ddpm/ddpm.py" showLineNumbers
+class DDPM():
+
+    def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
+        # highlight-start
+        # 线性噪声调度：β 从 min_beta 线性增长到 max_beta
+        betas = torch.linspace(min_beta, max_beta, n_steps).to(device)
+        alphas = 1 - betas
+        # highlight-end
+        # key-start
+        # 累积乘积 ᾱ_t = α_1 × α_2 × ... × α_t
+        alpha_bars = torch.empty_like(alphas)
+        product = 1
+        for i, alpha in enumerate(alphas):
+            product *= alpha
+            alpha_bars[i] = product
+        # key-end
+        self.betas = betas
+        self.alphas = alphas
+        self.alpha_bars = alpha_bars
+        # 预计算 clip_x0 模式的两个系数
+        alpha_prev = torch.empty_like(alpha_bars)
+        alpha_prev[1:] = alpha_bars[0:n_steps - 1]
+        alpha_prev[0] = 1
+        self.coef1 = torch.sqrt(alphas) * (1 - alpha_prev) / (1 - alpha_bars)
+        self.coef2 = torch.sqrt(alpha_prev) * self.betas / (1 - alpha_bars)
+```
+
+### 4.2 一步前向采样（交互式）
+
+:::info 试试看
+Hover 公式中的各个部分，观察对应代码行的高亮；或 hover 代码行，看公式中哪个部分亮起。
+:::
+
+<FormulaCode
+  formulaPrefix="x_t ="
+  formulaParts={[
+    { label: "缩放系数 √ᾱ_t", tex: "\\sqrt{\\bar\\alpha_t}\\," },
+    { label: "原始图像 x₀", tex: "x_0" },
+    { label: "噪声系数 √(1-ᾱ_t)", tex: "+ \\sqrt{1-\\bar\\alpha_t}\\," },
+    { label: "随机噪声 ε", tex: "\\varepsilon" },
+  ]}
+  code={`alpha_bar = self.alpha_bars[t].reshape(-1, 1, 1, 1)
+if eps is None:
+    eps = torch.randn_like(x)
+res = eps * torch.sqrt(1 - alpha_bar) + torch.sqrt(alpha_bar) * x
+return res`}
+  language="python"
+  title="dldemos/ddpm/ddpm.py — sample_forward"
+  mappings={[
+    { partIndex: 0, lines: [3] },
+    { partIndex: 2, lines: [0] },
+    { partIndex: 3, lines: [2] },
+  ]}
+/>
+
+### 4.3 逆向单步去噪
+
+```python title="dldemos/ddpm/ddpm.py" showLineNumbers
+    def sample_backward_step(self, x_t, t, net, simple_var=True, clip_x0=True):
+        n = x_t.shape[0]
+        t_tensor = torch.tensor([t] * n,
+                                dtype=torch.long).to(x_t.device).unsqueeze(1)
+        # 网络预测噪声 ε_θ
+        eps = net(x_t, t_tensor)
+
+        # 方差选择
+        if t == 0:
+            noise = 0
+        else:
+            if simple_var:
+                var = self.betas[t]
+            else:
+                var = (1 - self.alpha_bars[t - 1]) / (
+                    1 - self.alpha_bars[t]) * self.betas[t]
+            noise = torch.randn_like(x_t) * torch.sqrt(var)
+
+        # key-start
+        # clip_x0 模式：先估计 x_0，裁剪到 [-1,1]，再计算均值
+        # 这种方式比直接用 ε 估计均值更稳定
+        if clip_x0:
+            x_0 = (x_t - torch.sqrt(1 - self.alpha_bars[t]) *
+                   eps) / torch.sqrt(self.alpha_bars[t])
+            x_0 = torch.clip(x_0, -1, 1)
+            mean = self.coef1[t] * x_t + self.coef2[t] * x_0
+        # key-end
+        else:
+            mean = (x_t -
+                    (1 - self.alphas[t]) / torch.sqrt(1 - self.alpha_bars[t]) *
+                    eps) / torch.sqrt(self.alphas[t])
+        x_t = mean + noise
+        return x_t
+```
+
+### 4.4 UNet 时间步嵌入
+
+```python title="dldemos/ddpm/network.py" showLineNumbers
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, max_seq_len, d_model):
+        super().__init__()
+        assert d_model % 2 == 0
+        pe = torch.zeros(max_seq_len, d_model)
+        i_seq = torch.linspace(0, max_seq_len - 1, max_seq_len)
+        j_seq = torch.linspace(0, d_model - 2, d_model // 2)
+        pos, two_i = torch.meshgrid(i_seq, j_seq)
+        # key-start
+        # 正弦位置编码：让网络区分不同时间步
+        pe_2i   = torch.sin(pos / 10000**(two_i / d_model))
+        pe_2i_1 = torch.cos(pos / 10000**(two_i / d_model))
+        pe = torch.stack((pe_2i, pe_2i_1), 2).reshape(max_seq_len, d_model)
+        # key-end
+        self.embedding = nn.Embedding(max_seq_len, d_model)
+        self.embedding.weight.data = pe
+        self.embedding.requires_grad_(False)
+```
+
+---
+
+## 5. 训练细节
+
+<Tabs>
+  <TabItem value="loss" label="训练循环" default>
+
+核心训练逻辑：随机采样时间步 $t$，前向加噪，然后让网络预测噪声。
+
+```python title="训练伪代码"
+for x_0 in dataloader:
+    t = torch.randint(0, n_steps, (batch_size,))
+    eps = torch.randn_like(x_0)
+    x_t = ddpm.sample_forward(x_0, t, eps)
+    eps_pred = net(x_t, t)
+    loss = F.mse_loss(eps_pred, eps)
+    loss.backward()
+    optimizer.step()
+```
+
+  </TabItem>
+  <TabItem value="hyperparams" label="超参数">
+
+| 超参数 | 值 | 说明 |
+|--------|-----|------|
+| `n_steps` | 100 | 扩散步数（论文用 1000，此处精简）|
+| `min_beta` | 0.0001 | 噪声调度起始值 |
+| `max_beta` | 0.02 | 噪声调度终止值 |
+| 网络配置 | `unet_res_cfg` | UNet + 残差连接 |
+| 通道数 | `[10, 20, 40, 80]` | UNet 各层通道 |
+| `pe_dim` | 128 | 时间步嵌入维度 |
+| 数据集 | MNIST 28×28 | 单通道手写数字 |
+
+  </TabItem>
+</Tabs>
+
+---
+
+## 6. 延伸阅读
+
+- 📄 [Denoising Diffusion Probabilistic Models（Ho et al., 2020）](https://arxiv.org/abs/2006.11239)
+- 📄 [Understanding Diffusion Models: A Unified Perspective（Luo, 2022）](https://arxiv.org/abs/2208.11970)
+- 🔗 [本章源码：`dldemos/ddpm/`](https://github.com/SingleZombie/DL-Demos/tree/master/dldemos/ddpm)
+- ➡️ **下一章**：[DDIM — 去噪扩散隐式模型](./ddim)

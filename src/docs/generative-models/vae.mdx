@@ -1,0 +1,226 @@
+---
+id: vae
+title: VAE — 变分自编码器
+sidebar_label: 1. VAE
+description: 从隐变量模型出发，理解 VAE 的 ELBO 推导与重参数化技巧，并逐行解析 PyTorch 实现。
+keywords: [VAE, 变分自编码器, ELBO, 重参数化, 生成模型, KL散度]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# VAE — 变分自编码器
+
+:::tip 本章要点
+- 理解**隐变量模型**：为什么普通自编码器不能生成新图像
+- 推导 **ELBO**（证据下界）：最大似然估计的可解析替代目标
+- 掌握**重参数化技巧**：让采样操作可微分
+- 读懂 [`dldemos/VAE/model.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/VAE/model.py) 的核心实现
+:::
+
+---
+
+## 1. 为什么需要 VAE
+
+普通自编码器（AE）将图像 $x$ 压缩到潜在向量 $z$，再解码还原。但隐空间**没有结构**——随机采样一个 $z$ 解码出来往往是噪声，无法生成新图像。
+
+**核心问题**：AE 的编码器只学习了「把特定图像映射到特定点」，而不是「把图像映射到一个有规律的分布」。
+
+**VAE 的解法**：让编码器输出一个**概率分布**（而不是一个点），并要求这个分布尽量接近标准正态 $\mathcal{N}(0, I)$。生成时只需从 $\mathcal{N}(0, I)$ 中采样再解码，自然得到有意义的图像。
+
+---
+
+## 2. 数学原理
+
+### 2.1 生成模型的目标
+
+假设数据 $x$ 由潜在变量 $z$ 生成：
+
+$$
+z \sim p(z) = \mathcal{N}(0, I)
+$$
+
+$$
+x \sim p_\theta(x \mid z)
+$$
+
+训练目标是最大化观测数据的对数似然：
+
+$$
+\log p_\theta(x) = \log \int p_\theta(x \mid z)\, p(z)\, dz
+$$
+
+但这个积分**无法解析**（$z$ 的维度很高）。
+
+### 2.2 引入变分分布，推导 ELBO
+
+引入辅助分布 $q_\phi(z \mid x)$（编码器）来近似真实后验 $p(z \mid x)$，利用 Jensen 不等式推导下界：
+
+$$
+\log p_\theta(x) \geq \underbrace{\mathbb{E}_{q_\phi(z|x)}\!\left[\log p_\theta(x \mid z)\right]}_{\text{重建项}} - \underbrace{D_{\mathrm{KL}}\!\left(q_\phi(z \mid x) \,\|\, p(z)\right)}_{\text{KL 正则项}}
+$$
+
+这个下界称为 **ELBO（Evidence Lower BOund）**。最大化 ELBO 等效于：
+- **重建项**↑：编码后解码的输出应尽量接近原始输入
+- **KL 项**↓：编码器输出的分布应尽量接近先验 $\mathcal{N}(0, I)$
+
+### 2.3 KL 散度的解析形式
+
+当 $q_\phi(z \mid x) = \mathcal{N}(\mu, \sigma^2 I)$ 时，KL 散度有解析式，不需要蒙特卡洛估计：
+
+$$
+D_{\mathrm{KL}}\!\left(\mathcal{N}(\mu, \sigma^2) \,\|\, \mathcal{N}(0,I)\right) = -\frac{1}{2} \sum_{j=1}^{d} \left(1 + \log \sigma_j^2 - \mu_j^2 - \sigma_j^2\right)
+$$
+
+### 2.4 重参数化技巧
+
+从 $q_\phi(z \mid x) = \mathcal{N}(\mu, \sigma^2)$ 采样 $z$ 的操作**不可微**，梯度无法回传到编码器。
+
+重参数化将随机性「外移」：
+
+$$
+z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
+$$
+
+$\varepsilon$ 是与参数无关的随机噪声，梯度现在可以通过 $\mu$ 和 $\sigma$ 正常反传。
+
+---
+
+## 3. 模型架构
+
+本项目的 VAE 针对 **64×64 CelebA 人脸图像**设计：
+
+```
+输入 (3, 64, 64)
+      │
+      ▼  Conv2d × 5，每层 stride=2，通道数 [16, 32, 64, 128, 256]
+      │
+特征图 (256, 2, 2) ── flatten ──► Linear ─┬─► μ     (128维)
+                                           └─► log σ² (128维)
+                                                │
+                                         重参数化 z = μ + σ⊙ε
+                                                │
+                                           Linear + reshape
+                                                │
+      ▼  ConvTranspose2d × 5，逐步上采样回 64×64
+      │
+输出 (3, 64, 64)
+```
+
+两个关键设计：
+1. **双头输出**：编码器用两个独立的 Linear 层分别输出 $\mu$ 和 $\log\sigma^2$（而不是 $\sigma^2$，数值更稳定）
+2. **KL 权重**：损失函数中 KL 项乘以很小的权重（0.00025），防止 KL 项过强导致「后验崩溃」
+
+---
+
+## 4. 代码解析
+
+### 4.1 编码器：双头输出 μ 和 log σ²
+
+```python title="dldemos/VAE/model.py" showLineNumbers
+class VAE(nn.Module):
+
+    def __init__(self, hiddens=[16, 32, 64, 128, 256], latent_dim=128) -> None:
+        super().__init__()
+        # highlight-start
+        # 编码器：5 层 Conv2d，每层 stride=2，空间分辨率减半
+        prev_channels = 3
+        modules = []
+        img_length = 64
+        for cur_channels in hiddens:
+            modules.append(
+                nn.Sequential(
+                    nn.Conv2d(prev_channels, cur_channels,
+                              kernel_size=3, stride=2, padding=1),
+                    nn.BatchNorm2d(cur_channels),
+                    nn.ReLU()))
+            prev_channels = cur_channels
+            img_length //= 2
+        self.encoder = nn.Sequential(*modules)
+        # highlight-end
+        self.flatten_dim = prev_channels * img_length * img_length
+        # key-start
+        # 两个独立 Linear 头：分别预测均值 μ 和对数方差 log σ²
+        # 用 log σ² 而非 σ²：避免 σ² 出现负数，数值更稳定
+        self.mean_linear = nn.Linear(self.flatten_dim, latent_dim)
+        self.var_linear  = nn.Linear(self.flatten_dim, latent_dim)
+        # key-end
+        self.latent_dim = latent_dim
+```
+
+### 4.2 重参数化采样（forward 核心）
+
+```python title="dldemos/VAE/model.py" showLineNumbers
+    def forward(self, x):
+        # 编码
+        encoded = self.encoder(x)
+        encoded = torch.flatten(encoded, 1)
+        mean   = self.mean_linear(encoded)
+        logvar = self.var_linear(encoded)
+        # key-start
+        # 重参数化：z = ε * σ + μ，ε ~ N(0, I)
+        # ε 与参数无关，梯度可以通过 mean 和 std 反传
+        eps = torch.randn_like(logvar)
+        std = torch.exp(logvar / 2)   # log σ² / 2 = log σ，exp 得 σ
+        z   = eps * std + mean
+        # key-end
+        # 解码
+        x = self.decoder_projection(z)
+        x = torch.reshape(x, (-1, *self.decoder_input_chw))
+        decoded = self.decoder(x)
+        return decoded, mean, logvar
+```
+
+### 4.3 生成采样（推断时用，不需要编码器）
+
+```python title="dldemos/VAE/model.py" showLineNumbers
+    def sample(self, device='cuda'):
+        # highlight-next-line
+        z = torch.randn(1, self.latent_dim).to(device)  # 直接从先验 N(0,I) 采样
+        x = self.decoder_projection(z)
+        x = torch.reshape(x, (-1, *self.decoder_input_chw))
+        decoded = self.decoder(x)
+        return decoded
+```
+
+---
+
+## 5. 训练细节
+
+<Tabs>
+  <TabItem value="loss" label="损失函数" default>
+
+```python title="dldemos/VAE/main.py"
+def loss_fn(y, y_hat, mean, logvar):
+    # 重建损失：MSE（像素级 L2）
+    recons_loss = F.mse_loss(y_hat, y)
+    # KL 散度解析式（对 latent_dim 求和，再对 batch 取均值）
+    kl_loss = torch.mean(
+        -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0)
+    # kl_weight=0.00025：KL 项权重很小，防止"后验崩溃"
+    loss = recons_loss + kl_loss * kl_weight
+    return loss
+```
+
+  </TabItem>
+  <TabItem value="hyperparams" label="超参数">
+
+| 超参数 | 值 | 说明 |
+|--------|-----|------|
+| `latent_dim` | 128 | 隐空间维度 |
+| `hiddens` | `[16, 32, 64, 128, 256]` | 编解码器各层通道数 |
+| `lr` | 0.005 | Adam 学习率 |
+| `kl_weight` | 0.00025 | KL 散度权重 |
+| `n_epochs` | 10 | 训练轮数 |
+| 数据集 | CelebA 64×64 | 需自行下载 |
+
+  </TabItem>
+</Tabs>
+
+---
+
+## 6. 延伸阅读
+
+- 📄 [Auto-Encoding Variational Bayes（Kingma & Welling，2013）](https://arxiv.org/abs/1312.6114)
+- 🔗 [本章源码：`dldemos/VAE/`](https://github.com/SingleZombie/DL-Demos/tree/master/dldemos/VAE)
+- ➡️ **下一章**：[DDPM — 去噪扩散概率模型](./ddpm)

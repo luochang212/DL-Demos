@@ -1,0 +1,223 @@
+---
+id: vqvae
+title: VQVAE — 向量量化变分自编码器
+sidebar_label: 5. VQVAE
+description: 理解离散隐空间与码本学习的原理，掌握直通梯度估计和三段损失函数，并逐行解析 PyTorch 实现。
+keywords: [VQVAE, 向量量化, codebook, 离散隐空间, 直通梯度, 生成模型]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# VQVAE — 向量量化变分自编码器
+
+:::tip 本章要点
+- 理解**离散隐空间**：为什么 VAE 的连续隐空间不够好
+- 掌握**码本（Codebook）**：用有限个向量近似编码器输出
+- 理解**直通梯度估计**：绕过不可微的量化操作
+- 掌握**三段损失函数**：重建损失 + 嵌入损失 + 承诺损失
+- 读懂 [`dldemos/VQVAE/model.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/VQVAE/model.py)
+:::
+
+:::info 前置知识
+本章的先验模型使用 PixelCNN，其原理请参考 [PixelCNN 章节](./pixelcnn)。
+:::
+
+---
+
+## 1. 为什么需要离散隐空间
+
+VAE 的隐空间是连续的——编码器输出实数向量 $z \in \mathbb{R}^d$。这有两个问题：
+
+1. **后验崩溃**：当解码器太强时，编码器会「偷懒」，让所有 $z$ 都接近同一个点，隐空间丧失表达能力
+2. **无法做先验建模**：连续空间上的先验 $p(z)$ 是高斯分布，信息量有限
+
+VQVAE 的解法：把隐空间**离散化**。编码器输出仍然是连续向量 $z_e$，但被强制映射到码本中的最近邻 $z_q$——一个有限集合 $\{e_1, e_2, ..., e_K\}$ 中的某个向量。
+
+这样先验建模变成在 $K$ 个离散 token 上的分类问题，可以用 PixelCNN 直接建模。
+
+---
+
+## 2. 数学原理
+
+### 2.1 向量量化（VQ）
+
+给定编码器输出 $z_e(x)$ 和码本 $\mathcal{E} = \{e_k\}_{k=1}^K$，量化操作：
+
+$$
+z_q(x) = e_k, \quad k = \arg\min_j \|z_e(x) - e_j\|_2
+$$
+
+解码器接收量化后的 $z_q$（而非原始 $z_e$）作为输入。
+
+### 2.2 直通梯度估计
+
+$\arg\min$ 操作不可微——梯度无法通过量化步骤回传到编码器。
+
+直通梯度估计的解法：前向传播用 $z_q$，反向传播假装量化没有发生，梯度直接从 $z_q$ 「抄送」到 $z_e$：
+
+$$
+\text{decoder\_input} = z_e + (z_q - z_e).\text{detach}()
+$$
+
+- 前向传播：`.detach()` 不影响值，`z_e + (z_q - z_e) = z_q`
+- 反向传播：`(z_q - z_e).detach()` 的梯度为零，所以梯度只流过 $z_e$
+
+### 2.3 三段损失函数
+
+$$
+\mathcal{L} = \underbrace{\|x - D(z_q)\|_2^2}_{\text{重建损失}} + \underbrace{\|z_e - \text{sg}[z_q]\|_2^2}_{\text{承诺损失}} + \underbrace{\beta\|z_q - \text{sg}[z_e]\|_2^2}_{\text{嵌入损失}}
+$$
+
+- **重建损失**：标准自编码器重建误差
+- **承诺损失**（$\|z_e - \text{sg}[z_q]\|^2$）：迫使编码器输出靠近码本中选定的向量（`sg` = stop gradient）
+- **嵌入损失**（$\|z_q - \text{sg}[z_e]\|^2$）：迫使码本向量靠近编码器输出（码本也要学习）
+
+---
+
+## 3. 代码解析
+
+### 3.1 编码器 + 码本 + 解码器结构
+
+```python title="dldemos/VQVAE/model.py" showLineNumbers
+class VQVAE(nn.Module):
+
+    def __init__(self, input_dim, dim, n_embedding):
+        super().__init__()
+        # 编码器：Conv 下采样 × 2 + 残差块 × 2
+        self.encoder = nn.Sequential(
+            nn.Conv2d(input_dim, dim, 4, 2, 1), nn.ReLU(),
+            nn.Conv2d(dim, dim, 4, 2, 1), nn.ReLU(),
+            nn.Conv2d(dim, dim, 3, 1, 1),
+            ResidualBlock(dim), ResidualBlock(dim))
+        # key-start
+        # 码本：K 个 dim 维向量，均匀初始化
+        self.vq_embedding = nn.Embedding(n_embedding, dim)
+        self.vq_embedding.weight.data.uniform_(-1.0 / n_embedding,
+                                               1.0 / n_embedding)
+        # key-end
+        # 解码器：残差块 × 2 + ConvTranspose 上采样 × 2
+        self.decoder = nn.Sequential(
+            nn.Conv2d(dim, dim, 3, 1, 1),
+            ResidualBlock(dim), ResidualBlock(dim),
+            nn.ConvTranspose2d(dim, dim, 4, 2, 1), nn.ReLU(),
+            nn.ConvTranspose2d(dim, input_dim, 4, 2, 1))
+```
+
+### 3.2 量化过程（forward 核心）
+
+```python title="dldemos/VQVAE/model.py" showLineNumbers
+    def forward(self, x):
+        ze = self.encoder(x)
+        embedding = self.vq_embedding.weight.data
+        N, C, H, W = ze.shape
+        K, _ = embedding.shape
+        # key-start
+        # 计算每个空间位置到所有码本向量的距离
+        # ze: [N, C, H, W] → broadcast 为 [N, 1, C, H, W]
+        # embedding: [K, C] → broadcast 为 [1, K, C, 1, 1]
+        # distance: [N, K, H, W] — 每个位置的最近邻索引
+        embedding_broadcast = embedding.reshape(1, K, C, 1, 1)
+        ze_broadcast = ze.reshape(N, 1, C, H, W)
+        distance = torch.sum((embedding_broadcast - ze_broadcast)**2, 2)
+        nearest_neighbor = torch.argmin(distance, 1)
+        # key-end
+
+        # 取出码本向量并调整维度
+        zq = self.vq_embedding(nearest_neighbor).permute(0, 3, 1, 2)
+        # key-start
+        # 直通梯度估计：
+        # 前向：ze + (zq - ze) = zq（量化后的值）
+        # 反向：(zq - ze).detach() 的梯度为零，梯度只流过 ze
+        decoder_input = ze + (zq - ze).detach()
+        # key-end
+
+        x_hat = self.decoder(decoder_input)
+        return x_hat, ze, zq
+```
+
+### 3.3 推断：编码与解码分离
+
+```python title="dldemos/VQVAE/model.py" showLineNumbers
+    @torch.no_grad()
+    def encode(self, x):
+        ze = self.encoder(x)
+        # ... 距离计算和最近邻查找（与 forward 相同）...
+        nearest_neighbor = torch.argmin(distance, 1)
+        return nearest_neighbor  # 返回离散索引，而非连续向量
+
+    @torch.no_grad()
+    def decode(self, discrete_latent):
+        zq = self.vq_embedding(discrete_latent).permute(0, 3, 1, 2)
+        x_hat = self.decoder(zq)
+        return x_hat
+```
+
+注意 `encode` 返回的是**整数索引**（码本编号），而非连续向量——这正是「离散隐空间」的含义。
+
+---
+
+## 4. 训练细节
+
+<Tabs>
+  <TabItem value="loss" label="三段损失" default>
+
+```python title="dldemos/VQVAE/main.py"
+x_hat, ze, zq = model(x)
+l_reconstruct  = mse_loss(x, x_hat)            # 重建损失
+l_embedding    = mse_loss(ze.detach(), zq)      # 嵌入损失：码本靠近编码器
+l_commitment   = mse_loss(ze, zq.detach())      # 承诺损失：编码器靠近码本
+loss = l_reconstruct + l_w_embedding * l_embedding + l_w_commitment * l_commitment
+```
+
+注意 `.detach()` 的位置：
+
+<ul>
+<li>嵌入损失：梯度只更新码本（<code>ze.detach()</code>），不更新编码器</li>
+<li>承诺损失：梯度只更新编码器（<code>zq.detach()</code>），不更新码本</li>
+</ul>
+
+  </TabItem>
+  <TabItem value="pipeline" label="两阶段训练">
+
+VQVAE 的生成流程分为两个阶段：
+
+**阶段 1：训练 VQ-VAE**
+
+<ul>
+<li>目标：学会编码和重建</li>
+<li>输出：编码器将图像映射到离散索引，解码器从离散索引重建图像</li>
+</ul>
+
+**阶段 2：训练 PixelCNN 先验**
+
+<ul>
+<li>目标：学会离散索引的概率分布</li>
+<li>输入：用训练好的 VQ-VAE 编码器提取离散索引</li>
+<li>生成时：PixelCNN 逐像素采样索引 → VQ-VAE 解码器生成图像</li>
+</ul>
+
+（PixelCNN 的原理见 [上一章](./pixelcnn)。）
+
+  </TabItem>
+  <TabItem value="hyperparams" label="超参数">
+
+| 超参数 | 值 | 说明 |
+|--------|-----|------|
+| `dim` | 可调 | 编码器/码本向量维度 |
+| `n_embedding` | 可调 | 码本大小（离散 token 数）|
+| `l_w_embedding` | 1 | 嵌入损失权重 |
+| `l_w_commitment` | 0.25 | 承诺损失权重（$\beta$）|
+| 先验模型 | Gated PixelCNN | 码本索引上的自回归模型 |
+| 数据集 | MNIST | 28×28 单通道 |
+
+  </TabItem>
+</Tabs>
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Neural Discrete Representation Learning（van den Oord et al., 2017）](https://arxiv.org/abs/1711.00937)
+- 🔗 [本章源码：`dldemos/VQVAE/`](https://github.com/SingleZombie/DL-Demos/tree/master/dldemos/VQVAE)
+- ⬅️ **前置章节**：[PixelCNN — 自回归像素生成](./pixelcnn)

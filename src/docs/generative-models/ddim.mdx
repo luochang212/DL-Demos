@@ -1,0 +1,139 @@
+---
+id: ddim
+title: DDIM — 去噪扩散隐式模型
+sidebar_label: 3. DDIM
+description: 理解 DDIM 如何将扩散采样从 1000 步加速到 20 步，掌握非马尔可夫逆向过程的 eta 参数控制。
+keywords: [DDIM, 扩散模型, 加速采样, 隐式模型, ODE, 生成模型]
+---
+
+# DDIM — 去噪扩散隐式模型
+
+:::tip 本章要点
+- 理解 DDIM 与 DDPM 的核心差异：**非马尔可夫逆向过程**
+- 掌握 **子序列采样**：用 20 步跳步采样达到 1000 步的效果
+- 理解 **eta 参数**：$\eta=0$ 确定性采样，$\eta=1$ 退化为 DDPM
+- 读懂 [`dldemos/ddim/ddim.py`](https://github.com/SingleZombie/DL-Demos/blob/master/dldemos/ddim/ddim.py) 的 57 行实现
+:::
+
+:::info 前置要求
+本章是 [DDPM](./ddpm) 的延伸章节。请先阅读 DDPM 章节，理解前向过程和噪声预测目标。
+:::
+
+---
+
+## 1. DDPM 的瓶颈
+
+DDPM 生成一张图像需要完整跑 $T=1000$ 步逆向去噪，每一步都调用一次网络推理。这导致：
+- 生成速度极慢（MNIST 上几秒，高分辨率图像几分钟）
+- 1000 步中大部分是微小变化，许多步是「冗余」的
+
+DDIM 的核心问题：能不能只跑 20 步，跳过中间步骤？
+
+---
+
+## 2. 数学原理
+
+### 2.1 非马尔可夫逆向过程
+
+DDPM 的逆向过程是严格马尔可夫的：$x_{t-1}$ 只依赖 $x_t$。DDIM 放松了这个约束，允许**跳步**。
+
+DDIM 定义了一个子序列 $\tau = [\tau_1, \tau_2, ..., \tau_S]$（$S \ll T$），逆向过程直接从 $x_{\tau_i}$ 跳到 $x_{\tau_{i-1}}$，中间的时间步完全跳过。
+
+### 2.2 DDIM 更新公式
+
+从 $x_{\tau_i}$ 到 $x_{\tau_{i-1}}$ 的更新分解为三项：
+
+$$
+x_{\tau_{i-1}} = \underbrace{\sqrt{\bar\alpha_{\tau_{i-1}} / \bar\alpha_{\tau_i}}\, x_{\tau_i}}_{\text{第一项：确定性缩放}} + \underbrace{\left(\sqrt{1 - \bar\alpha_{\tau_{i-1}} - \sigma^2} - \sqrt{\bar\alpha_{\tau_{i-1}}(1 - \bar\alpha_{\tau_i}) / \bar\alpha_{\tau_i}}\right) \varepsilon_\theta}_{\text{第二项：噪声校正}} + \underbrace{\sigma\, z}_{\text{第三项：随机扰动}}
+$$
+
+其中方差 $\sigma^2$ 由 $\eta$ 参数控制：
+
+$$
+\sigma = \eta \sqrt{\frac{1 - \bar\alpha_{\tau_{i-1}}}{1 - \bar\alpha_{\tau_i}} \cdot \frac{1 - \bar\alpha_{\tau_i} / \bar\alpha_{\tau_{i-1}}}}
+$$
+
+- **$\eta = 0$**：第三项消失，变成确定性 ODE 采样——同样的起点一定生成同样的图像
+- **$\eta = 1$**：退化为 DDPM 的马尔可夫采样
+
+这就是代码中 `first_term` / `second_term` / `third_term` 的来源。
+
+---
+
+## 3. 代码解析
+
+DDIM 直接继承 DDPM 类，只重写了 `sample_backward` 方法——全部差异就在这一个方法里。
+
+### 3.1 继承与子序列构造
+
+```python title="dldemos/ddim/ddim.py" showLineNumbers
+class DDIM(DDPM):
+
+    def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
+        # 复用 DDPM 的前向过程和系数计算
+        super().__init__(device, n_steps, min_beta, max_beta)
+
+    def sample_backward(self, img_or_shape, net, device,
+                        simple_var=True, ddim_step=20, eta=1):
+        if simple_var:
+            eta = 1
+        # key-start
+        # 子序列：在 [0, n_steps] 之间均匀取 ddim_step+1 个点
+        # 例如 n_steps=100, ddim_step=20 → ts = [100,95,90,...,5,0]
+        ts = torch.linspace(self.n_steps, 0,
+                            (ddim_step + 1)).to(device).to(torch.long)
+        # key-end
+```
+
+### 3.2 三项更新公式
+
+```python title="dldemos/ddim/ddim.py" showLineNumbers
+        for i in tqdm(range(1, ddim_step + 1),
+                      f'DDIM sampling with eta {eta}'):
+            cur_t = ts[i - 1] - 1
+            prev_t = ts[i] - 1
+
+            ab_cur = self.alpha_bars[cur_t]
+            ab_prev = self.alpha_bars[prev_t] if prev_t >= 0 else 1
+
+            t_tensor = torch.tensor([cur_t] * batch_size,
+                                    dtype=torch.long).to(device).unsqueeze(1)
+            eps = net(x, t_tensor)
+            # key-start
+            # eta 控制的方差（与 DDPM 的 simple_var 对应）
+            var = eta * (1 - ab_prev) / (1 - ab_cur) * (1 - ab_cur / ab_prev)
+
+            # 三项更新公式，与论文公式一一对应
+            first_term  = (ab_prev / ab_cur)**0.5 * x
+            second_term = ((1 - ab_prev - var)**0.5 -
+                           (ab_prev * (1 - ab_cur) / ab_cur)**0.5) * eps
+            if simple_var:
+                third_term = (1 - ab_cur / ab_prev)**0.5 * noise
+            else:
+                third_term = var**0.5 * noise
+            x = first_term + second_term + third_term
+            # key-end
+```
+
+---
+
+## 4. DDIM vs DDPM 对比
+
+| 维度 | DDPM | DDIM |
+|------|------|------|
+| 逆向过程 | 马尔可夫，严格 $x_t → x_{t-1}$ | 非马尔可夫，跳步 $x_{\tau_i} → x_{\tau_{i-1}}$ |
+| 采样步数 | 1000 步（不可跳） | 20 步（可调 `ddim_step`）|
+| 随机性 | 每步都加随机噪声 | $\eta$ 控制：0=确定性，1=等价 DDPM |
+| 训练方式 | 完全相同 | **完全相同**（只改采样，不改训练）|
+| 生成速度 | 慢 | 快 50×（20步 vs 1000步）|
+
+**关键结论**：DDIM 不需要重新训练模型。任何 DDPM 训练好的权重都可以直接用 DDIM 采样——只需把 `sample_backward` 替换为 DDIM 版本。
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Denoising Diffusion Implicit Models（Song et al., 2021）](https://arxiv.org/abs/2010.02502)
+- 🔗 [本章源码：`dldemos/ddim/`](https://github.com/SingleZombie/DL-Demos/tree/master/dldemos/ddim)
+- ⬅️ **前置章节**：[DDPM — 去噪扩散概率模型](./ddpm)
+- ➡️ **下一章**：[PixelCNN — 自回归像素生成](./pixelcnn)
