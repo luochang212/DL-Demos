@@ -1,11 +1,18 @@
+# Basic RNN
+
 1. Download [IMDb dataset](https://ai.stanford.edu/~amaas/data/sentiment/).
 
 2. Modify the directory in `read_imdb`.
 
-3. Run `main.py` to train and test the language model. You can:
+3. Train, evaluate, or sample explicitly:
 
-- Use `rnn1` or `rnn2`
-- Switch the dataset by modifying `is_vocab` parameter of `get_dataloader_and_max_length`
-- Tune the hyperparameters
+```bash
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode train
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode evaluate
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode sample
+```
 
-to do more experiments.
+The default device is selected automatically. Use `--device cpu` or
+`--device cuda:0` to choose one explicitly, and `--checkpoint PATH` to override
+the default `rnn1.pth` or `rnn2.pth` path. Training and evaluation require the
+IMDb vocabulary data; sampling only requires a checkpoint.

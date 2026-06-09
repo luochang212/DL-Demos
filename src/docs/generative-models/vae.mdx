@@ -174,9 +174,11 @@ class VAE(nn.Module):
 ### 4.3 生成采样（推断时用，不需要编码器）
 
 ```python title="dldemos/VAE/model.py" showLineNumbers
-    def sample(self, device='cuda'):
+    def sample(self, device=None):
+        if device is None:
+            device = next(self.parameters()).device
         # highlight-next-line
-        z = torch.randn(1, self.latent_dim).to(device)  # 直接从先验 N(0,I) 采样
+        z = torch.randn(1, self.latent_dim, device=device)  # 直接从先验 N(0,I) 采样
         x = self.decoder_projection(z)
         x = torch.reshape(x, (-1, *self.decoder_input_chw))
         decoded = self.decoder(x)
@@ -216,6 +218,14 @@ def loss_fn(y, y_hat, mean, logvar):
 
   </TabItem>
 </Tabs>
+
+训练、重建和生成通过显式 CLI 模式选择。默认自动选择 CUDA 或 CPU，重建和生成要求 checkpoint 已存在：
+
+```bash
+uv run python dldemos/VAE/main.py --mode train
+uv run python dldemos/VAE/main.py --mode reconstruct
+uv run python dldemos/VAE/main.py --mode generate
+```
 
 ---
 

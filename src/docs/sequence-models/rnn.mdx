@@ -151,7 +151,9 @@ class RNN1(nn.Module):
 
 ```python title="dldemos/BasicRNN/models.py" showLineNumbers
     @torch.no_grad()
-    def sample_word(self, device='cuda:0'):
+    def sample_word(self, device=None):
+        if device is None:
+            device = next(self.parameters()).device
         output = ''
         a = torch.zeros(1, self.hidden_units, device=device)
         x = torch.zeros(1, EMBEDDING_LENGTH, device=device)
@@ -215,6 +217,14 @@ for epoch in range(5):
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 梯度裁剪
         # key-end
         optimizer.step()
+```
+
+训练、评估和采样通过显式 CLI 模式选择，默认自动使用可用的 CUDA 或 CPU：
+
+```bash
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode train
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode evaluate
+uv run python dldemos/BasicRNN/main.py --model rnn1 --mode sample
 ```
 
 ---

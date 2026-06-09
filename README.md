@@ -10,6 +10,8 @@
 uv sync --group dev
 ```
 
+维护中的非分布式 PyTorch 示例会自动选择 CUDA 或 CPU。完整训练通常需要对应数据集，单元测试使用合成输入，不要求 GPU 或真实数据集。DDP 示例仍明确要求 CUDA/NCCL。
+
 运行示例：
 
 ```bash

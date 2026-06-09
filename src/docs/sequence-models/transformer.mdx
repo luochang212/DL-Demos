@@ -26,6 +26,7 @@ $1/\sqrt{d_k}$ 防止点积随维度增大而让 Softmax 饱和。Multi-Head Att
 ## 3. 训练契约
 
 `load_train_data()` 明确返回 `(english_source, chinese_target)`。训练输入使用中文目标序列去掉最后一个 token，标签使用去掉第一个 token 的序列。
+训练和推理都为英文源序列添加 `<S>`、`</S>`，并将词表外单词映射为 `<UNK>`，避免输入分布不一致。
 
 ```python
 y_input = y_batch[:, :-1]
