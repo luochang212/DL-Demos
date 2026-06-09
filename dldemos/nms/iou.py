@@ -4,8 +4,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 def box_intersection(
-        b1: Tuple[int, int, int, int],
-        b2: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    b1: Tuple[int, int, int, int], b2: Tuple[int, int, int, int]
+) -> Tuple[int, int, int, int]:
     x11, y11, x12, y12 = b1
     x21, y21, x22, y22 = b2
 
@@ -27,6 +27,8 @@ def iou(b1: Tuple[int, int, int, int], b2: Tuple[int, int, int, int]) -> float:
     intersection = box_intersection(b1, b2)
     inter_area = area(intersection)
     union_area = area(b1) + area(b2) - inter_area
+    if union_area == 0:
+        return 0.0
     return inter_area / union_area
 
 
@@ -76,8 +78,7 @@ def main():
 
     image_darw.rectangle(bbox1, outline='green', fill='green', width=2)
     image_darw.rectangle(bbox2, outline='green', fill='green', width=2)
-    draw_line_of_text(
-        f'u = a1 + a2 - i = {area(bbox1) + area(bbox2) - area(ibox)}')
+    draw_line_of_text(f'u = a1 + a2 - i = {area(bbox1) + area(bbox2) - area(ibox)}')
     imgs.append(img.copy())
     durations.append(1500)
 
@@ -86,11 +87,13 @@ def main():
     imgs.append(img.copy())
     durations.append(2000)
 
-    img0.save('work_dirs/NMS/1.gif',
-              save_all=True,
-              append_images=imgs,
-              duration=durations,
-              loop=0)
+    img0.save(
+        'work_dirs/NMS/1.gif',
+        save_all=True,
+        append_images=imgs,
+        duration=durations,
+        loop=0,
+    )
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+import os
 import random
 
 from babel.dates import format_date
@@ -5,15 +6,22 @@ from faker import Faker
 
 faker = Faker()
 format_list = [
-    'short', 'medium', 'long', 'full', 'd MMM YYY', 'd MMMM YYY', 'dd/MM/YYY',
-    'dd-MM-YYY', 'EE d, MMM YYY', 'EEEE d, MMMM YYY'
+    'short',
+    'medium',
+    'long',
+    'full',
+    'd MMM YYY',
+    'd MMMM YYY',
+    'dd/MM/YYY',
+    'dd-MM-YYY',
+    'EE d, MMM YYY',
+    'EEEE d, MMMM YYY',
 ]
 
 if __name__ == '__main__':
     for format in format_list:
         date_obj = faker.date_object()
-        print(f'{format}:', date_obj,
-              format_date(date_obj, format=format, locale='en'))
+        print(f'{format}:', date_obj, format_date(date_obj, format=format, locale='en'))
 
 
 def generate_date():
@@ -24,6 +32,7 @@ def generate_date():
 
 
 def generate_date_data(count, filename):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as fp:
         for _ in range(count):
             formated_date, date_obj = generate_date()

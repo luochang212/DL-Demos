@@ -3,9 +3,13 @@ import time
 import torch
 import torch.nn as nn
 
-from dldemos.Transformer.data_load import (get_batch_indices, load_cn_vocab,
-                                           load_en_vocab, load_train_data,
-                                           maxlen)
+from dldemos.Transformer.data_load import (
+    get_batch_indices,
+    load_cn_vocab,
+    load_en_vocab,
+    load_train_data,
+    maxlen,
+)
 from dldemos.Transformer.model import Transformer
 
 # Config
@@ -21,17 +25,26 @@ PAD_ID = 0
 
 
 def main():
-    device = 'cuda'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     cn2idx, idx2cn = load_cn_vocab()
     en2idx, idx2en = load_en_vocab()
     # X: en
     # Y: cn
-    Y, X = load_train_data()
+    X, Y = load_train_data()
 
     print_interval = 100
 
-    model = Transformer(len(en2idx), len(cn2idx), PAD_ID, d_model, d_ff,
-                        n_layers, heads, dropout_rate, maxlen)
+    model = Transformer(
+        len(en2idx),
+        len(cn2idx),
+        PAD_ID,
+        d_model,
+        d_ff,
+        n_layers,
+        heads,
+        dropout_rate,
+        maxlen,
+    )
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr)
@@ -54,7 +67,7 @@ def main():
 
             n, seq_len = y_label.shape
             y_hat = torch.reshape(y_hat, (n * seq_len, -1))
-            y_label = torch.reshape(y_label, (n * seq_len, ))
+            y_label = torch.reshape(y_label, (n * seq_len,))
             loss = citerion(y_hat, y_label)
 
             optimizer.zero_grad()
@@ -67,8 +80,10 @@ def main():
                 interval = toc - tic
                 minutes = int(interval // 60)
                 seconds = int(interval % 60)
-                print(f'{cnter:08d} {minutes:02d}:{seconds:02d}'
-                      f' loss: {loss.item()} acc: {acc.item()}')
+                print(
+                    f'{cnter:08d} {minutes:02d}:{seconds:02d}'
+                    f' loss: {loss.item()} acc: {acc.item()}'
+                )
             cnter += 1
 
     model_path = 'dldemos/Transformer/model.pth'

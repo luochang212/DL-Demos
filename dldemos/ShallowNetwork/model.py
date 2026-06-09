@@ -28,6 +28,7 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
         pass
 
     def loss(self, Y_hat, Y):
+        Y_hat = np.clip(Y_hat, 1e-12, 1 - 1e-12)
         return np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
 
     def evaluate(self, X, Y):
@@ -38,7 +39,6 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
 
 
 class LogisticRegression(BaseRegressionModel):
-
     def __init__(self, n_x):
         super().__init__()
         self.n_x = n_x
@@ -114,14 +114,16 @@ class ShallowNetwork(BaseRegressionModel):
         self.b2 -= learning_rate * self.db2_cache
 
 
-def train_model(model: BaseRegressionModel,
-                X_train,
-                Y_train,
-                X_test,
-                Y_test,
-                steps=1000,
-                learning_rate=0.001,
-                print_interval=100):
+def train_model(
+    model: BaseRegressionModel,
+    X_train,
+    Y_train,
+    X_test,
+    Y_test,
+    steps=1000,
+    learning_rate=0.001,
+    print_interval=100,
+):
     for step in range(steps):
         Y_hat = model.forward(X_train)
         model.backward(Y_train)

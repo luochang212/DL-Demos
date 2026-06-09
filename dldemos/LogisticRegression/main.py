@@ -61,6 +61,7 @@ def predict(w, b, X):
 
 
 def loss(y_hat, y):
+    y_hat = np.clip(y_hat, 1e-12, 1 - 1e-12)
     return np.mean(-(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat)))
 
 

@@ -5,11 +5,14 @@ import torch
 import torch.nn.functional as F
 
 from dldemos.MulticlassClassification.points_classification import (
-    generate_plot_set, generate_points, plot_points, visualize)
+    generate_plot_set,
+    generate_points,
+    plot_points,
+    visualize,
+)
 
 
-class MulticlassClassificationNet():
-
+class MulticlassClassificationNet:
     def __init__(self, neuron_cnt: List[int]):
         self.num_layer = len(neuron_cnt) - 1
         self.neuron_cnt = neuron_cnt
@@ -17,9 +20,8 @@ class MulticlassClassificationNet():
         self.b = []
         for i in range(self.num_layer):
             new_W = torch.empty(neuron_cnt[i + 1], neuron_cnt[i])
-            new_b = torch.empty(neuron_cnt[i + 1], 1)
+            new_b = torch.zeros(neuron_cnt[i + 1], 1)
             torch.nn.init.kaiming_normal_(new_W, nonlinearity='relu')
-            torch.nn.init.kaiming_normal_(new_b, nonlinearity='relu')
             self.W.append(torch.nn.Parameter(new_W))
             self.b.append(torch.nn.Parameter(new_b))
         self.trainable_vars = self.W + self.b
@@ -30,7 +32,7 @@ class MulticlassClassificationNet():
         for i in range(self.num_layer):
             Z = torch.matmul(self.W[i], A) + self.b[i]
             if i == self.num_layer - 1:
-                A = F.softmax(Z, 0)
+                A = Z
             else:
                 A = F.relu(Z)
 
@@ -52,12 +54,9 @@ class MulticlassClassificationNet():
             return accuracy
 
 
-def train(model: MulticlassClassificationNet,
-          X,
-          Y,
-          step,
-          learning_rate,
-          print_interval=100):
+def train(
+    model: MulticlassClassificationNet, X, Y, step, learning_rate, print_interval=100
+):
     optimizer = torch.optim.Adam(model.trainable_vars, learning_rate)
     for s in range(step):
         Y_hat = model.forward(X)

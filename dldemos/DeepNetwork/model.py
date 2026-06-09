@@ -7,7 +7,6 @@ from dldemos.utils import get_activation_de_func, get_activation_func
 
 
 class BaseRegressionModel(metaclass=abc.ABCMeta):
-
     def __init__(self):
         pass
 
@@ -32,6 +31,7 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
         pass
 
     def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
+        Y_hat = np.clip(Y_hat, 1e-12, 1 - 1e-12)
         return np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
 
     def evaluate(self, X: np.ndarray, Y: np.ndarray, return_loss=False):
@@ -46,7 +46,6 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
 
 
 class DeepNetwork(BaseRegressionModel):
-
     def __init__(self, neuron_cnt: List[int], activation_func: List[str]):
         assert len(neuron_cnt) - 1 == len(activation_func)
         self.num_layer = len(neuron_cnt) - 1
@@ -55,8 +54,7 @@ class DeepNetwork(BaseRegressionModel):
         self.W: List[np.ndarray] = []
         self.b: List[np.ndarray] = []
         for i in range(self.num_layer):
-            self.W.append(
-                np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 0.2)
+            self.W.append(np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 0.2)
             self.b.append(np.zeros((neuron_cnt[i + 1], 1)))
 
         self.Z_cache = [None] * self.num_layer
@@ -79,11 +77,10 @@ class DeepNetwork(BaseRegressionModel):
 
     def backward(self, Y):
         dA = -Y / self.A_cache[-1] + (1 - Y) / (1 - self.A_cache[-1])
-        assert (self.m == Y.shape[1])
+        assert self.m == Y.shape[1]
 
         for i in range(self.num_layer - 1, -1, -1):
-            dZ = dA * get_activation_de_func(self.activation_func[i])(
-                self.Z_cache[i])
+            dZ = dA * get_activation_de_func(self.activation_func[i])(self.Z_cache[i])
             dW = np.dot(dZ, self.A_cache[i].T) / self.m
             db = np.mean(dZ, axis=1, keepdims=True)
             dA = np.dot(self.W[i].T, dZ)
@@ -111,14 +108,16 @@ class DeepNetwork(BaseRegressionModel):
             self.b[i] = params['b' + str(i)]
 
 
-def train(model: BaseRegressionModel,
-          X,
-          Y,
-          step,
-          learning_rate,
-          print_interval=100,
-          test_X=None,
-          test_Y=None):
+def train(
+    model: BaseRegressionModel,
+    X,
+    Y,
+    step,
+    learning_rate,
+    print_interval=100,
+    test_X=None,
+    test_Y=None,
+):
     for s in range(step):
         Y_hat = model.forward(X)
         model.backward(Y)
@@ -128,8 +127,6 @@ def train(model: BaseRegressionModel,
             print(f'Step: {s}')
             print(f'Train loss: {loss}')
             if test_X is not None and test_Y is not None:
-                accuracy, loss = model.evaluate(test_X,
-                                                test_Y,
-                                                return_loss=True)
+                accuracy, loss = model.evaluate(test_X, test_Y, return_loss=True)
                 print(f'Test loss: {loss}')
                 print(f'Test accuracy: {accuracy}')

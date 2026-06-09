@@ -1,9 +1,11 @@
+import os
+
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from torch.utils.data import DataLoader, Dataset
 
-from dldemos.attention.dataset import generate_date, load_date_data
+from dldemos.attention.dataset import generate_date, generate_date_data, load_date_data
 
 EMBEDDING_LENGTH = 128
 OUTPUT_LENGTH = 10
@@ -18,7 +20,6 @@ def itos(arr):
 
 
 class DateDataset(Dataset):
-
     def __init__(self, lines):
         self.lines = lines
 
@@ -35,9 +36,10 @@ def get_dataloader(filename):
 
     def collate_fn(batch):
         x, y = zip(*batch)
+        lengths = torch.tensor([len(sequence) for sequence in x])
         x_pad = pad_sequence(x, batch_first=True)
         y_pad = pad_sequence(y, batch_first=True)
-        return x_pad, y_pad
+        return x_pad, lengths, y_pad
 
     lines = load_date_data(filename)
     dataset = DateDataset(lines)
@@ -45,30 +47,29 @@ def get_dataloader(filename):
 
 
 class AttentionModel(nn.Module):
-
-    def __init__(self,
-                 embeding_dim=32,
-                 encoder_dim=32,
-                 decoder_dim=32,
-                 dropout_rate=0.5):
+    def __init__(
+        self, embeding_dim=32, encoder_dim=32, decoder_dim=32, dropout_rate=0.5
+    ):
         super().__init__()
         self.drop = nn.Dropout(dropout_rate)
         self.embedding = nn.Embedding(EMBEDDING_LENGTH, embeding_dim)
         self.attention_linear = nn.Linear(2 * encoder_dim + decoder_dim, 1)
         self.softmax = nn.Softmax(-1)
-        self.encoder = nn.LSTM(embeding_dim,
-                               encoder_dim,
-                               1,
-                               batch_first=True,
-                               bidirectional=True)
-        self.decoder = nn.LSTM(EMBEDDING_LENGTH + 2 * encoder_dim,
-                               decoder_dim,
-                               1,
-                               batch_first=True)
+        self.encoder = nn.LSTM(
+            embeding_dim, encoder_dim, 1, batch_first=True, bidirectional=True
+        )
+        self.decoder = nn.LSTM(
+            EMBEDDING_LENGTH + 2 * encoder_dim, decoder_dim, 1, batch_first=True
+        )
         self.output_linear = nn.Linear(decoder_dim, EMBEDDING_LENGTH)
         self.decoder_dim = decoder_dim
 
-    def forward(self, x: torch.Tensor, n_output: int = OUTPUT_LENGTH):
+    def forward(
+        self,
+        x: torch.Tensor,
+        lengths: torch.Tensor,
+        n_output: int = OUTPUT_LENGTH,
+    ):
         # x: [batch, n_sequence, EMBEDDING_LENGTH]
         batch, n_squence = x.shape[0:2]
 
@@ -76,7 +77,14 @@ class AttentionModel(nn.Module):
         x = self.drop(self.embedding(x))
 
         # a: [batch, n_sequence, hidden]
-        a, _ = self.encoder(x)
+        packed = pack_padded_sequence(
+            x, lengths.cpu(), batch_first=True, enforce_sorted=False
+        )
+        packed_a, _ = self.encoder(packed)
+        a, _ = pad_packed_sequence(packed_a, batch_first=True, total_length=n_squence)
+        padding_mask = torch.arange(n_squence, device=x.device).unsqueeze(
+            0
+        ) >= lengths.to(x.device).unsqueeze(1)
 
         # prev_s: [batch, n_squence=1, hidden]
         # prev_y: [batch, n_squence=1, EMBEDDING_LENGTH]
@@ -89,12 +97,12 @@ class AttentionModel(nn.Module):
             # repeat_s: [batch, n_squence, hidden]
             repeat_s = prev_s.repeat(1, n_squence, 1)
             # attention_input: [batch * n_sequence, hidden_s + hidden_a]
-            attention_input = torch.cat((repeat_s, a),
-                                        2).reshape(batch * n_squence, -1)
+            attention_input = torch.cat((repeat_s, a), 2).reshape(batch * n_squence, -1)
             # x: [batch * n_sequence, 1]
             x = self.attention_linear(attention_input)
             # x: [batch, n_sequence]
             x = x.reshape(batch, n_squence)
+            x = x.masked_fill(padding_mask, float('-inf'))
             alpha = self.softmax(x)
             c = torch.sum(a * alpha.reshape(batch, n_squence, 1), 1)
             c = c.unsqueeze(1)
@@ -111,9 +119,15 @@ class AttentionModel(nn.Module):
 
 
 def main():
-    device = 'cuda:0'
-    train_dataloader = get_dataloader('dldemos/attention/train.txt')
-    test_dataloader = get_dataloader('dldemos/attention/test.txt')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    train_path = 'dldemos/attention/train.txt'
+    test_path = 'dldemos/attention/test.txt'
+    if not os.path.exists(train_path):
+        generate_date_data(50000, train_path)
+    if not os.path.exists(test_path):
+        generate_date_data(10000, test_path)
+    train_dataloader = get_dataloader(train_path)
+    test_dataloader = get_dataloader(test_path)
 
     model = AttentionModel().to(device)
 
@@ -126,13 +140,13 @@ def main():
         loss_sum = 0
         dataset_len = len(train_dataloader.dataset)
 
-        for x, y in train_dataloader:
+        for x, lengths, y in train_dataloader:
             x = x.to(device)
             y = y.to(device)
-            hat_y = model(x)
+            hat_y = model(x, lengths)
             n, Tx, _ = hat_y.shape
             hat_y = torch.reshape(hat_y, (n * Tx, -1))
-            label_y = torch.reshape(y, (n * Tx, ))
+            label_y = torch.reshape(y, (n * Tx,))
             loss = citerion(hat_y, label_y)
 
             optimizer.zero_grad()
@@ -152,10 +166,12 @@ def main():
     accuracy = 0
     dataset_len = len(test_dataloader.dataset)
 
-    for x, y in test_dataloader:
+    model.eval()
+    for x, lengths, y in test_dataloader:
         x = x.to(device)
         y = y.to(device)
-        hat_y = model(x)
+        with torch.no_grad():
+            hat_y = model(x, lengths)
         prediction = torch.argmax(hat_y, 2)
         score = torch.where(torch.sum(prediction - y, -1) == 0, 1, 0)
         accuracy += torch.sum(score)
@@ -167,7 +183,9 @@ def main():
         x, y = generate_date()
         origin_x = x
         x = stoi(x).unsqueeze(0).to(device)
-        hat_y = model(x)
+        lengths = torch.tensor([x.shape[1]])
+        with torch.no_grad():
+            hat_y = model(x, lengths)
         hat_y = hat_y.squeeze(0).argmax(1)
         hat_y = itos(hat_y)
         print(f'input: {origin_x}, prediction: {hat_y}, gt: {y}')

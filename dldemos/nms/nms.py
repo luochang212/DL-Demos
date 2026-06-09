@@ -5,8 +5,7 @@ from dldemos.nms.iou import iou
 from dldemos.nms.show_bbox import draw_bbox
 
 
-class BoxRenderer():
-
+class BoxRenderer:
     def __init__(self, img: str, predicts: np.ndarray):
         self.ori_img = Image.open(img)
         self.imgs = []
@@ -46,23 +45,20 @@ class BoxRenderer():
         self.durations.append(duration)
 
     def save(self, fn):
-        self.ori_img.save(fn,
-                          save_all=True,
-                          append_images=self.imgs,
-                          duration=self.durations,
-                          loop=0)
+        self.ori_img.save(
+            fn, save_all=True, append_images=self.imgs, duration=self.durations, loop=0
+        )
 
 
-def nms_render(predicts: np.ndarray,
-               renderer: BoxRenderer,
-               score_thresh=0.6,
-               iou_thresh=0.3):
+def nms_render(
+    predicts: np.ndarray, renderer: BoxRenderer, score_thresh=0.6, iou_thresh=0.3
+):
     """Non-Maximum Suppression.
 
     Args:
         predicts (np.ndarray): Tensor of shape [n, 5]. The second demesion
-            includes 1 probability and 4 numbers x, y, w, h denoting a bounding
-            box.
+            includes 1 probability and 4 numbers x1, y1, x2, y2 denoting a
+            bounding box.
     """
     # False for unvisited item
     n_remainder = len(predicts)
@@ -121,15 +117,13 @@ def nms_render(predicts: np.ndarray,
     return output_predicts
 
 
-def nms(predicts: np.ndarray,
-        score_thresh: float = 0.6,
-        iou_thresh: float = 0.3):
+def nms(predicts: np.ndarray, score_thresh: float = 0.6, iou_thresh: float = 0.3):
     """Non-Maximum Suppression.
 
     Args:
         predicts (np.ndarray): Tensor of shape [n, 5]. The second demesion
-            includes 1 probability and 4 numbers x, y, w, h denoting a bounding
-            box.
+            includes 1 probability and 4 numbers x1, y1, x2, y2 denoting a
+            bounding box.
         score_thresh (float): The boxes with probability lower than
             score_threash will be discarded.
         iou_thresh (float): The threshold determining whether two boxes are
@@ -179,34 +173,110 @@ def nms(predicts: np.ndarray,
 
 
 def exp1_draw_gif():
-    predicts = np.array([(0.95, 191, 105, 294, 157), (0.8, 168, 111, 280, 150),
-                         (0.7, 218, 113, 284, 159), (0.3, 193, 140, 231, 153),
-                         (0.7, 323, 112, 380, 145), (0.8, 305, 107, 364, 134),
-                         (0.9, 294, 114, 376, 151), (0.3, 319, 138, 358, 155)])
+    predicts = np.array(
+        [
+            (0.95, 191, 105, 294, 157),
+            (0.8, 168, 111, 280, 150),
+            (0.7, 218, 113, 284, 159),
+            (0.3, 193, 140, 231, 153),
+            (0.7, 323, 112, 380, 145),
+            (0.8, 305, 107, 364, 134),
+            (0.9, 294, 114, 376, 151),
+            (0.3, 319, 138, 358, 155),
+        ]
+    )
     renderer = BoxRenderer('work_dirs/detection_demo.jpg', predicts)
     nms_render(predicts, renderer)
     renderer.save('work_dirs/NMS/2.gif')
 
 
 coco_classes = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
-    'truck', 'boat', 'traffic_light', 'fire_hydrant', 'stop_sign',
-    'parking_meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag',
-    'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports_ball', 'kite',
-    'baseball_bat', 'baseball_glove', 'skateboard', 'surfboard',
-    'tennis_racket', 'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon',
-    'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-    'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted_plant',
-    'bed', 'dining_table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-    'keyboard', 'cell_phone', 'microwave', 'oven', 'toaster', 'sink',
-    'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy_bear',
-    'hair_drier', 'toothbrush'
+    'person',
+    'bicycle',
+    'car',
+    'motorcycle',
+    'airplane',
+    'bus',
+    'train',
+    'truck',
+    'boat',
+    'traffic_light',
+    'fire_hydrant',
+    'stop_sign',
+    'parking_meter',
+    'bench',
+    'bird',
+    'cat',
+    'dog',
+    'horse',
+    'sheep',
+    'cow',
+    'elephant',
+    'bear',
+    'zebra',
+    'giraffe',
+    'backpack',
+    'umbrella',
+    'handbag',
+    'tie',
+    'suitcase',
+    'frisbee',
+    'skis',
+    'snowboard',
+    'sports_ball',
+    'kite',
+    'baseball_bat',
+    'baseball_glove',
+    'skateboard',
+    'surfboard',
+    'tennis_racket',
+    'bottle',
+    'wine_glass',
+    'cup',
+    'fork',
+    'knife',
+    'spoon',
+    'bowl',
+    'banana',
+    'apple',
+    'sandwich',
+    'orange',
+    'broccoli',
+    'carrot',
+    'hot_dog',
+    'pizza',
+    'donut',
+    'cake',
+    'chair',
+    'couch',
+    'potted_plant',
+    'bed',
+    'dining_table',
+    'toilet',
+    'tv',
+    'laptop',
+    'mouse',
+    'remote',
+    'keyboard',
+    'cell_phone',
+    'microwave',
+    'oven',
+    'toaster',
+    'sink',
+    'refrigerator',
+    'book',
+    'clock',
+    'vase',
+    'scissors',
+    'teddy_bear',
+    'hair_drier',
+    'toothbrush',
 ]
 
 
 def exp2_nms_test():
     import torch
+
     info = torch.load('dldemos/nms/bboxes.pt')
     bboxes = info['bboxes']  # [n, 4]
     cls_scores = info['cls_scores']  # [n, 80]
@@ -215,17 +285,12 @@ def exp2_nms_test():
     probs *= torch.gather(cls_scores, 1, torch.unsqueeze(max_indices, 1))
 
     predicts = torch.cat((probs, bboxes), 1)
-    filtered_predicts, indices = nms(predicts,
-                                     score_thresh=0.3,
-                                     iou_thresh=0.45)
+    filtered_predicts, indices = nms(predicts, score_thresh=0.3, iou_thresh=0.45)
 
     img = Image.open('work_dirs/detection_demo.jpg')
     for predict, index in zip(filtered_predicts, indices):
         predict = predict.detach().cpu().numpy()
-        draw_bbox(img,
-                  predict[1:],
-                  predict[0],
-                  text=coco_classes[max_indices[index]])
+        draw_bbox(img, predict[1:], predict[0], text=coco_classes[max_indices[index]])
 
     img.save('work_dirs/NMS/3.jpg')
 
