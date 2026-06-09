@@ -1,0 +1,246 @@
+---
+id: distributed
+title: 分布式训练 — PyTorch DDP 实战
+sidebar_label: 2. 分布式训练
+description: 理解数据并行训练的原理，掌握 PyTorch DistributedDataParallel（DDP）的完整流程，包括进程初始化、数据分片、梯度同步和断点续训。
+keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel, 多GPU]
+---
+
+# 分布式训练 — PyTorch DDP 实战
+
+:::tip 本章要点
+- 理解**数据并行** vs **模型并行**：两种分布式训练策略
+- 掌握 **DDP 完整流程**：初始化 → 数据分片 → 模型包装 → 梯度同步 → 清理
+- 理解 **rank / world_size / DistributedSampler** 等核心概念
+- 读懂 [`dldemos/PyTorchDistributed/main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/PyTorchDistributed/main.py) 的最小可运行示例
+:::
+
+---
+
+## 1. 为什么需要分布式训练
+
+当模型太大或数据太多，单张 GPU 放不下或训练太慢时，就需要多 GPU（甚至多机）协同训练。
+
+两种主要策略：
+
+| 策略 | 思路 | 适用场景 |
+|------|------|---------|
+| **数据并行** | 每张卡持有完整模型副本，但处理不同的数据分片 | 模型能放进单卡，但数据量大 |
+| **模型并行** | 模型被拆分到多张卡上，每张卡只存一部分 | 模型太大，单卡放不下（如大语言模型） |
+
+本章聚焦 **数据并行**，使用 PyTorch 的 `DistributedDataParallel`（DDP）实现。
+
+### 数据并行的核心流程
+
+```
+                    ┌──────────┐
+                    │ 完整数据集 │
+                    └─────┬────┘
+                          │ DistributedSampler 分片
+              ┌───────────┼───────────┐
+              ▼           ▼           ▼
+          ┌───────┐   ┌───────┐   ┌───────┐
+          │ GPU 0 │   │ GPU 1 │   │ GPU 2 │
+          │模型副本│   │模型副本│   │模型副本│
+          │数据分片│   │数据分片│   │数据分片│
+          └───┬───┘   └───┬───┘   └───┬───┘
+              │ 前向+反向  │ 前向+反向  │ 前向+反向
+              ▼           ▼           ▼
+          ┌───────┐   ┌───────┐   ┌───────┐
+          │梯度 g₀ │   │梯度 g₁ │   │梯度 g₂ │
+          └───┬───┘   └───┬───┘   └───┬───┘
+              │           │           │
+              └───────────┼───────────┘
+                          │ AllReduce 平均
+                          ▼
+                    ḡ = (g₀+g₁+g₂)/3
+                          │
+                    所有 GPU 用 ḡ 更新参数
+```
+
+每个 GPU 独立计算自己数据分片的梯度，然后通过 **AllReduce** 通信操作汇总梯度，最后所有 GPU 用相同的平均梯度更新参数——保证模型一致性。
+
+---
+
+## 2. 核心概念
+
+| 概念 | 说明 |
+|------|------|
+| **rank** | 当前进程的全局编号（0, 1, 2, ...） |
+| **world_size** | 总进程数（通常 = GPU 数量） |
+| **local_rank** | 当前节点内的 GPU 编号 |
+| **DistributedSampler** | 确保每个进程拿到不同的数据分片，不重叠 |
+| **AllReduce** | 跨所有进程的规约操作（如求和、求平均） |
+| **barrier** | 同步屏障，所有进程到达后才能继续 |
+
+---
+
+## 3. 代码解析
+
+这是一个最小可运行的 DDP 示例，使用一个简单的线性模型 `Linear(1, 1)` 和 4 条数据，重点展示 DDP 的框架用法。
+
+### 3.1 初始化与清理
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+import torch.distributed as dist
+
+def setup():
+    # key-start
+    # 初始化进程组：使用 NCCL 后端（GPU 通信的高性能实现）
+    dist.init_process_group('nccl')
+    # key-end
+
+def cleanup():
+    # key-start
+    # 销毁进程组，释放通信资源
+    dist.destroy_process_group()
+    # key-end
+```
+
+NCCL（NVIDIA Collective Communications Library）是 GPU 间通信的最高性能后端。其他选项包括 `gloo`（CPU/GPU 通用）和 `mpi`（高性能计算集群）。
+
+### 3.2 数据集与采样器
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+class MyDataset(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([1, 2, 3, 4], dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index:index + 1]
+
+# key-start
+sampler = DistributedSampler(dataset)  # 自动分片：4条数据 + 2个GPU → 每GPU 2条
+dataloader = DataLoader(dataset, batch_size=2, sampler=sampler)
+# key-end
+```
+
+**为什么用 DistributedSampler 而不是普通采样器**：它保证每个 GPU 拿到**不重叠**的数据分片。普通 DataLoader 会让每个 GPU 都看到完整数据集。
+
+### 3.3 模型包装
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+device_id = rank % torch.cuda.device_count()
+
+model = ToyModel().to(device_id)
+# key-start
+# DDP 包装：自动在反向传播后同步梯度
+# device_ids 指定当前进程使用的 GPU
+ddp_model = DistributedDataParallel(model, device_ids=[device_id])
+# key-end
+```
+
+DDP 在 `forward()` 时自动注册反向传播的钩子，在 `backward()` 后自动触发 AllReduce 梯度同步。
+
+### 3.4 权重保存与加载（跨设备）
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+# key-start
+if rank == 0:
+    # 只有 rank 0 保存权重，避免多个进程同时写文件
+    torch.save(ddp_model.state_dict(), ckpt_path)
+
+dist.barrier()  # 等待 rank 0 保存完成
+
+# 加载时需要做设备映射：cuda:0 → cuda:device_id
+map_location = {'cuda:0': f'cuda:{device_id}'}
+state_dict = torch.load(ckpt_path, map_location=map_location)
+ddp_model.load_state_dict(state_dict)
+# key-end
+```
+
+`map_location` 是关键——保存的权重张量位于 `cuda:0`，但 rank 1 的模型在 `cuda:1` 上，需要做设备映射。
+
+### 3.5 训练循环
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+for epoch in range(2):
+    # key-start
+    sampler.set_epoch(epoch)  # 每个 epoch 设置不同的随机种子，保证数据打乱不同
+    # key-end
+    for x in dataloader:
+        x = x.to(device_id)
+        y = ddp_model(x)
+        optimizer.zero_grad()
+        loss = loss_fn(x, y)
+        loss.backward()     # DDP 自动在此之后同步梯度
+        optimizer.step()
+```
+
+`sampler.set_epoch(epoch)` 很容易被遗忘——如果不设置，每个 epoch 的数据顺序相同，失去随机打乱的效果。
+
+### 3.6 完整主函数
+
+```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+def main():
+    setup()
+    rank = dist.get_rank()
+    device_id = rank % torch.cuda.device_count()
+
+    dataset = MyDataset()
+    sampler = DistributedSampler(dataset)
+    dataloader = DataLoader(dataset, batch_size=2, sampler=sampler)
+
+    model = ToyModel().to(device_id)
+    ddp_model = DistributedDataParallel(model, device_ids=[device_id])
+    loss_fn = nn.MSELoss()
+    optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
+
+    # ... 保存/加载权重（见上文） ...
+
+    for epoch in range(2):
+        sampler.set_epoch(epoch)
+        for x in dataloader:
+            x = x.to(device_id)
+            y = ddp_model(x)
+            optimizer.zero_grad()
+            loss = loss_fn(x, y)
+            loss.backward()
+            optimizer.step()
+
+    cleanup()
+```
+
+---
+
+## 4. 运行方式
+
+DDP 脚本不能用 `python main.py` 直接运行，需要用 `torchrun` 启动多进程：
+
+```bash
+# 单机 2 GPU
+torchrun --nproc_per_node=2 dldemos/PyTorchDistributed/main.py
+
+# 单机 4 GPU
+torchrun --nproc_per_node=4 dldemos/PyTorchDistributed/main.py
+
+# 双机，每机 2 GPU（需要在两台机器上分别执行）
+torchrun --nnodes=2 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
+```
+
+`torchrun` 会自动设置 `RANK`、`WORLD_SIZE`、`MASTER_ADDR` 等环境变量，`init_process_group` 会读取这些变量完成初始化。
+
+---
+
+## 5. 常见陷阱
+
+| 问题 | 说明 | 解决方法 |
+|------|------|---------|
+| 忘记 `set_epoch` | 每个 epoch 数据顺序相同 | 每轮循环开头调用 `sampler.set_epoch(epoch)` |
+| 所有 rank 都保存模型 | 多进程同时写文件导致冲突 | 只在 `rank == 0` 时保存 |
+| `map_location` 缺失 | 加载的权重在错误的 GPU 上 | 用 `{'cuda:0': f'cuda:{rank}'}` 映射 |
+| 忘记 `cleanup()` | 进程组未销毁，资源泄漏 | 在 `finally` 或函数末尾调用 `cleanup()` |
+| `batch_size` 含义 | 是每个 GPU 的 batch size | 全局 batch size = batch_size × world_size |
+
+---
+
+## 6. 延伸阅读
+
+- 📄 [PyTorch Distributed Data Parallel 官方教程](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 📄 [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 📄 [PyTorch Distributed: Experiences on Multi-Node Training（Li et al.，2020）](https://arxiv.org/abs/2006.15704)
+- 🔗 [本章源码：`dldemos/PyTorchDistributed/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/PyTorchDistributed)
+- ⬅️ **上一章**：[傅里叶特征](./fourier-feature)

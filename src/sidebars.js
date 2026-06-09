@@ -46,6 +46,61 @@ const sidebars = {
         },
       ],
     },
+    {
+      type: 'category',
+      label: '⚙️ 训练技巧',
+      collapsible: true,
+      collapsed: false,
+      link: {
+        type: 'generated-index',
+        title: '训练技巧系列',
+        description:
+          '从参数初始化到优化器，系统讲解深度学习训练中的关键技巧与从零实现。',
+        slug: '/training-tricks',
+      },
+      items: [
+        {
+          type: 'doc',
+          id: 'training-tricks/initialization',
+          label: '1. 参数初始化',
+        },
+        {
+          type: 'doc',
+          id: 'training-tricks/regularization',
+          label: '2. 正则化',
+        },
+        {
+          type: 'doc',
+          id: 'training-tricks/optimizer',
+          label: '3. 优化器',
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: '🚀 工程实践',
+      collapsible: true,
+      collapsed: false,
+      link: {
+        type: 'generated-index',
+        title: '工程实践系列',
+        description:
+          '从隐式表示到分布式训练，掌握深度学习前沿工程技巧。',
+        slug: '/engineering',
+      },
+      items: [
+        {
+          type: 'doc',
+          id: 'engineering/fourier-feature',
+          label: '1. 傅里叶特征',
+        },
+        {
+          type: 'doc',
+          id: 'engineering/distributed',
+          label: '2. 分布式训练',
+        },
+      ],
+    },
   ],
 };
 

@@ -1,0 +1,307 @@
+---
+id: optimizer
+title: 优化器 — 从 SGD 到 Adam
+sidebar_label: 3. 优化器
+description: 从零实现 SGD、Momentum、RMSProp、Adam 四种优化器，理解指数移动平均、自适应学习率和偏差校正的数学原理。
+keywords: [优化器, SGD, Momentum, RMSProp, Adam, 学习率调度, 深度学习, NumPy]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 优化器 — 从 SGD 到 Adam
+
+:::tip 本章要点
+- 理解 **SGD** 的局限：梯度震荡、鞍点停滞
+- 掌握 **动量**：用指数移动平均平滑梯度方向
+- 掌握 **RMSProp**：自适应学习率，对不同参数区别对待
+- 掌握 **Adam**：Momentum + RMSProp + 偏差校正，实战首选
+- 读懂 [`dldemos/AdvancedOptimizer/optimizer.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/AdvancedOptimizer/optimizer.py) 的纯 NumPy 实现
+:::
+
+> 💡 本章代码使用纯 NumPy 从零实现四种优化器，不依赖 PyTorch 的 `torch.optim`，帮助理解底层算法。
+
+---
+
+## 1. 为什么需要更好的优化器
+
+SGD（随机梯度下降）的更新规则很简单：
+
+$$
+\theta_{t+1} = \theta_t - \eta \nabla_\theta L
+$$
+
+但在实际训练中面临几个问题：
+
+- **梯度震荡**：在峡谷形损失曲面中，梯度在两侧来回弹跳，沿谷底方向进展缓慢
+- **学习率困境**：全局统一学习率，对不同参数无法区别对待——有些方向需要大步走，有些方向需要小步
+- **鞍点停滞**：在鞍点附近梯度接近零，SGD 几乎无法前进
+
+后续优化器通过**引入历史信息**来解决这些问题。
+
+---
+
+## 2. 数学原理
+
+### 2.1 SGD with Momentum
+
+引入**速度**（velocity）变量，对梯度做指数移动平均（EMA）：
+
+$$
+v_t = \beta v_{t-1} + (1 - \beta) g_t
+$$
+
+$$
+\theta_{t+1} = \theta_t - \eta \cdot v_t
+$$
+
+其中 $\beta$ 通常取 0.9。
+
+**为什么有效**：
+- 方向一致的梯度被**累加增强**（加速）
+- 方向交替的梯度被**相互抵消**（减少震荡）
+- 在峡谷地形中，沿谷底方向的动量被累积，两侧的震荡被抑制
+
+### 2.2 RMSProp
+
+对梯度的**平方**做指数移动平均，实现自适应学习率：
+
+$$
+s_t = \beta s_{t-1} + (1 - \beta) g_t^2
+$$
+
+$$
+\theta_{t+1} = \theta_t - \eta \cdot \frac{g_t}{\sqrt{s_t} + \epsilon}
+$$
+
+**为什么有效**：
+- 梯度一直很大的参数 → $s_t$ 大 → 学习率被**缩小** → 防止步子太大
+- 梯度一直很小的参数 → $s_t$ 小 → 学习率被**放大** → 避免停滞不前
+- $\epsilon$（通常 $10^{-8}$）防止除零
+
+### 2.3 Adam
+
+Adam 结合了 Momentum 和 RMSProp，并对两者都做了**偏差校正**（bias correction）：
+
+$$
+v_t = \beta_1 v_{t-1} + (1 - \beta_1) g_t \quad \text{（一阶矩估计，同 Momentum）}
+$$
+
+$$
+s_t = \beta_2 s_{t-1} + (1 - \beta_2) g_t^2 \quad \text{（二阶矩估计，同 RMSProp）}
+$$
+
+偏差校正（因为 $v_t$ 和 $s_t$ 初始化为 0，前期估计偏低）：
+
+$$
+\hat{v}_t = \frac{v_t}{1 - \beta_1^t}, \quad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}
+$$
+
+最终更新：
+
+$$
+\theta_{t+1} = \theta_t - \eta \cdot \frac{\hat{v}_t}{\sqrt{\hat{s}_t} + \epsilon}
+$$
+
+默认超参数：$\beta_1 = 0.9$，$\beta_2 = 0.999$，$\epsilon = 10^{-8}$。
+
+**为什么需要偏差校正**：初始化 $v_0 = 0$，所以 $v_1 = (1-\beta_1) g_1 = 0.1 g_1$，远小于真实梯度。除以 $1 - \beta_1^t$ 后，第一步时 $\hat{v}_1 = g_1$，消除了初始化偏差。
+
+---
+
+## 3. 代码解析
+
+### 3.1 基类：统一的优化器接口
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+class BaseOptimizer(metaclass=abc.ABCMeta):
+
+    def __init__(self,
+                 param_dict: Dict[str, np.ndarray],
+                 learning_rate: float,
+                 lr_scheduler: Callable[[float, int], float] = const_lr):
+        self.param_dict = param_dict
+        self._epoch = 0
+        self._num_step = 0
+        self._learning_rate_zero = learning_rate
+        self._lr_scheduler = lr_scheduler
+
+    @property
+    def learning_rate(self) -> float:
+        return self._lr_scheduler(self._learning_rate_zero, self.epoch)
+
+    @abc.abstractmethod
+    def step(self):
+        pass
+
+    def zero_grad(self):
+        for k in self.grad_dict:
+            self.grad_dict[k] = 0
+
+    def add_grad(self, grad_dict: Dict[str, np.ndarray]):
+        for k in self.grad_dict:
+            self.grad_dict[k] += grad_dict[k]
+```
+
+设计要点：
+- `param_dict`：用字典存储参数，方便统一遍历
+- `lr_scheduler`：可插拔的学习率调度策略
+- `step()`：子类只需实现这一个方法
+
+### 3.2 学习率调度
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+def const_lr(learning_rate_zero: float, epoch: int) -> float:
+    return learning_rate_zero
+
+def get_hyperbola_func(decay_rate: float):
+    # key-start
+    # 双曲线衰减：lr = lr₀ / (1 + epoch × decay_rate)
+    def scheduler(learning_rate_zero: float, epoch: int):
+        return learning_rate_zero / (1 + epoch * decay_rate)
+    # key-end
+    return scheduler
+```
+
+### 3.3 SGD
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+class GradientDescent(BaseOptimizer):
+
+    def step(self):
+        self._num_step += 1
+        for k in self.param_dict:
+            self.param_dict[k] -= self.learning_rate * self.grad_dict[k]
+```
+
+最简单的形式：参数减去学习率乘以梯度。
+
+### 3.4 Momentum
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+class Momentum(BaseOptimizer):
+
+    def __init__(self, param_dict, learning_rate, beta: float = 0.9, ...):
+        super().__init__(param_dict, learning_rate)
+        self.beta = beta
+        self.velocity_dict = ...  # 初始化为 0
+
+    def step(self):
+        self._num_step += 1
+        for k in self.param_dict:
+            # key-start
+            # 速度 = β × 历史速度 + (1-β) × 当前梯度
+            self.velocity_dict[k] = self.beta * self.velocity_dict[k] + \
+                (1 - self.beta) * self.grad_dict[k]
+            # 参数沿速度方向更新（而非梯度方向）
+            self.param_dict[k] -= self.learning_rate * self.velocity_dict[k]
+            # key-end
+```
+
+### 3.5 RMSProp
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+class RMSProp(BaseOptimizer):
+
+    def __init__(self, param_dict, learning_rate, beta: float = 0.9,
+                 eps: float = 1e-6, ..., correct_param=True):
+        super().__init__(param_dict, learning_rate)
+        self.beta = beta
+        self.eps = eps
+        self.s_dict = ...   # 梯度平方的 EMA，初始化为 0
+        self.correct_param = correct_param  # 是否做偏差校正
+
+    def step(self):
+        self._num_step += 1
+        for k in self.param_dict:
+            # key-start
+            # s = β × 历史 + (1-β) × 当前梯度²
+            self.s_dict[k] = self.beta * self.s_dict[k] + \
+                (1 - self.beta) * np.square(self.grad_dict[k])
+            # 偏差校正（可选）
+            if self.correct_param:
+                s = self.s_dict[k] / (1 - self.beta**self._num_step)
+            else:
+                s = self.s_dict[k]
+            # 自适应学习率：÷ √(s + ε)
+            self.param_dict[k] -= self.learning_rate * self.grad_dict[k] / (
+                np.sqrt(s + self.eps))
+            # key-end
+```
+
+### 3.6 Adam
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+class Adam(BaseOptimizer):
+
+    def __init__(self, param_dict, learning_rate,
+                 beta1: float = 0.9, beta2: float = 0.999,
+                 eps: float = 1e-8, ..., correct_param=True):
+        super().__init__(param_dict, learning_rate, lr_scheduler)
+        self.v_dict = ...  # 一阶矩（梯度的 EMA）
+        self.s_dict = ...  # 二阶矩（梯度平方的 EMA）
+
+    def step(self):
+        self._num_step += 1
+        for k in self.param_dict:
+            # key-start
+            # 一阶矩：梯度的 EMA（同 Momentum）
+            self.v_dict[k] = self.beta1 * self.v_dict[k] + \
+                (1 - self.beta1) * self.grad_dict[k]
+            # 二阶矩：梯度平方的 EMA（同 RMSProp）
+            self.s_dict[k] = self.beta2 * self.s_dict[k] + \
+                (1 - self.beta2) * (self.grad_dict[k] ** 2)
+            # 偏差校正
+            if self.correct_param:
+                v = self.v_dict[k] / (1 - self.beta1**self._num_step)
+                s = self.s_dict[k] / (1 - self.beta2**self._num_step)
+            else:
+                v = self.v_dict[k]
+                s = self.s_dict[k]
+            # 更新：校正后的一阶矩 / √(校正后的二阶矩 + ε)
+            self.param_dict[k] -= self.learning_rate * v / (np.sqrt(s) + self.eps)
+            # key-end
+```
+
+### 3.7 断点续训支持
+
+所有优化器都实现了 `save()` 和 `load()`，可以保存和恢复优化器状态（包括动量、二阶矩等）：
+
+```python title="dldemos/AdvancedOptimizer/optimizer.py" showLineNumbers
+    def save(self) -> Dict:
+        state_dict = super().save()
+        state_dict['v_dict'] = self.v_dict
+        state_dict['s_dict'] = self.s_dict
+        return state_dict
+
+    def load(self, state_dict: Dict):
+        self.v_dict = state_dict.get('v_dict', None)
+        self.s_dict = state_dict.get('s_dict', None)
+        # 如果没有保存的状态，重新初始化为 0
+        if self.v_dict is None:
+            self.v_dict = deepcopy(self.param_dict)
+            for k in self.v_dict:
+                self.v_dict[k] = 0
+        ...
+```
+
+---
+
+## 4. 四种优化器对比
+
+| 优化器 | 公式 | 自适应学习率 | 偏差校正 | 典型场景 |
+|--------|------|:----------:|:-------:|---------|
+| **SGD** | $\theta - \eta g$ | ❌ | — | 简单任务，配合精心调的学习率调度 |
+| **Momentum** | $\theta - \eta \cdot v$ | ❌ | ❌ | 峡谷形损失曲面 |
+| **RMSProp** | $\theta - \eta \frac{g}{\sqrt{s}+\epsilon}$ | ✅ | 可选 | 稀疏梯度 |
+| **Adam** | $\theta - \eta \frac{\hat{v}}{\sqrt{\hat{s}}+\epsilon}$ | ✅ | ✅ | 🏆 **实战默认选择** |
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Adam: A Method for Stochastic Optimization（Kingma & Ba，2015）](https://arxiv.org/abs/1412.6980)
+- 📄 [An overview of gradient descent optimization algorithms（Ruder，2017）](https://arxiv.org/abs/1609.04747)
+- 🔗 [本章源码：`dldemos/AdvancedOptimizer/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/AdvancedOptimizer)
+- ⬅️ **上一章**：[正则化](./regularization)
+- ➡️ **下一章**：[傅里叶特征 — 突破 MLP 的频率瓶颈](../engineering/fourier-feature)

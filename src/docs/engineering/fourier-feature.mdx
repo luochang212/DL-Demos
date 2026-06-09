@@ -1,0 +1,215 @@
+---
+id: fourier-feature
+title: 傅里叶特征 — 突破 MLP 的频率瓶颈
+sidebar_label: 1. 傅里叶特征
+description: 理解 MLP 的频谱偏置问题，掌握 Fourier Feature 映射如何让网络学到高频细节，并逐行解析 PyTorch 实现。
+keywords: [Fourier Feature, 频谱偏置, NeRF, 隐式表示, MLP, 深度学习]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 傅里叶特征 — 突破 MLP 的频率瓶颈
+
+:::tip 本章要点
+- 理解**频谱偏置**（spectral bias）：为什么 MLP 擅长学低频、不擅长学高频
+- 掌握 **Fourier Feature 映射**：通过正弦/余弦变换将低维输入映射到高维特征空间
+- 理解 **NTK 理论**：为什么 Fourier Feature 能改变网络的频率偏好
+- 读懂 [`dldemos/FourierFeature/image_mlp.ipynb`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/FourierFeature/image_mlp.ipynb) 的实验代码
+:::
+
+---
+
+## 1. 问题：用 MLP 拟合一张图片
+
+考虑一个看似简单的任务：**用一个 MLP 记住一张图片**。
+
+- **输入**：像素坐标 $(x, y)$，取值范围 $[0, 1]$
+- **输出**：该位置的 RGB 颜色值
+- **方法**：让 MLP 对每个像素坐标回归其颜色，最小化 L1 损失
+
+直觉上，一个足够宽的 MLP 应该能拟合任何连续函数。但实际实验发现：**MLP 能快速学到图片的低频轮廓，但很难学到高频细节（纹理、边缘）**。这就是**频谱偏置**（Spectral Bias）。
+
+---
+
+## 2. 数学原理
+
+### 2.1 频谱偏置的 NTK 解释
+
+Neural Tangent Kernel（NTK）理论给出了频谱偏置的数学解释。
+
+无限宽 MLP 的训练动态可以用 NTK 核函数 $K$ 描述：
+
+$$
+K(x, x') = \left\langle \nabla_\theta f(x), \nabla_\theta f(x') \right\rangle
+$$
+
+NTK 的特征值谱决定了不同频率分量的学习速度。对于标准 MLP，NTK 的特征值随频率**指数衰减**——这意味着高频分量的学习速度极慢。
+
+**本质原因**：标准 MLP 对低维输入 $(x, y)$ 的 NTK 类似于一个**低通滤波器**。
+
+### 2.2 Fourier Feature 映射
+
+解法是将输入通过一个**随机 Fourier 特征映射**：
+
+$$
+\gamma(\mathbf{v}) = \begin{bmatrix} \cos(2\pi B\mathbf{v}) \\ \sin(2\pi B\mathbf{v}) \end{bmatrix}
+$$
+
+其中 $B \in \mathbb{R}^{m \times d}$ 是一个随机矩阵，每个元素从 $\mathcal{N}(0, \sigma^2)$ 中采样。$\sigma$ 控制了映射的频率范围。
+
+**关键洞见**：经过 Fourier Feature 映射后，NTK 的核函数变成：
+
+$$
+K_\gamma(x, x') = K(\gamma(x), \gamma(x')) = \varphi(B(x - x'))
+$$
+
+NTK 的频率响应现在由 $B$ 的分布决定。通过选择合适的 $\sigma$，可以让 NTK 对目标频率范围的响应大幅增强。
+
+### 2.3 scale 参数的影响
+
+$B$ 的标准差 $\sigma$ 决定了 Fourier Feature 的「频率范围」：
+
+| $\sigma$ | 效果 |
+|----------|------|
+| 太小 | 映射频率偏低，仍然学不到高频细节 |
+| 合适 | 匹配目标信号的频率范围，拟合效果最好 |
+| 太大 | 映射频率过高，可能引入噪声 |
+
+---
+
+## 3. 代码解析
+
+实验用 MLP 拟合一张 256×256 图片，对比有无 Fourier Feature 的效果。
+
+### 3.1 基准 MLP
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+class MLP(nn.Module):
+    def __init__(self, in_c, out_c=3, hiden_states=256):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Conv2d(in_c, hiden_states, 1), nn.ReLU(), nn.BatchNorm2d(hiden_states),
+            nn.Conv2d(hiden_states, hiden_states, 1), nn.ReLU(), nn.BatchNorm2d(hiden_states),
+            nn.Conv2d(hiden_states, hiden_states, 1), nn.ReLU(), nn.BatchNorm2d(hiden_states),
+            nn.Conv2d(hiden_states, out_c, 1), nn.Sigmoid()
+        )
+    def forward(self, x):
+        return self.mlp(x)
+```
+
+用 `Conv2d(kernel_size=1)` 实现 pointwise 全连接层，方便处理 2D 特征图。
+
+### 3.2 输入坐标网格
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+H, W = input_image.shape[2:]
+h_coord = torch.linspace(0, 1, H)
+w_coord = torch.linspace(0, 1, W)
+grid = torch.stack(torch.meshgrid([h_coord, w_coord]), -1).permute(2, 0, 1).unsqueeze(0)
+```
+
+生成 `(1, 2, H, W)` 的坐标网格，每个位置的值是该像素的 $(x, y)$ 坐标（归一化到 $[0, 1]$）。
+
+### 3.3 Fourier Feature 模块
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+class FourierFeature(nn.Module):
+    def __init__(self, in_c, out_c, scale):
+        super().__init__()
+        # key-start
+        # 随机频率矩阵 B：shape (in_c, out_c//2)，元素 ~ N(0, scale²)
+        fourier_basis = torch.randn(in_c, out_c // 2) * scale
+        self.register_buffer('_fourier_basis', fourier_basis)
+        # key-end
+
+    def forward(self, x):
+        N, C, H, W = x.shape
+        # key-start
+        x = rearrange(x, 'n c h w -> (n h w) c')  # 展平空间维度
+        x = x @ self._fourier_basis                  # 线性投影：v → Bv
+        x = rearrange(x, '(n h w) c -> n c h w', h=H, w=W)
+        x = 2 * torch.pi * x                         # 乘以 2π
+        x = torch.cat([torch.sin(x), torch.cos(x)], dim=1)  # [sin, cos] 拼接
+        # key-end
+        return x
+```
+
+流程：$\mathbf{v} \xrightarrow{B\mathbf{v}} \xrightarrow{2\pi} \xrightarrow{[\sin, \cos]} \gamma(\mathbf{v})$
+
+输入维度 2，经过 `out_c // 2 = 128` 维的随机投影，再 sin/cos 拼接得到 `out_c = 256` 维特征。
+
+### 3.4 基准训练（无 Fourier Feature）
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+model = MLP(2).to(device)           # 输入维度 = 2（x, y 坐标）
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+for epoch in range(400):
+    output = model(grid)            # 直接输入坐标
+    loss = F.l1_loss(output, input_image)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+```
+
+### 3.5 Fourier Feature 训练
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+feature_length = 256
+model = MLP(feature_length).to(device)      # 输入维度 = 256（Fourier 特征）
+fourier_feature = FourierFeature(2, feature_length, 10).to(device)  # scale=10
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+for epoch in range(400):
+    x = fourier_feature(grid)               # 坐标 → Fourier 特征
+    output = model(x)
+    loss = F.l1_loss(output, input_image)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+```
+
+唯一的区别：坐标先经过 `fourier_feature` 映射再送入 MLP。
+
+### 3.6 平移不变性实验
+
+代码中还做了一个有趣的实验——将 Fourier Feature 应用于平移后的坐标，验证模型的泛化能力：
+
+```python title="dldemos/FourierFeature/image_mlp.ipynb" showLineNumbers
+# 在 Fourier 空间中做仿射变换（平移 + 旋转）
+def aff_transform(model, x, aff):
+    # ...
+    phases = model._fourier_basis.T @ aff[:2, 2:]  # 平移 → 相位偏移
+    # ...
+```
+
+这展示了 Fourier Feature 的一个重要性质：在频率空间中，空间域的平移对应于相位的偏移。
+
+---
+
+## 4. 实验对比
+
+用同一张 256×256 图片，同样的 MLP 结构，训练 400 个 epoch：
+
+| 方法 | 输入维度 | 高频细节 | Loss |
+|------|---------|---------|------|
+| **直接输入坐标** | 2 | ❌ 模糊，细节丢失 | 较高 |
+| **Fourier Feature（scale=10）** | 256 | ✅ 纹理清晰，边缘锐利 | 显著降低 |
+
+---
+
+## 5. 应用场景
+
+Fourier Feature 不仅是一个有趣的实验，它在实际研究中有广泛应用：
+
+- **NeRF（Neural Radiance Fields）**：用 Fourier Feature 编码 3D 坐标，实现高质量的新视角合成
+- **SIREN**：用正弦激活函数替代 ReLU，隐式实现类似的频率增强效果
+- **隐式神经表示**：将图像、音频、3D 形状等信号用神经网络参数化
+
+---
+
+## 6. 延伸阅读
+
+- 📄 [Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains（Tancik et al.，2020）](https://arxiv.org/abs/2006.10739)
+- 📄 [NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis（Mildenhall et al.，2020）](https://arxiv.org/abs/2003.08934)
+- 🔗 [本章源码：`dldemos/FourierFeature/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/FourierFeature)
+- ➡️ **下一章**：[分布式训练 — PyTorch DDP 实战](./distributed)

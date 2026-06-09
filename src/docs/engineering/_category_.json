@@ -1,0 +1,8 @@
+{
+  "label": "🚀 工程实践",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "从隐式表示到分布式训练，掌握深度学习前沿工程技巧。"
+  }
+}
