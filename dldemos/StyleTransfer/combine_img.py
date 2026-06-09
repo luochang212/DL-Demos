@@ -11,8 +11,8 @@ img_size = (256, 256)
 
 def read_image(image_path):
     pipeline = transforms.Compose(
-        [transforms.Resize((img_size)),
-         transforms.ToTensor()])
+        [transforms.Resize((img_size)), transforms.ToTensor()]
+    )
 
     img = Image.open(image_path)
     img = pipeline(img).unsqueeze(0)
@@ -39,8 +39,7 @@ while steps <= 10:
     def closure():
         global steps
         optimizer.zero_grad()
-        loss = F.mse_loss(input_img, style_img) + F.mse_loss(
-            input_img, content_img)
+        loss = F.mse_loss(input_img, style_img) + F.mse_loss(input_img, content_img)
         loss.backward()
         steps += 1
         if steps % 1 == 0:

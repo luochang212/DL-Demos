@@ -18,12 +18,12 @@ def get_hyperbola_func(decay_rate: float) -> Callable[[float, int], float]:
 
 
 class BaseOptimizer(metaclass=abc.ABCMeta):
-
     def __init__(
-            self,
-            param_dict: Dict[str, np.ndarray],
-            learning_rate: float,
-            lr_scheduler: Callable[[float, int], float] = const_lr) -> None:
+        self,
+        param_dict: Dict[str, np.ndarray],
+        learning_rate: float,
+        lr_scheduler: Callable[[float, int], float] = const_lr,
+    ) -> None:
         self.param_dict = param_dict
         self._epoch = 0
         self._num_step = 0
@@ -62,9 +62,7 @@ class BaseOptimizer(metaclass=abc.ABCMeta):
 
 
 class GradientDescent(BaseOptimizer):
-
-    def __init__(self, param_dict: Dict[str, np.ndarray],
-                 learning_rate: float) -> None:
+    def __init__(self, param_dict: Dict[str, np.ndarray], learning_rate: float) -> None:
         super().__init__(param_dict, learning_rate)
         self.grad_dict = deepcopy(self.param_dict)
 
@@ -81,12 +79,13 @@ class GradientDescent(BaseOptimizer):
 
 
 class Momentum(BaseOptimizer):
-
-    def __init__(self,
-                 param_dict: Dict[str, np.ndarray],
-                 learning_rate: float,
-                 beta: float = 0.9,
-                 from_scratch=False) -> None:
+    def __init__(
+        self,
+        param_dict: Dict[str, np.ndarray],
+        learning_rate: float,
+        beta: float = 0.9,
+        from_scratch=False,
+    ) -> None:
         super().__init__(param_dict, learning_rate)
         self.beta = beta
         self.grad_dict = deepcopy(self.param_dict)
@@ -111,20 +110,22 @@ class Momentum(BaseOptimizer):
     def step(self):
         self._num_step += 1
         for k in self.param_dict:
-            self.velocity_dict[k] = self.beta * self.velocity_dict[k] + \
-                (1 - self.beta) * self.grad_dict[k]
+            self.velocity_dict[k] = (
+                self.beta * self.velocity_dict[k] + (1 - self.beta) * self.grad_dict[k]
+            )
             self.param_dict[k] -= self.learning_rate * self.velocity_dict[k]
 
 
 class RMSProp(BaseOptimizer):
-
-    def __init__(self,
-                 param_dict: Dict[str, np.ndarray],
-                 learning_rate: float,
-                 beta: float = 0.9,
-                 eps: float = 1e-6,
-                 from_scratch=False,
-                 correct_param=True) -> None:
+    def __init__(
+        self,
+        param_dict: Dict[str, np.ndarray],
+        learning_rate: float,
+        beta: float = 0.9,
+        eps: float = 1e-6,
+        from_scratch=False,
+        correct_param=True,
+    ) -> None:
         super().__init__(param_dict, learning_rate)
         self.beta = beta
         self.eps = eps
@@ -151,28 +152,30 @@ class RMSProp(BaseOptimizer):
     def step(self):
         self._num_step += 1
         for k in self.param_dict:
-            self.s_dict[k] = self.beta * self.s_dict[k] + \
-                (1 - self.beta) * np.square(self.grad_dict[k])
+            self.s_dict[k] = self.beta * self.s_dict[k] + (1 - self.beta) * np.square(
+                self.grad_dict[k]
+            )
             if self.correct_param:
                 s = self.s_dict[k] / (1 - self.beta**self._num_step)
             else:
                 s = self.s_dict[k]
-            self.param_dict[k] -= self.learning_rate * self.grad_dict[k] / (
-                np.sqrt(s + self.eps))
+            self.param_dict[k] -= (
+                self.learning_rate * self.grad_dict[k] / (np.sqrt(s + self.eps))
+            )
 
 
 class Adam(BaseOptimizer):
-
     def __init__(
-            self,
-            param_dict: Dict[str, np.ndarray],
-            learning_rate: float,
-            beta1: float = 0.9,
-            beta2: float = 0.999,
-            eps: float = 1e-8,
-            from_scratch=False,
-            correct_param=True,
-            lr_scheduler: Callable[[float, int], float] = const_lr) -> None:
+        self,
+        param_dict: Dict[str, np.ndarray],
+        learning_rate: float,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
+        eps: float = 1e-8,
+        from_scratch=False,
+        correct_param=True,
+        lr_scheduler: Callable[[float, int], float] = const_lr,
+    ) -> None:
         super().__init__(param_dict, learning_rate, lr_scheduler)
         self.beta1 = beta1
         self.beta2 = beta2
@@ -208,15 +211,16 @@ class Adam(BaseOptimizer):
     def step(self):
         self._num_step += 1
         for k in self.param_dict:
-            self.v_dict[k] = self.beta1 * self.v_dict[k] + \
-                (1 - self.beta1) * self.grad_dict[k]
-            self.s_dict[k] = self.beta2 * self.s_dict[k] + \
-                (1 - self.beta2) * (self.grad_dict[k] ** 2)
+            self.v_dict[k] = (
+                self.beta1 * self.v_dict[k] + (1 - self.beta1) * self.grad_dict[k]
+            )
+            self.s_dict[k] = self.beta2 * self.s_dict[k] + (1 - self.beta2) * (
+                self.grad_dict[k] ** 2
+            )
             if self.correct_param:
                 v = self.v_dict[k] / (1 - self.beta1**self._num_step)
                 s = self.s_dict[k] / (1 - self.beta2**self._num_step)
             else:
                 v = self.v_dict[k]
                 s = self.s_dict[k]
-            self.param_dict[k] -= self.learning_rate * v / (np.sqrt(s) +
-                                                            self.eps)
+            self.param_dict[k] -= self.learning_rate * v / (np.sqrt(s) + self.eps)

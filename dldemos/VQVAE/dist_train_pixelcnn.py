@@ -21,20 +21,24 @@ def reduce_sum(tensor):
     return rt
 
 
-def train_generative_model(vqvae: VQVAE,
-                           model,
-                           img_shape=None,
-                           device='cuda',
-                           ckpt_path='dldemos/VQVAE/gen_model.pth',
-                           dataset_type='MNIST',
-                           batch_size=64,
-                           n_epochs=50):
+def train_generative_model(
+    vqvae: VQVAE,
+    model,
+    img_shape=None,
+    device='cuda',
+    ckpt_path='dldemos/VQVAE/gen_model.pth',
+    dataset_type='MNIST',
+    batch_size=64,
+    n_epochs=50,
+):
     print('batch size:', batch_size)
-    dataloader, sampler = get_dataloader(dataset_type,
-                                         batch_size,
-                                         img_shape=img_shape,
-                                         dist_train=True,
-                                         use_lmdb=USE_LMDB)
+    dataloader, sampler = get_dataloader(
+        dataset_type,
+        batch_size,
+        img_shape=img_shape,
+        dist_train=True,
+        use_lmdb=USE_LMDB,
+    )
     vqvae.to(device)
     vqvae.eval()
     model.to(device)
@@ -83,10 +87,13 @@ if __name__ == '__main__':
     device = rank % torch.cuda.device_count()
 
     vqvae = VQVAE(img_shape[0], cfg['dim'], cfg['n_embedding'])
-    gen_model = PixelCNNWithEmbedding(cfg['pixelcnn_n_blocks'],
-                                      cfg['pixelcnn_dim'],
-                                      cfg['pixelcnn_linear_dim'], True,
-                                      cfg['n_embedding'])
+    gen_model = PixelCNNWithEmbedding(
+        cfg['pixelcnn_n_blocks'],
+        cfg['pixelcnn_dim'],
+        cfg['pixelcnn_linear_dim'],
+        True,
+        cfg['n_embedding'],
+    )
 
     # 3. Train Generative model (Gated PixelCNN in our project)
     vqvae.load_state_dict(torch.load(cfg['vqvae_path']))
@@ -99,14 +106,16 @@ if __name__ == '__main__':
     # state_dict = torch.load(cfg['gen_model_path'], map_location=map_location)
     # gen_model.module.load_state_dict(state_dict)
 
-    train_generative_model(vqvae,
-                           gen_model,
-                           img_shape=(img_shape[1], img_shape[2]),
-                           device=device,
-                           ckpt_path=cfg['gen_model_path'],
-                           dataset_type=cfg['dataset_type'],
-                           batch_size=cfg['batch_size_2'],
-                           n_epochs=cfg['n_epochs_2'])
+    train_generative_model(
+        vqvae,
+        gen_model,
+        img_shape=(img_shape[1], img_shape[2]),
+        device=device,
+        ckpt_path=cfg['gen_model_path'],
+        dataset_type=cfg['dataset_type'],
+        batch_size=cfg['batch_size_2'],
+        n_epochs=cfg['n_epochs_2'],
+    )
 
     dist.destroy_process_group()
 

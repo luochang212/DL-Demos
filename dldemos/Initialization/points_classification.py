@@ -6,8 +6,7 @@ def generate_points(cnt):
 
     def draw_ring(cnt, inner_radius, outer_radius):
         angle_arr = np.random.rand(cnt) * np.pi * 2
-        length_arr = np.random.rand(cnt) * (outer_radius -
-                                            inner_radius) + inner_radius
+        length_arr = np.random.rand(cnt) * (outer_radius - inner_radius) + inner_radius
         return length_arr * np.cos(angle_arr), length_arr * np.sin(angle_arr)
 
     red_cnt = cnt // 2
@@ -15,8 +14,7 @@ def generate_points(cnt):
 
     red_x, red_y = draw_ring(red_cnt, 5, 6)
     blue_x, blue_y = draw_ring(blue_cnt, 6, 7)
-    X = np.stack((np.concatenate(
-        (red_x, blue_x)), np.concatenate((red_y, blue_y))), 1)
+    X = np.stack((np.concatenate((red_x, blue_x)), np.concatenate((red_y, blue_y))), 1)
     Y = np.array([0] * red_cnt + [1] * blue_cnt)
     return X.T, Y[..., np.newaxis].T
 

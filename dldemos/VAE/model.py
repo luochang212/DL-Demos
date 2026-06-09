@@ -18,46 +18,58 @@ class VAE(nn.Module):
         for cur_channels in hiddens:
             modules.append(
                 nn.Sequential(
-                    nn.Conv2d(prev_channels,
-                              cur_channels,
-                              kernel_size=3,
-                              stride=2,
-                              padding=1), nn.BatchNorm2d(cur_channels),
-                    nn.ReLU()))
+                    nn.Conv2d(
+                        prev_channels, cur_channels, kernel_size=3, stride=2, padding=1
+                    ),
+                    nn.BatchNorm2d(cur_channels),
+                    nn.ReLU(),
+                )
+            )
             prev_channels = cur_channels
             img_length //= 2
         self.encoder = nn.Sequential(*modules)
-        self.mean_linear = nn.Linear(prev_channels * img_length * img_length,
-                                     latent_dim)
-        self.var_linear = nn.Linear(prev_channels * img_length * img_length,
-                                    latent_dim)
+        self.mean_linear = nn.Linear(
+            prev_channels * img_length * img_length, latent_dim
+        )
+        self.var_linear = nn.Linear(prev_channels * img_length * img_length, latent_dim)
         self.latent_dim = latent_dim
         # decoder
         modules = []
         self.decoder_projection = nn.Linear(
-            latent_dim, prev_channels * img_length * img_length)
+            latent_dim, prev_channels * img_length * img_length
+        )
         self.decoder_input_chw = (prev_channels, img_length, img_length)
         for i in range(len(hiddens) - 1, 0, -1):
             modules.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(hiddens[i],
-                                       hiddens[i - 1],
-                                       kernel_size=3,
-                                       stride=2,
-                                       padding=1,
-                                       output_padding=1),
-                    nn.BatchNorm2d(hiddens[i - 1]), nn.ReLU()))
+                    nn.ConvTranspose2d(
+                        hiddens[i],
+                        hiddens[i - 1],
+                        kernel_size=3,
+                        stride=2,
+                        padding=1,
+                        output_padding=1,
+                    ),
+                    nn.BatchNorm2d(hiddens[i - 1]),
+                    nn.ReLU(),
+                )
+            )
         modules.append(
             nn.Sequential(
-                nn.ConvTranspose2d(hiddens[0],
-                                   hiddens[0],
-                                   kernel_size=3,
-                                   stride=2,
-                                   padding=1,
-                                   output_padding=1),
-                nn.BatchNorm2d(hiddens[0]), nn.ReLU(),
+                nn.ConvTranspose2d(
+                    hiddens[0],
+                    hiddens[0],
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    output_padding=1,
+                ),
+                nn.BatchNorm2d(hiddens[0]),
+                nn.ReLU(),
                 nn.Conv2d(hiddens[0], 3, kernel_size=3, stride=1, padding=1),
-                nn.ReLU()))
+                nn.ReLU(),
+            )
+        )
         self.decoder = nn.Sequential(*modules)
 
     def forward(self, x):

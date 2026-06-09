@@ -4,7 +4,6 @@ import torch.nn.functional as F
 
 
 class PositionalEncoding(nn.Module):
-
     def __init__(self, max_seq_len: int, d_model: int):
         super().__init__()
 
@@ -15,8 +14,8 @@ class PositionalEncoding(nn.Module):
         i_seq = torch.linspace(0, max_seq_len - 1, max_seq_len)
         j_seq = torch.linspace(0, d_model - 2, d_model // 2)
         pos, two_i = torch.meshgrid(i_seq, j_seq)
-        pe_2i = torch.sin(pos / 10000**(two_i / d_model))
-        pe_2i_1 = torch.cos(pos / 10000**(two_i / d_model))
+        pe_2i = torch.sin(pos / 10000 ** (two_i / d_model))
+        pe_2i_1 = torch.cos(pos / 10000 ** (two_i / d_model))
         pe = torch.stack((pe_2i, pe_2i_1), 2).reshape(max_seq_len, d_model)
 
         self.embedding = nn.Embedding(max_seq_len, d_model)
@@ -42,14 +41,9 @@ def create_activation(type):
 
 
 class ResBlock(nn.Module):
-
-    def __init__(self,
-                 shape,
-                 in_c,
-                 out_c,
-                 time_c,
-                 norm_type='ln',
-                 activation_type='silu'):
+    def __init__(
+        self, shape, in_c, out_c, time_c, norm_type='ln', activation_type='silu'
+    ):
         super().__init__()
         self.norm1 = create_norm(norm_type, shape)
         self.norm2 = create_norm(norm_type, (out_c, *shape[1:]))
@@ -78,7 +72,6 @@ class ResBlock(nn.Module):
 
 
 class SelfAttentionBlock(nn.Module):
-
     def __init__(self, shape, dim, norm_type='ln'):
         super().__init__()
 
@@ -117,21 +110,24 @@ class SelfAttentionBlock(nn.Module):
 
 
 class ResAttnBlock(nn.Module):
-
-    def __init__(self,
-                 shape,
-                 in_c,
-                 out_c,
-                 time_c,
-                 with_attn,
-                 norm_type='ln',
-                 activation_type='silu'):
+    def __init__(
+        self,
+        shape,
+        in_c,
+        out_c,
+        time_c,
+        with_attn,
+        norm_type='ln',
+        activation_type='silu',
+    ):
         super().__init__()
-        self.res_block = ResBlock(shape, in_c, out_c, time_c, norm_type,
-                                  activation_type)
+        self.res_block = ResBlock(
+            shape, in_c, out_c, time_c, norm_type, activation_type
+        )
         if with_attn:
-            self.attn_block = SelfAttentionBlock((out_c, shape[1], shape[2]),
-                                                 out_c, norm_type)
+            self.attn_block = SelfAttentionBlock(
+                (out_c, shape[1], shape[2]), out_c, norm_type
+            )
         else:
             self.attn_block = nn.Identity()
 
@@ -142,23 +138,32 @@ class ResAttnBlock(nn.Module):
 
 
 class ResAttnBlockMid(nn.Module):
-
-    def __init__(self,
-                 shape,
-                 in_c,
-                 out_c,
-                 time_c,
-                 with_attn,
-                 norm_type='ln',
-                 activation_type='silu'):
+    def __init__(
+        self,
+        shape,
+        in_c,
+        out_c,
+        time_c,
+        with_attn,
+        norm_type='ln',
+        activation_type='silu',
+    ):
         super().__init__()
-        self.res_block1 = ResBlock(shape, in_c, out_c, time_c, norm_type,
-                                   activation_type)
-        self.res_block2 = ResBlock((out_c, shape[1], shape[2]), out_c, out_c,
-                                   time_c, norm_type, activation_type)
+        self.res_block1 = ResBlock(
+            shape, in_c, out_c, time_c, norm_type, activation_type
+        )
+        self.res_block2 = ResBlock(
+            (out_c, shape[1], shape[2]),
+            out_c,
+            out_c,
+            time_c,
+            norm_type,
+            activation_type,
+        )
         if with_attn:
-            self.attn_block = SelfAttentionBlock((out_c, shape[1], shape[2]),
-                                                 out_c, norm_type)
+            self.attn_block = SelfAttentionBlock(
+                (out_c, shape[1], shape[2]), out_c, norm_type
+            )
         else:
             self.attn_block = nn.Identity()
 
@@ -170,15 +175,16 @@ class ResAttnBlockMid(nn.Module):
 
 
 class UNet(nn.Module):
-
-    def __init__(self,
-                 n_steps,
-                 img_shape,
-                 channels=[10, 20, 40, 80],
-                 pe_dim=10,
-                 with_attns=False,
-                 norm_type='ln',
-                 activation_type='silu'):
+    def __init__(
+        self,
+        n_steps,
+        img_shape,
+        channels=[10, 20, 40, 80],
+        pe_dim=10,
+        with_attns=False,
+        norm_type='ln',
+        activation_type='silu',
+    ):
         super().__init__()
         C, H, W = img_shape
         layers = len(channels)
@@ -197,26 +203,41 @@ class UNet(nn.Module):
 
         self.pe = PositionalEncoding(n_steps, pe_dim)
         time_c = 4 * channels[0]
-        self.pe_linears = nn.Sequential(nn.Linear(pe_dim, time_c),
-                                        create_activation(activation_type),
-                                        nn.Linear(time_c, time_c))
+        self.pe_linears = nn.Sequential(
+            nn.Linear(pe_dim, time_c),
+            create_activation(activation_type),
+            nn.Linear(time_c, time_c),
+        )
         self.encoders = nn.ModuleList()
         self.decoders = nn.ModuleList()
         self.downs = nn.ModuleList()
         self.ups = nn.ModuleList()
         prev_channel = channels[0]
-        for channel, cH, cW, with_attn in zip(channels[0:-1], Hs[0:-1],
-                                              Ws[0:-1], with_attns[0:-1]):
+        for channel, cH, cW, with_attn in zip(
+            channels[0:-1], Hs[0:-1], Ws[0:-1], with_attns[0:-1]
+        ):
             encoder_layer = nn.ModuleList()
             for index in range(self.NUM_RES_BLOCK):
                 if index == 0:
                     modules = ResAttnBlock(
-                        (prev_channel, cH, cW), prev_channel, channel, time_c,
-                        with_attn, norm_type, activation_type)
+                        (prev_channel, cH, cW),
+                        prev_channel,
+                        channel,
+                        time_c,
+                        with_attn,
+                        norm_type,
+                        activation_type,
+                    )
                 else:
-                    modules = ResAttnBlock((channel, cH, cW), channel, channel,
-                                           time_c, with_attn, norm_type,
-                                           activation_type)
+                    modules = ResAttnBlock(
+                        (channel, cH, cW),
+                        channel,
+                        channel,
+                        time_c,
+                        with_attn,
+                        norm_type,
+                        activation_type,
+                    )
                 encoder_layer.append(modules)
             self.encoders.append(encoder_layer)
             self.downs.append(nn.Conv2d(channel, channel, 2, 2))
@@ -225,20 +246,33 @@ class UNet(nn.Module):
         cH = Hs[-1]
         cW = Ws[-1]
         channel = channels[-1]
-        self.mid = ResAttnBlockMid((prev_channel, cH, cW), prev_channel,
-                                   channel, time_c, with_attns[-1], norm_type,
-                                   activation_type)
+        self.mid = ResAttnBlockMid(
+            (prev_channel, cH, cW),
+            prev_channel,
+            channel,
+            time_c,
+            with_attns[-1],
+            norm_type,
+            activation_type,
+        )
 
         prev_channel = channel
-        for channel, cH, cW, with_attn in zip(channels[-2::-1], Hs[-2::-1],
-                                              Ws[-2::-1], with_attns[-2::-1]):
+        for channel, cH, cW, with_attn in zip(
+            channels[-2::-1], Hs[-2::-1], Ws[-2::-1], with_attns[-2::-1]
+        ):
             self.ups.append(nn.ConvTranspose2d(prev_channel, channel, 2, 2))
 
             decoder_layer = nn.ModuleList()
             for _ in range(self.NUM_RES_BLOCK):
-                modules = ResAttnBlock((2 * channel, cH, cW), 2 * channel,
-                                       channel, time_c, with_attn, norm_type,
-                                       activation_type)
+                modules = ResAttnBlock(
+                    (2 * channel, cH, cW),
+                    2 * channel,
+                    channel,
+                    time_c,
+                    with_attn,
+                    norm_type,
+                    activation_type,
+                )
 
                 decoder_layer.append(modules)
 
@@ -266,15 +300,17 @@ class UNet(nn.Module):
             encoder_outs.append(tmp_outs)
             x = down(x)
         x = self.mid(x, pe)
-        for decoder, up, encoder_out in zip(self.decoders, self.ups,
-                                            encoder_outs[::-1]):
+        for decoder, up, encoder_out in zip(
+            self.decoders, self.ups, encoder_outs[::-1]
+        ):
             x = up(x)
 
             # If input H/W is not even
             pad_x = encoder_out[0].shape[2] - x.shape[2]
             pad_y = encoder_out[0].shape[3] - x.shape[3]
-            x = F.pad(x, (pad_x // 2, pad_x - pad_x // 2, pad_y // 2,
-                          pad_y - pad_y // 2))
+            x = F.pad(
+                x, (pad_x // 2, pad_x - pad_x // 2, pad_y // 2, pad_y - pad_y // 2)
+            )
 
             for index in range(self.NUM_RES_BLOCK):
                 c_encoder_out = encoder_out[index]

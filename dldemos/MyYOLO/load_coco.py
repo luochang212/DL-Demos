@@ -24,7 +24,8 @@ def load_img_ann():
         img_dict[img_info['id']] = {'name': img_info['file_name'], 'anns': []}
     for ann_info in root['annotations']:
         img_dict[ann_info['image_id']]['anns'].append(
-            ann_info['bbox'] + [ann_info['category_id']])
+            ann_info['bbox'] + [ann_info['category_id']]
+        )
 
     return img_dict
 
@@ -33,6 +34,7 @@ def show_img_ann(img_info):
     from PIL import Image
 
     from dldemos.nms.show_bbox import draw_bbox
+
     print(img_info)
 
     with open('data/coco/annotations/instances_val2014.json') as fp:

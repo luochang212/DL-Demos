@@ -8,8 +8,7 @@ def vertical_flip():
 
 
 def rotate(theta):
-    return np.array([[np.cos(theta), -np.sin(theta)],
-                     [np.sin(theta), np.cos(theta)]])
+    return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
 
 def half_oval(cnt, h=10, w=20):

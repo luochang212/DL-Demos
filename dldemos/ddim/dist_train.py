@@ -19,21 +19,22 @@ def reduce_sum(tensor):
     return rt
 
 
-def train(ddpm: DDPM,
-          net,
-          dataset_type,
-          resolution=None,
-          batch_size=512,
-          n_epochs=50,
-          scheduler_cfg=None,
-          device='cuda',
-          ckpt_path='dldemos/ddpm/model.pth'):
+def train(
+    ddpm: DDPM,
+    net,
+    dataset_type,
+    resolution=None,
+    batch_size=512,
+    n_epochs=50,
+    scheduler_cfg=None,
+    device='cuda',
+    ckpt_path='dldemos/ddpm/model.pth',
+):
 
     n_steps = ddpm.n_steps
-    dataloader, sampler = get_dataloader(dataset_type,
-                                         batch_size,
-                                         True,
-                                         resolution=resolution)
+    dataloader, sampler = get_dataloader(
+        dataset_type, batch_size, True, resolution=resolution
+    )
     if device == 0:
         print('batch size: ', batch_size * dist.get_world_size())
         print('batch size per device: ', batch_size)
@@ -44,7 +45,8 @@ def train(ddpm: DDPM,
     if scheduler_cfg is not None:
         optimizer = torch.optim.Adam(net.parameters(), scheduler_cfg['lr'])
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, scheduler_cfg['milestones'], scheduler_cfg['gamma'])
+            optimizer, scheduler_cfg['milestones'], scheduler_cfg['gamma']
+        )
     else:
         optimizer = torch.optim.Adam(net.parameters(), 2e-4)
         scheduler = None
@@ -56,7 +58,7 @@ def train(ddpm: DDPM,
         for x in dataloader:
             current_batch_size = x.shape[0]
             x = x.to(device)
-            t = torch.randint(0, n_steps, (current_batch_size, )).to(device)
+            t = torch.randint(0, n_steps, (current_batch_size,)).to(device)
             eps = torch.randn_like(x).to(device)
             x_t = ddpm.sample_forward(x, t, eps)
             eps_theta = net(x_t, t.reshape(current_batch_size, 1))
@@ -96,8 +98,14 @@ if __name__ == '__main__':
     img_shape = cfg['img_shape']
     to_bgr = False if cfg['dataset_type'] == 'MNIST' else True
 
-    net = UNet(n_steps, img_shape, cfg['channels'], cfg['pe_dim'],
-               cfg.get('with_attn', False), cfg.get('norm_type', 'ln'))
+    net = UNet(
+        n_steps,
+        img_shape,
+        cfg['channels'],
+        cfg['pe_dim'],
+        cfg.get('with_attn', False),
+        cfg.get('norm_type', 'ln'),
+    )
     net.to(device)
     net = DistributedDataParallel(net, device_ids=[device])
     ddpm = DDPM(device, n_steps)
@@ -108,15 +116,17 @@ if __name__ == '__main__':
     # state_dict = torch.load(resume_path, map_location=map_location)
     # net.module.load_state_dict(state_dict)
 
-    train(ddpm,
-          net,
-          cfg['dataset_type'],
-          resolution=(img_shape[1], img_shape[2]),
-          batch_size=cfg['batch_size'],
-          n_epochs=cfg['n_epochs'],
-          scheduler_cfg=cfg.get('scheduler_cfg', None),
-          device=device,
-          ckpt_path=model_path)
+    train(
+        ddpm,
+        net,
+        cfg['dataset_type'],
+        resolution=(img_shape[1], img_shape[2]),
+        batch_size=cfg['batch_size'],
+        n_epochs=cfg['n_epochs'],
+        scheduler_cfg=cfg.get('scheduler_cfg', None),
+        device=device,
+        ckpt_path=model_path,
+    )
 
     dist.destroy_process_group()
 

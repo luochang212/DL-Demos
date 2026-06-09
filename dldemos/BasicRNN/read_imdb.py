@@ -13,10 +13,7 @@ def read_imdb(dir='data/aclImdb', split='pos', is_train=True):
     return lines
 
 
-def read_imdb_words(dir='data/aclImdb',
-                    split='pos',
-                    is_train=True,
-                    n_files=1000):
+def read_imdb_words(dir='data/aclImdb', split='pos', is_train=True, n_files=1000):
     subdir = 'train' if is_train else 'test'
     dir = os.path.join(dir, subdir, split)
     all_str = ''
@@ -28,7 +25,7 @@ def read_imdb_words(dir='data/aclImdb',
             all_str += line
         n_files -= 1
 
-    words = re.sub(u'([^\u0020\u0061-\u007a])', '', all_str.lower()).split(' ')
+    words = re.sub('([^\u0020\u0061-\u007a])', '', all_str.lower()).split(' ')
 
     return words
 
@@ -37,8 +34,7 @@ def read_imdb_vocab(dir='data/aclImdb'):
     fn = os.path.join(dir, 'imdb.vocab')
     with open(fn, 'rb') as f:
         word = f.read().decode('utf-8').replace('\n', ' ')
-        words = re.sub(u'([^\u0020\u0061-\u007a])', '',
-                       word.lower()).split(' ')
+        words = re.sub('([^\u0020\u0061-\u007a])', '', word.lower()).split(' ')
         filtered_words = [w for w in words if len(w) > 0]
 
     return filtered_words

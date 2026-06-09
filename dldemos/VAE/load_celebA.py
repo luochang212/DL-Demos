@@ -7,7 +7,6 @@ from torchvision import transforms
 
 
 class CelebADataset(Dataset):
-
     def __init__(self, root, img_shape=(64, 64)) -> None:
         super().__init__()
         self.root = root
@@ -20,11 +19,13 @@ class CelebADataset(Dataset):
     def __getitem__(self, index: int):
         path = os.path.join(self.root, self.filenames[index])
         img = Image.open(path).convert('RGB')
-        pipeline = transforms.Compose([
-            transforms.CenterCrop(168),
-            transforms.Resize(self.img_shape),
-            transforms.ToTensor()
-        ])
+        pipeline = transforms.Compose(
+            [
+                transforms.CenterCrop(168),
+                transforms.Resize(self.img_shape),
+                transforms.ToTensor(),
+            ]
+        )
         return pipeline(img)
 
 

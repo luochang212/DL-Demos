@@ -5,8 +5,9 @@ import pytest
 import torch
 
 
-def conv2d_forward(input: np.ndarray, weight: np.ndarray, bias: np.ndarray,
-                   stride: int, padding: int) -> Dict[str, np.ndarray]:
+def conv2d_forward(
+    input: np.ndarray, weight: np.ndarray, bias: np.ndarray, stride: int, padding: int
+) -> Dict[str, np.ndarray]:
     """2D Convolution Forward Implemented with NumPy.
 
     Args:
@@ -24,9 +25,9 @@ def conv2d_forward(input: np.ndarray, weight: np.ndarray, bias: np.ndarray,
     h_i, w_i, c_i = input.shape
     c_o, f, f_2, c_k = weight.shape
 
-    assert (f == f_2)
-    assert (c_i == c_k)
-    assert (bias.shape[0] == c_o)
+    assert f == f_2
+    assert c_i == c_k
+    assert bias.shape[0] == c_o
 
     input_pad = np.pad(input, [(padding, padding), (padding, padding), (0, 0)])
 
@@ -58,8 +59,9 @@ def conv2d_forward(input: np.ndarray, weight: np.ndarray, bias: np.ndarray,
     return cache
 
 
-def conv2d_backward(dZ: np.ndarray, cache: Dict[str, np.ndarray], stride: int,
-                    padding: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def conv2d_backward(
+    dZ: np.ndarray, cache: Dict[str, np.ndarray], stride: int, padding: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """2D Convolution Backward Implemented with NumPy.
 
     Args:
@@ -84,14 +86,12 @@ def conv2d_backward(dZ: np.ndarray, cache: Dict[str, np.ndarray], stride: int,
     c_o, f, f_2, c_k = W.shape
     h_o, w_o, c_o_2 = dZ.shape
 
-    assert (f == f_2)
-    assert (c_i == c_k)
-    assert (c_o == c_o_2)
+    assert f == f_2
+    assert c_i == c_k
+    assert c_o == c_o_2
 
-    A_prev_pad = np.pad(A_prev, [(padding, padding), (padding, padding),
-                                 (0, 0)])
-    dA_prev_pad = np.pad(dA_prev, [(padding, padding), (padding, padding),
-                                   (0, 0)])
+    A_prev_pad = np.pad(A_prev, [(padding, padding), (padding, padding), (0, 0)])
+    dA_prev_pad = np.pad(dA_prev, [(padding, padding), (padding, padding), (0, 0)])
 
     for i_h in range(h_o):
         for i_w in range(w_o):
@@ -109,8 +109,9 @@ def conv2d_backward(dZ: np.ndarray, cache: Dict[str, np.ndarray], stride: int,
 
                 # backward
                 dW[i_c] += input_slice * dZ[i_h, i_w, i_c]
-                dA_prev_pad[h_lower:h_upper,
-                            w_lower:w_upper, :] += W[i_c] * dZ[i_h, i_w, i_c]
+                dA_prev_pad[h_lower:h_upper, w_lower:w_upper, :] += (
+                    W[i_c] * dZ[i_h, i_w, i_c]
+                )
                 db[i_c] += dZ[i_h, i_w, i_c]
 
     if padding > 0:
@@ -131,17 +132,19 @@ def test_conv(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str):
     weight = np.random.randn(c_o, kernel_size, kernel_size, c_i)
     bias = np.random.randn(c_o)
 
-    torch_input = torch.from_numpy(np.transpose(
-        input, (2, 0, 1))).unsqueeze(0).requires_grad_()
-    torch_weight = torch.from_numpy(np.transpose(
-        weight, (0, 3, 1, 2))).requires_grad_()
+    torch_input = (
+        torch.from_numpy(np.transpose(input, (2, 0, 1))).unsqueeze(0).requires_grad_()
+    )
+    torch_weight = torch.from_numpy(np.transpose(weight, (0, 3, 1, 2))).requires_grad_()
     torch_bias = torch.from_numpy(bias).requires_grad_()
 
     # forward
-    torch_output_tensor = torch.conv2d(torch_input, torch_weight, torch_bias,
-                                       stride, padding)
+    torch_output_tensor = torch.conv2d(
+        torch_input, torch_weight, torch_bias, stride, padding
+    )
     torch_output = np.transpose(
-        torch_output_tensor.detach().numpy().squeeze(0), (1, 2, 0))
+        torch_output_tensor.detach().numpy().squeeze(0), (1, 2, 0)
+    )
 
     cache = conv2d_forward(input, weight, bias, stride, padding)
     numpy_output = cache['Z']
@@ -153,8 +156,7 @@ def test_conv(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str):
     torch_sum.backward()
     torch_dW = np.transpose(torch_weight.grad.numpy(), (0, 2, 3, 1))
     torch_db = torch_bias.grad.numpy()
-    torch_dA_prev = np.transpose(torch_input.grad.numpy().squeeze(0),
-                                 (1, 2, 0))
+    torch_dA_prev = np.transpose(torch_input.grad.numpy().squeeze(0), (1, 2, 0))
 
     dZ = np.ones(numpy_output.shape)
     dW, db, dA_prev = conv2d_backward(dZ, cache, stride, padding)

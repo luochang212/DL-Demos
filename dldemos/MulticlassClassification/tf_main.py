@@ -4,11 +4,14 @@ import numpy as np
 import tensorflow as tf
 
 from dldemos.MulticlassClassification.points_classification import (
-    generate_plot_set, generate_points, plot_points, visualize)
+    generate_plot_set,
+    generate_points,
+    plot_points,
+    visualize,
+)
 
 
-class MulticlassClassificationNet():
-
+class MulticlassClassificationNet:
     def __init__(self, neuron_cnt: List[int]):
         self.num_layer = len(neuron_cnt) - 1
         self.neuron_cnt = neuron_cnt
@@ -17,10 +20,9 @@ class MulticlassClassificationNet():
         initializer = tf.keras.initializers.HeNormal(seed=1)
         for i in range(self.num_layer):
             self.W.append(
-                tf.Variable(
-                    initializer(shape=(neuron_cnt[i + 1], neuron_cnt[i]))))
-            self.b.append(
-                tf.Variable(initializer(shape=(neuron_cnt[i + 1], 1))))
+                tf.Variable(initializer(shape=(neuron_cnt[i + 1], neuron_cnt[i])))
+            )
+            self.b.append(tf.Variable(initializer(shape=(neuron_cnt[i + 1], 1))))
         self.trainable_vars = self.W + self.b
 
     def forward(self, X):
@@ -36,8 +38,10 @@ class MulticlassClassificationNet():
 
     def loss(self, Y, Y_hat):
         return tf.reduce_mean(
-            tf.keras.losses.categorical_crossentropy(tf.transpose(Y),
-                                                     tf.transpose(Y_hat)))
+            tf.keras.losses.categorical_crossentropy(
+                tf.transpose(Y), tf.transpose(Y_hat)
+            )
+        )
 
     def evaluate(self, X, Y, return_loss=False):
         Y_hat = self.forward(X)
@@ -52,12 +56,9 @@ class MulticlassClassificationNet():
             return accuracy
 
 
-def train(model: MulticlassClassificationNet,
-          X,
-          Y,
-          step,
-          learning_rate,
-          print_interval=100):
+def train(
+    model: MulticlassClassificationNet, X, Y, step, learning_rate, print_interval=100
+):
     optimizer = tf.keras.optimizers.Adam(learning_rate)
     for s in range(step):
         with tf.GradientTape() as tape:

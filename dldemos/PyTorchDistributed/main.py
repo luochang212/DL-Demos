@@ -18,7 +18,6 @@ def cleanup():
 
 
 class ToyModel(nn.Module):
-
     def __init__(self) -> None:
         super().__init__()
         self.layer = nn.Linear(1, 1)
@@ -28,7 +27,6 @@ class ToyModel(nn.Module):
 
 
 class MyDataset(Dataset):
-
     def __init__(self):
         super().__init__()
         self.data = torch.tensor([1, 2, 3, 4], dtype=torch.float32)
@@ -37,7 +35,7 @@ class MyDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        return self.data[index:index + 1]
+        return self.data[index : index + 1]
 
 
 ckpt_path = 'tmp.pth'

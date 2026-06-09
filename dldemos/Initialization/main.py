@@ -3,15 +3,16 @@ from typing import List
 
 import numpy as np
 
-from dldemos.Initialization.points_classification import (generate_plot_set,
-                                                          generate_points,
-                                                          plot_points,
-                                                          visualize)
+from dldemos.Initialization.points_classification import (
+    generate_plot_set,
+    generate_points,
+    plot_points,
+    visualize,
+)
 from dldemos.utils import get_activation_de_func, get_activation_func, sigmoid
 
 
 class BaseRegressionModel(metaclass=abc.ABCMeta):
-
     def __init__(self):
         pass
 
@@ -42,11 +43,9 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
 
 
 class DeepNetwork(BaseRegressionModel):
-
-    def __init__(self,
-                 neuron_cnt: List[int],
-                 activation_func: List[str],
-                 initialization='zeros'):
+    def __init__(
+        self, neuron_cnt: List[int], activation_func: List[str], initialization='zeros'
+    ):
         assert len(neuron_cnt) - 2 == len(activation_func)
         self.num_layer = len(neuron_cnt) - 1
         self.neuron_cnt = neuron_cnt
@@ -57,12 +56,12 @@ class DeepNetwork(BaseRegressionModel):
             if initialization == 'zeros':
                 self.W.append(np.zeros((neuron_cnt[i + 1], neuron_cnt[i])))
             elif initialization == 'random':
-                self.W.append(
-                    np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 5)
+                self.W.append(np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 5)
             elif initialization == 'he':
                 self.W.append(
-                    np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) *
-                    np.sqrt(2 / neuron_cnt[i]))
+                    np.random.randn(neuron_cnt[i + 1], neuron_cnt[i])
+                    * np.sqrt(2 / neuron_cnt[i])
+                )
             self.b.append(np.zeros((neuron_cnt[i + 1], 1)))
 
         self.Z_cache = [None] * self.num_layer
@@ -87,7 +86,7 @@ class DeepNetwork(BaseRegressionModel):
         return A
 
     def backward(self, Y):
-        assert (self.m == Y.shape[1])
+        assert self.m == Y.shape[1]
 
         dA = 0
         for i in range(self.num_layer - 1, -1, -1):
@@ -95,7 +94,8 @@ class DeepNetwork(BaseRegressionModel):
                 dZ = self.A_cache[-1] - Y
             else:
                 dZ = dA * get_activation_de_func(self.activation_func[i])(
-                    self.Z_cache[i])
+                    self.Z_cache[i]
+                )
             dW = np.dot(dZ, self.A_cache[i].T) / self.m
             db = np.mean(dZ, axis=1, keepdims=True)
             dA = np.dot(self.W[i].T, dZ)
@@ -108,14 +108,16 @@ class DeepNetwork(BaseRegressionModel):
             self.b[i] -= learning_rate * self.db_cache[i]
 
 
-def train(model: BaseRegressionModel,
-          X,
-          Y,
-          step,
-          learning_rate,
-          print_interval=100,
-          test_X=None,
-          test_Y=None):
+def train(
+    model: BaseRegressionModel,
+    X,
+    Y,
+    step,
+    learning_rate,
+    print_interval=100,
+    test_X=None,
+    test_Y=None,
+):
     for s in range(step):
         Y_hat = model.forward(X)
         model.backward(Y)
@@ -125,9 +127,7 @@ def train(model: BaseRegressionModel,
             print(f'Step: {s}')
             print(f'Train loss: {loss}')
             if test_X is not None and test_Y is not None:
-                accuracy, loss = model.evaluate(test_X,
-                                                test_Y,
-                                                return_loss=True)
+                accuracy, loss = model.evaluate(test_X, test_Y, return_loss=True)
                 print(f'Test loss: {loss}')
                 print(f'Test accuracy: {accuracy}')
 

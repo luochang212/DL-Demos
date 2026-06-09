@@ -12,7 +12,6 @@ GLOVE = GloVe(name='6B', dim=GLOVE_DIM)
 
 
 class IMDBDataset(Dataset):
-
     def __init__(self, is_train=True, dir='data/aclImdb'):
         super().__init__()
         self.tokenizer = get_tokenizer('basic_english')
@@ -41,19 +40,16 @@ def get_dataloader(dir='data/aclImdb'):
         y = torch.Tensor(y)
         return x_pad, lengths, y
 
-    train_dataloader = DataLoader(IMDBDataset(True, dir),
-                                  batch_size=32,
-                                  shuffle=True,
-                                  collate_fn=collate_fn)
-    test_dataloader = DataLoader(IMDBDataset(False, dir),
-                                 batch_size=32,
-                                 shuffle=True,
-                                 collate_fn=collate_fn)
+    train_dataloader = DataLoader(
+        IMDBDataset(True, dir), batch_size=32, shuffle=True, collate_fn=collate_fn
+    )
+    test_dataloader = DataLoader(
+        IMDBDataset(False, dir), batch_size=32, shuffle=True, collate_fn=collate_fn
+    )
     return train_dataloader, test_dataloader
 
 
 class RNN(torch.nn.Module):
-
     def __init__(self, hidden_units=64, dropout_rate=0.5):
         super().__init__()
         self.drop = nn.Dropout(dropout_rate)
@@ -64,10 +60,9 @@ class RNN(torch.nn.Module):
     def forward(self, x: torch.Tensor, lengths: torch.Tensor):
         # x shape: [batch, max_word_length, embedding_length]
         emb = self.drop(x)
-        packed = pack_padded_sequence(emb,
-                                      lengths.cpu(),
-                                      batch_first=True,
-                                      enforce_sorted=False)
+        packed = pack_padded_sequence(
+            emb, lengths.cpu(), batch_first=True, enforce_sorted=False
+        )
         _, hidden = self.rnn(packed)
         output = self.linear(hidden[-1])
         output = self.sigmoid(output)
@@ -85,7 +80,6 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     citerion = torch.nn.BCELoss()
     for epoch in range(100):
-
         loss_sum = 0
         dataset_len = len(train_dataloader.dataset)
 
@@ -131,12 +125,14 @@ def main():
 
     # Inference
     tokenizer = get_tokenizer('basic_english')
-    article = 'U.S. stock indexes fell Tuesday, driven by expectations for ' \
-        'tighter Federal Reserve policy and an energy crisis in Europe. ' \
-        'Stocks around the globe have come under pressure in recent weeks ' \
-        'as worries about tighter monetary policy in the U.S. and a '\
-        'darkening economic outlook in Europe have led investors to '\
+    article = (
+        'U.S. stock indexes fell Tuesday, driven by expectations for '
+        'tighter Federal Reserve policy and an energy crisis in Europe. '
+        'Stocks around the globe have come under pressure in recent weeks '
+        'as worries about tighter monetary policy in the U.S. and a '
+        'darkening economic outlook in Europe have led investors to '
         'sell riskier assets.'
+    )
 
     x = GLOVE.get_vecs_by_tokens(tokenizer(article)).unsqueeze(0).to(device)
     lengths = torch.tensor([x.shape[1]])

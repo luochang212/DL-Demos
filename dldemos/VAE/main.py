@@ -16,7 +16,8 @@ lr = 0.005
 def loss_fn(y, y_hat, mean, logvar):
     recons_loss = F.mse_loss(y_hat, y)
     kl_loss = torch.mean(
-        -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0)
+        -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0
+    )
     loss = recons_loss + kl_loss * kl_weight
     return loss
 

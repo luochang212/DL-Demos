@@ -35,7 +35,6 @@ def download_mnist():
 
 
 class CelebADataset(Dataset):
-
     def __init__(self, root, img_shape=(64, 64)):
         super().__init__()
         self.root = root
@@ -48,11 +47,13 @@ class CelebADataset(Dataset):
     def __getitem__(self, index: int):
         path = os.path.join(self.root, self.filenames[index])
         img = Image.open(path)
-        pipeline = transforms.Compose([
-            transforms.CenterCrop(168),
-            transforms.Resize(self.img_shape),
-            transforms.ToTensor()
-        ])
+        pipeline = transforms.Compose(
+            [
+                transforms.CenterCrop(168),
+                transforms.Resize(self.img_shape),
+                transforms.ToTensor(),
+            ]
+        )
         return pipeline(img)
 
 
@@ -60,18 +61,18 @@ if TO_LMDB:
     from dldemos.lmdb_loader import ImageFolderLMDB
 
     class CelebALMDBDataset(ImageFolderLMDB):
-
         def __init__(self, path, img_shape=(64, 64)):
-            pipeline = transforms.Compose([
-                transforms.CenterCrop(168),
-                transforms.Resize(img_shape),
-                transforms.ToTensor()
-            ])
+            pipeline = transforms.Compose(
+                [
+                    transforms.CenterCrop(168),
+                    transforms.Resize(img_shape),
+                    transforms.ToTensor(),
+                ]
+            )
             super().__init__(path, pipeline)
 
 
 class MNISTImageDataset(Dataset):
-
     def __init__(self, img_shape=(28, 28)):
         super().__init__()
         self.img_shape = img_shape
@@ -83,18 +84,20 @@ class MNISTImageDataset(Dataset):
     def __getitem__(self, index: int):
         img = self.mnist[index][0]
         pipeline = transforms.Compose(
-            [transforms.Resize(self.img_shape),
-             transforms.ToTensor()])
+            [transforms.Resize(self.img_shape), transforms.ToTensor()]
+        )
         return pipeline(img)
 
 
-def get_dataloader(type,
-                   batch_size,
-                   img_shape=None,
-                   dist_train=False,
-                   num_workers=4,
-                   use_lmdb=False,
-                   **kwargs):
+def get_dataloader(
+    type,
+    batch_size,
+    img_shape=None,
+    dist_train=False,
+    num_workers=4,
+    use_lmdb=False,
+    **kwargs,
+):
     if type == 'CelebA':
         if img_shape is not None:
             kwargs['img_shape'] = img_shape
@@ -116,16 +119,14 @@ def get_dataloader(type,
             dataset = MNISTImageDataset()
     if dist_train:
         sampler = DistributedSampler(dataset)
-        dataloader = DataLoader(dataset,
-                                batch_size=batch_size,
-                                sampler=sampler,
-                                num_workers=num_workers)
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, sampler=sampler, num_workers=num_workers
+        )
         return dataloader, sampler
     else:
-        dataloader = DataLoader(dataset,
-                                batch_size=batch_size,
-                                shuffle=True,
-                                num_workers=num_workers)
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
         return dataloader
 
 
@@ -137,9 +138,7 @@ if __name__ == '__main__':
         img = next(iter(dataloader))
         print(img.shape)
         N = img.shape[0]
-        img = einops.rearrange(img,
-                               '(n1 n2) c h w -> c (n1 h) (n2 w)',
-                               n1=int(N**0.5))
+        img = einops.rearrange(img, '(n1 n2) c h w -> c (n1 h) (n2 w)', n1=int(N**0.5))
         print(img.shape)
         print(img.max())
         print(img.min())
@@ -147,6 +146,7 @@ if __name__ == '__main__':
         img.save('work_dirs/tmp_celeba.jpg')
         if TO_LMDB:
             from dldemos.lmdb_loader import folder2lmdb
+
             folder2lmdb(CELEBA_DIR, CELEBA_LMDB_PATH)
 
     if os.path.exists(CELEBA_HQ_DIR):
@@ -154,9 +154,7 @@ if __name__ == '__main__':
         img = next(iter(dataloader))
         print(img.shape)
         N = img.shape[0]
-        img = einops.rearrange(img,
-                               '(n1 n2) c h w -> c (n1 h) (n2 w)',
-                               n1=int(N**0.5))
+        img = einops.rearrange(img, '(n1 n2) c h w -> c (n1 h) (n2 w)', n1=int(N**0.5))
         print(img.shape)
         print(img.max())
         print(img.min())
@@ -164,6 +162,7 @@ if __name__ == '__main__':
         img.save('work_dirs/tmp_celebahq.jpg')
         if TO_LMDB:
             from dldemos.lmdb_loader import folder2lmdb
+
             folder2lmdb(CELEBA_HQ_DIR, CELEBA_HQ_LMDB_PATH)
 
     download_mnist()

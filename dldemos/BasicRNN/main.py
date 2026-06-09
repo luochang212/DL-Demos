@@ -50,7 +50,6 @@ def onehot_to_word(arr):
 
 
 class WordDataset(Dataset):
-
     def __init__(self, words, max_length, is_onehot=True):
         super().__init__()
         n_words = len(words)
@@ -81,9 +80,7 @@ class WordDataset(Dataset):
         return tensor
 
 
-def get_dataloader_and_max_length(limit_length=None,
-                                  is_onehot=True,
-                                  is_vocab=True):
+def get_dataloader_and_max_length(limit_length=None, is_onehot=True, is_vocab=True):
 
     if is_vocab:
         words = read_imdb_vocab()
@@ -106,9 +103,26 @@ def get_dataloader_and_max_length(limit_length=None,
 
 
 test_words = [
-    'apple', 'appll', 'appla', 'apply', 'bear', 'beer', 'berr', 'beee', 'car',
-    'cae', 'cat', 'cac', 'caq', 'query', 'queee', 'queue', 'queen', 'quest',
-    'quess', 'quees'
+    'apple',
+    'appll',
+    'appla',
+    'apply',
+    'bear',
+    'beer',
+    'berr',
+    'beee',
+    'car',
+    'cae',
+    'cat',
+    'cac',
+    'caq',
+    'query',
+    'queee',
+    'queue',
+    'queen',
+    'quest',
+    'quess',
+    'quees',
 ]
 
 
@@ -121,7 +135,6 @@ def train_rnn1():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     citerion = torch.nn.CrossEntropyLoss()
     for epoch in range(5):
-
         loss_sum = 0
         dataset_len = len(dataloader.dataset)
 
@@ -156,7 +169,6 @@ def train_rnn2():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     citerion = torch.nn.CrossEntropyLoss()
     for epoch in range(5):
-
         loss_sum = 0
         dataset_len = len(dataloader.dataset)
 
@@ -165,7 +177,7 @@ def train_rnn2():
             hat_y = model(y)
             n, Tx, _ = hat_y.shape
             hat_y = torch.reshape(hat_y, (n * Tx, -1))
-            label_y = torch.reshape(y, (n * Tx, ))
+            label_y = torch.reshape(y, (n * Tx,))
             loss = citerion(hat_y, label_y)
 
             optimizer.zero_grad()
@@ -205,8 +217,7 @@ def rnn1():
     # rnn1 = train_rnn1()
 
     # Or load the models
-    state_dict = torch.load('dldemos/BasicRNN/rnn1_vocab.pth',
-                            map_location='cuda')
+    state_dict = torch.load('dldemos/BasicRNN/rnn1_vocab.pth', map_location='cuda')
     rnn1 = RNN1().to('cuda')
     rnn1.load_state_dict(state_dict)
 

@@ -38,13 +38,10 @@ def get_cat_set(
     test_size=200,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
-    train_X = load_set(os.path.join(data_root, 'training_set'), train_size,
-                       img_shape)
-    test_X = load_set(os.path.join(data_root, 'test_set'), test_size,
-                      img_shape)
+    train_X = load_set(os.path.join(data_root, 'training_set'), train_size, img_shape)
+    test_X = load_set(os.path.join(data_root, 'test_set'), test_size, img_shape)
 
     train_Y = np.array([1] * train_size + [0] * train_size)
     test_Y = np.array([1] * test_size + [0] * test_size)
 
-    return train_X.T, np.expand_dims(train_Y,
-                                     0), test_X.T, np.expand_dims(test_Y.T, 0)
+    return train_X.T, np.expand_dims(train_Y, 0), test_X.T, np.expand_dims(test_Y.T, 0)

@@ -22,8 +22,7 @@ def download_dataset():
 
 
 def get_dataloader(batch_size: int):
-    dataset = torchvision.datasets.MNIST(root='./data/mnist',
-                                         transform=ToTensor())
+    dataset = torchvision.datasets.MNIST(root='./data/mnist', transform=ToTensor())
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 
@@ -33,5 +32,6 @@ def get_img_shape():
 
 if __name__ == '__main__':
     import os
+
     os.makedirs('work_dirs', exist_ok=True)
     download_dataset()

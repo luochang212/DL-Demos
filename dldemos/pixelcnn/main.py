@@ -55,15 +55,14 @@ def sample(model, device, model_path, output_path, n_sample=81):
             for j in range(W):
                 output = model(x)
                 prob_dist = F.softmax(output[:, :, i, j], -1)
-                pixel = torch.multinomial(prob_dist,
-                                          1).float() / (color_level - 1)
+                pixel = torch.multinomial(prob_dist, 1).float() / (color_level - 1)
                 x[:, :, i, j] = pixel
 
     imgs = x * 255
     imgs = imgs.clamp(0, 255)
-    imgs = einops.rearrange(imgs,
-                            '(b1 b2) c h w -> (b1 h) (b2 w) c',
-                            b1=int(n_sample**0.5))
+    imgs = einops.rearrange(
+        imgs, '(b1 b2) c h w -> (b1 h) (b2 w) c', b1=int(n_sample**0.5)
+    )
 
     imgs = imgs.detach().cpu().numpy().astype(np.uint8)
 
@@ -72,7 +71,7 @@ def sample(model, device, model_path, output_path, n_sample=81):
 
 models = [
     PixelCNN(15, 128, 32, False, color_level),
-    GatedPixelCNN(15, 128, 32, False, color_level)
+    GatedPixelCNN(15, 128, 32, False, color_level),
 ]
 
 if __name__ == '__main__':
@@ -82,5 +81,6 @@ if __name__ == '__main__':
     device = 'cuda'
     model_path = f'dldemos/pixelcnn/model_{model_id}_{color_level}.pth'
     train(model, device, model_path)
-    sample(model, device, model_path,
-           f'work_dirs/pixelcnn_{model_id}_{color_level}.jpg')
+    sample(
+        model, device, model_path, f'work_dirs/pixelcnn_{model_id}_{color_level}.jpg'
+    )

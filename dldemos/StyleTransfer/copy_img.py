@@ -11,8 +11,8 @@ img_size = (256, 256)
 
 def read_image(image_path):
     pipeline = transforms.Compose(
-        [transforms.Resize((img_size)),
-         transforms.ToTensor()])
+        [transforms.Resize((img_size)), transforms.ToTensor()]
+    )
 
     img = Image.open(image_path)
     img = pipeline(img).unsqueeze(0)

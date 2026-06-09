@@ -3,13 +3,15 @@ import pytest
 import torch
 
 
-def conv2d(input: np.ndarray,
-           weight: np.ndarray,
-           stride: int,
-           padding: int,
-           dilation: int,
-           groups: int,
-           bias: np.ndarray = None) -> np.ndarray:
+def conv2d(
+    input: np.ndarray,
+    weight: np.ndarray,
+    stride: int,
+    padding: int,
+    dilation: int,
+    groups: int,
+    bias: np.ndarray = None,
+) -> np.ndarray:
     """2D Convolution Implemented with NumPy.
 
     Args:
@@ -29,12 +31,12 @@ def conv2d(input: np.ndarray,
     h_i, w_i, c_i = input.shape
     c_o, f, f_2, c_k = weight.shape
 
-    assert (f == f_2)
-    assert (c_i % groups == 0)
-    assert (c_o % groups == 0)
-    assert (c_i // groups == c_k)
+    assert f == f_2
+    assert c_i % groups == 0
+    assert c_o % groups == 0
+    assert c_i // groups == c_k
     if bias is not None:
-        assert (bias.shape[0] == c_o)
+        assert bias.shape[0] == c_o
 
     f_new = f + (f - 1) * (dilation - 1)
     weight_new = np.zeros((c_o, f_new, f_new, c_k), dtype=weight.dtype)
@@ -44,8 +46,9 @@ def conv2d(input: np.ndarray,
                 for j_f in range(f):
                     i_f_new = i_f * dilation
                     j_f_new = j_f * dilation
-                    weight_new[i_c_o, i_f_new, j_f_new, i_c_k] = \
-                        weight[i_c_o, i_f, j_f, i_c_k]
+                    weight_new[i_c_o, i_f_new, j_f_new, i_c_k] = weight[
+                        i_c_o, i_f, j_f, i_c_k
+                    ]
 
     input_pad = np.pad(input, [(padding, padding), (padding, padding), (0, 0)])
 
@@ -69,8 +72,9 @@ def conv2d(input: np.ndarray,
                 w_upper = i_w * stride + f_new
                 c_lower = i_g * c_k
                 c_upper = (i_g + 1) * c_k
-                input_slice = input_pad[h_lower:h_upper, w_lower:w_upper,
-                                        c_lower:c_upper]
+                input_slice = input_pad[
+                    h_lower:h_upper, w_lower:w_upper, c_lower:c_upper
+                ]
                 kernel_slice = weight_new[i_c]
                 output[i_h, i_w, i_c] = np.sum(input_slice * kernel_slice)
                 if bias is not None:
@@ -85,8 +89,16 @@ def conv2d(input: np.ndarray,
 @pytest.mark.parametrize('dilation', [1, 2])
 @pytest.mark.parametrize('groups', ['1', 'all'])
 @pytest.mark.parametrize('bias', [False, True])
-def test_conv(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str,
-              dilation: int, groups: str, bias: bool):
+def test_conv(
+    c_i: int,
+    c_o: int,
+    kernel_size: int,
+    stride: int,
+    padding: str,
+    dilation: int,
+    groups: str,
+    bias: bool,
+):
     if groups == '1':
         groups = 1
     elif groups == 'all':
@@ -104,11 +116,11 @@ def test_conv(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str,
 
     torch_input = torch.from_numpy(np.transpose(input, (2, 0, 1))).unsqueeze(0)
     torch_weight = torch.from_numpy(np.transpose(weight, (0, 3, 1, 2)))
-    torch_output = torch.conv2d(torch_input, torch_weight, torch_bias, stride,
-                                padding, dilation, groups).numpy()
+    torch_output = torch.conv2d(
+        torch_input, torch_weight, torch_bias, stride, padding, dilation, groups
+    ).numpy()
     torch_output = np.transpose(torch_output.squeeze(0), (1, 2, 0))
 
-    numpy_output = conv2d(input, weight, stride, padding, dilation, groups,
-                          bias)
+    numpy_output = conv2d(input, weight, stride, padding, dilation, groups, bias)
 
     assert np.allclose(torch_output, numpy_output)

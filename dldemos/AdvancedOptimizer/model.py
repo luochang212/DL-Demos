@@ -11,7 +11,6 @@ from dldemos.utils import get_activation_de_func, get_activation_func
 
 
 class BaseRegressionModel(metaclass=abc.ABCMeta):
-
     def __init__(self):
         pass
 
@@ -50,7 +49,6 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
 
 
 class DeepNetwork(BaseRegressionModel):
-
     def __init__(self, neuron_cnt: List[int], activation_func: List[str]):
         super().__init__()
         assert len(neuron_cnt) - 1 == len(activation_func)
@@ -61,8 +59,9 @@ class DeepNetwork(BaseRegressionModel):
         self.b: List[np.ndarray] = []
         for i in range(self.num_layer):
             self.W.append(
-                np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) *
-                np.sqrt(2 / neuron_cnt[i]))
+                np.random.randn(neuron_cnt[i + 1], neuron_cnt[i])
+                * np.sqrt(2 / neuron_cnt[i])
+            )
             self.b.append(np.zeros((neuron_cnt[i + 1], 1)))
 
         self.Z_cache = [None] * self.num_layer
@@ -85,9 +84,8 @@ class DeepNetwork(BaseRegressionModel):
 
     def backward(self, Y):
         # Assume the activation of the lat layer is sigmoid
-        assert self.activation_func[-1] == 'sigmoid' and \
-            self.neuron_cnt[-1] == 1
-        assert (self.m == Y.shape[1])
+        assert self.activation_func[-1] == 'sigmoid' and self.neuron_cnt[-1] == 1
+        assert self.m == Y.shape[1]
 
         dA = 0
         for i in range(self.num_layer - 1, -1, -1):
@@ -95,7 +93,8 @@ class DeepNetwork(BaseRegressionModel):
                 dZ = self.A_cache[-1] - Y
             else:
                 dZ = dA * get_activation_de_func(self.activation_func[i])(
-                    self.Z_cache[i])
+                    self.Z_cache[i]
+                )
             dW = np.dot(dZ, self.A_cache[i].T) / self.m
             db = np.mean(dZ, axis=1, keepdims=True)
             dA = np.dot(self.W[i].T, dZ)
@@ -125,32 +124,36 @@ class DeepNetwork(BaseRegressionModel):
             self.b[i] = state_dict['b' + str(i)]
 
 
-def save_state_dict(model: BaseRegressionModel, optimizer: BaseOptimizer,
-                    filename: str):
+def save_state_dict(
+    model: BaseRegressionModel, optimizer: BaseOptimizer, filename: str
+):
     state_dict = {'model': model.save(), 'optimizer': optimizer.save()}
     np.savez(filename, **state_dict)
 
 
-def load_state_dict(model: BaseRegressionModel, optimizer: BaseOptimizer,
-                    filename: str):
+def load_state_dict(
+    model: BaseRegressionModel, optimizer: BaseOptimizer, filename: str
+):
     state_dict = np.load(filename)
     model.load(state_dict['model'])
     optimizer.load(state_dict['optimizer'])
 
 
-def train(model: BaseRegressionModel,
-          optimizer: BaseOptimizer,
-          X,
-          Y,
-          total_epoch,
-          batch_size,
-          model_name: str = 'model',
-          save_dir: str = 'work_dirs',
-          recover_from: Optional[str] = None,
-          print_interval: int = 100,
-          dev_X=None,
-          dev_Y=None,
-          plot_mini_batch: bool = False):
+def train(
+    model: BaseRegressionModel,
+    optimizer: BaseOptimizer,
+    X,
+    Y,
+    total_epoch,
+    batch_size,
+    model_name: str = 'model',
+    save_dir: str = 'work_dirs',
+    recover_from: Optional[str] = None,
+    print_interval: int = 100,
+    dev_X=None,
+    dev_Y=None,
+    plot_mini_batch: bool = False,
+):
     if recover_from:
         load_state_dict(model, optimizer, recover_from)
     m = X.shape[1]
@@ -161,11 +164,11 @@ def train(model: BaseRegressionModel,
     mini_batch_XYs = []
     for i in range(num_mini_batch):
         if i == num_mini_batch - 1:
-            mini_batch_X = shuffle_X[:, i * batch_size:]
-            mini_batch_Y = shuffle_Y[:, i * batch_size:]
+            mini_batch_X = shuffle_X[:, i * batch_size :]
+            mini_batch_Y = shuffle_Y[:, i * batch_size :]
         else:
-            mini_batch_X = shuffle_X[:, i * batch_size:(i + 1) * batch_size]
-            mini_batch_Y = shuffle_Y[:, i * batch_size:(i + 1) * batch_size]
+            mini_batch_X = shuffle_X[:, i * batch_size : (i + 1) * batch_size]
+            mini_batch_Y = shuffle_Y[:, i * batch_size : (i + 1) * batch_size]
         mini_batch_XYs.append((mini_batch_X, mini_batch_Y))
     print(f'Num mini-batch: {num_mini_batch}')
 
@@ -198,8 +201,9 @@ def train(model: BaseRegressionModel,
 
         optimizer.increase_epoch()
 
-    save_state_dict(model, optimizer,
-                    os.path.join(save_dir, f'{model_name}_latest.npz'))
+    save_state_dict(
+        model, optimizer, os.path.join(save_dir, f'{model_name}_latest.npz')
+    )
 
     if plot_mini_batch:
         plot_length = len(mini_batch_loss_list)

@@ -31,28 +31,24 @@ def load_set(data_path: str, cnt: int, img_shape: Tuple[int, int]):
 
 
 def get_cat_set(
-        data_root: str,
-        img_shape: Tuple[int, int] = (224, 224),
-        train_size=1000,
-        test_size=200,
-        format='nhwc'
+    data_root: str,
+    img_shape: Tuple[int, int] = (224, 224),
+    train_size=1000,
+    test_size=200,
+    format='nhwc',
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
-    train_X = load_set(os.path.join(data_root, 'training_set'), train_size,
-                       img_shape)
-    test_X = load_set(os.path.join(data_root, 'test_set'), test_size,
-                      img_shape)
+    train_X = load_set(os.path.join(data_root, 'training_set'), train_size, img_shape)
+    test_X = load_set(os.path.join(data_root, 'test_set'), test_size, img_shape)
 
     train_Y = np.array([1] * train_size + [0] * train_size)
     test_Y = np.array([1] * test_size + [0] * test_size)
 
     if format == 'nhwc':
-        return train_X, np.expand_dims(train_Y,
-                                       1), test_X, np.expand_dims(test_Y, 1)
+        return train_X, np.expand_dims(train_Y, 1), test_X, np.expand_dims(test_Y, 1)
     elif format == 'nchw':
         train_X = np.transpose(train_X, (0, 3, 1, 2))
         test_X = np.transpose(test_X, (0, 3, 1, 2))
-        return train_X, np.expand_dims(train_Y,
-                                       1), test_X, np.expand_dims(test_Y, 1)
+        return train_X, np.expand_dims(train_Y, 1), test_X, np.expand_dims(test_Y, 1)
     else:
         raise NotImplementedError('Format must be "nhwc" or "nchw". ')

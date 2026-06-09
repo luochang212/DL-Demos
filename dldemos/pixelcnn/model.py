@@ -6,15 +6,14 @@ import torch.nn.functional as F
 
 
 class MaskConv2d(nn.Module):
-
     def __init__(self, conv_type, *args, **kwags):
         super().__init__()
         assert conv_type in ('A', 'B')
         self.conv = nn.Conv2d(*args, **kwags)
         H, W = self.conv.weight.shape[-2:]
         mask = torch.zeros((H, W), dtype=torch.float32)
-        mask[0:H // 2] = 1
-        mask[H // 2, 0:W // 2] = 1
+        mask[0 : H // 2] = 1
+        mask[H // 2, 0 : W // 2] = 1
         if conv_type == 'B':
             mask[H // 2, W // 2] = 1
         mask = mask.reshape((1, 1, H, W))
@@ -27,7 +26,6 @@ class MaskConv2d(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-
     def __init__(self, h, bn=False):
         super().__init__()
         self.relu = nn.ReLU()
@@ -53,12 +51,12 @@ class ResidualBlock(nn.Module):
 
 
 class PixelCNN(nn.Module):
-
     def __init__(self, n_blocks, h, linear_dim, bn=False, color_level=256):
         super().__init__()
         if bn:
             raise ValueError(
-                'BatchNorm leaks future pixels and cannot be used in PixelCNN')
+                'BatchNorm leaks future pixels and cannot be used in PixelCNN'
+            )
         self.conv1 = MaskConv2d('A', 1, 2 * h, 7, 1, 3)
         self.bn1 = nn.BatchNorm2d(2 * h) if bn else nn.Identity()
         self.residual_blocks = nn.ModuleList()
@@ -86,13 +84,12 @@ class PixelCNN(nn.Module):
 
 
 class VerticalMaskConv2d(nn.Module):
-
     def __init__(self, *args, **kwags):
         super().__init__()
         self.conv = nn.Conv2d(*args, **kwags)
         H, W = self.conv.weight.shape[-2:]
         mask = torch.zeros((H, W), dtype=torch.float32)
-        mask[0:H // 2 + 1] = 1
+        mask[0 : H // 2 + 1] = 1
         mask = mask.reshape((1, 1, H, W))
         self.register_buffer('mask', mask, False)
 
@@ -103,14 +100,13 @@ class VerticalMaskConv2d(nn.Module):
 
 
 class HorizontalMaskConv2d(nn.Module):
-
     def __init__(self, conv_type, *args, **kwags):
         super().__init__()
         assert conv_type in ('A', 'B')
         self.conv = nn.Conv2d(*args, **kwags)
         H, W = self.conv.weight.shape[-2:]
         mask = torch.zeros((H, W), dtype=torch.float32)
-        mask[H // 2, 0:W // 2] = 1
+        mask[H // 2, 0 : W // 2] = 1
         if conv_type == 'B':
             mask[H // 2, W // 2] = 1
         mask = mask.reshape((1, 1, H, W))
@@ -123,7 +119,6 @@ class HorizontalMaskConv2d(nn.Module):
 
 
 class GatedBlock(nn.Module):
-
     def __init__(self, conv_type, in_channels, p, bn=False):
         super().__init__()
         self.conv_type = conv_type
@@ -132,8 +127,7 @@ class GatedBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(2 * p) if bn else nn.Identity()
         self.v_to_h_conv = nn.Conv2d(2 * p, 2 * p, 1)
         self.bn2 = nn.BatchNorm2d(2 * p) if bn else nn.Identity()
-        self.h_conv = HorizontalMaskConv2d(conv_type, in_channels, 2 * p, 3, 1,
-                                           1)
+        self.h_conv = HorizontalMaskConv2d(conv_type, in_channels, 2 * p, 3, 1, 1)
         self.bn3 = nn.BatchNorm2d(2 * p) if bn else nn.Identity()
         self.h_output_conv = nn.Conv2d(p, p, 1)
         self.bn4 = nn.BatchNorm2d(p) if bn else nn.Identity()
@@ -146,7 +140,7 @@ class GatedBlock(nn.Module):
         v_to_h = self.v_to_h_conv(v_to_h)
         v_to_h = self.bn2(v_to_h)
 
-        v1, v2 = v[:, :self.p], v[:, self.p:]
+        v1, v2 = v[:, : self.p], v[:, self.p :]
         v1 = torch.tanh(v1)
         v2 = torch.sigmoid(v2)
         v = v1 * v2
@@ -154,7 +148,7 @@ class GatedBlock(nn.Module):
         h = self.h_conv(h_input)
         h = self.bn3(h)
         h = h + v_to_h
-        h1, h2 = h[:, :self.p], h[:, self.p:]
+        h1, h2 = h[:, : self.p], h[:, self.p :]
         h1 = torch.tanh(h1)
         h2 = torch.sigmoid(h2)
         h = h1 * h2
@@ -166,12 +160,12 @@ class GatedBlock(nn.Module):
 
 
 class GatedPixelCNN(nn.Module):
-
     def __init__(self, n_blocks, p, linear_dim, bn=False, color_level=256):
         super().__init__()
         if bn:
             raise ValueError(
-                'BatchNorm leaks future pixels and cannot be used in PixelCNN')
+                'BatchNorm leaks future pixels and cannot be used in PixelCNN'
+            )
         self.block1 = GatedBlock('A', 1, p, bn)
         self.blocks = nn.ModuleList()
         for _ in range(n_blocks):

@@ -1,0 +1,32 @@
+name: Python quality
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.30"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Sync environment
+        run: uv sync --frozen --group dev
+
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      - name: Format check
+        run: uv run --frozen ruff format --check .
+
+      - name: Test
+        run: uv run --frozen pytest

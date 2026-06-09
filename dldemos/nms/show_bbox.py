@@ -3,12 +3,14 @@ from typing import Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 
-def draw_bbox(img: Image.Image,
-              bbox: Tuple[float, float, float, float],
-              prob: float,
-              rect_color: Tuple[int, int, int] = (255, 0, 0),
-              text: Optional[str] = None,
-              better_font: Optional[str] = None):
+def draw_bbox(
+    img: Image.Image,
+    bbox: Tuple[float, float, float, float],
+    prob: float,
+    rect_color: Tuple[int, int, int] = (255, 0, 0),
+    text: Optional[str] = None,
+    better_font: Optional[str] = None,
+):
     img_draw = ImageDraw.Draw(img, 'RGBA')
     x1, y1, x2, y2 = bbox
     if better_font is not None:
@@ -19,9 +21,7 @@ def draw_bbox(img: Image.Image,
     else:
         font = ImageFont.load_default()
 
-    img_draw.rectangle((x1 - 2, y1 - 2, x2 + 2, y2 + 2),
-                       outline=rect_color,
-                       width=2)
+    img_draw.rectangle((x1 - 2, y1 - 2, x2 + 2, y2 + 2), outline=rect_color, width=2)
 
     # Show class label on the top right corner
     if text is not None:

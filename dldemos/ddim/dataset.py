@@ -28,7 +28,6 @@ def download_dataset():
 
 
 class MNISTImageDataset(Dataset):
-
     def __init__(self):
         super().__init__()
         self.mnist = torchvision.datasets.MNIST(root='./data/mnist')
@@ -38,15 +37,13 @@ class MNISTImageDataset(Dataset):
 
     def __getitem__(self, index: int):
         img = self.mnist[index][0]
-        pipeline = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: (x - 0.5) * 2)
-        ])
+        pipeline = transforms.Compose(
+            [transforms.ToTensor(), transforms.Lambda(lambda x: (x - 0.5) * 2)]
+        )
         return pipeline(img)
 
 
 class CelebADataset(Dataset):
-
     def __init__(self, root, resolution=(64, 64)):
         super().__init__()
         self.root = root
@@ -59,19 +56,17 @@ class CelebADataset(Dataset):
     def __getitem__(self, index: int):
         path = os.path.join(self.root, self.filenames[index])
         img = Image.open(path)
-        pipeline = transforms.Compose([
-            transforms.Resize(self.resolution),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: (x - 0.5) * 2)
-        ])
+        pipeline = transforms.Compose(
+            [
+                transforms.Resize(self.resolution),
+                transforms.ToTensor(),
+                transforms.Lambda(lambda x: (x - 0.5) * 2),
+            ]
+        )
         return pipeline(img)
 
 
-def get_dataloader(type,
-                   batch_size,
-                   dist_train=False,
-                   num_workers=4,
-                   resolution=None):
+def get_dataloader(type, batch_size, dist_train=False, num_workers=4, resolution=None):
     if type == 'CelebAHQ':
         if resolution is not None:
             dataset = CelebADataset(CELEBA_HQ_DIR, resolution)
@@ -81,16 +76,14 @@ def get_dataloader(type,
         dataset = MNISTImageDataset()
     if dist_train:
         sampler = DistributedSampler(dataset)
-        dataloader = DataLoader(dataset,
-                                batch_size=batch_size,
-                                sampler=sampler,
-                                num_workers=num_workers)
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, sampler=sampler, num_workers=num_workers
+        )
         return dataloader, sampler
     else:
-        dataloader = DataLoader(dataset,
-                                batch_size=batch_size,
-                                shuffle=True,
-                                num_workers=num_workers)
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
         return dataloader
 
 

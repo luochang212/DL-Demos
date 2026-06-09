@@ -26,8 +26,9 @@ def convolution_block_2(x, f, filters, s: int, use_shortcut=True):
     x = layers.Conv2D(filters, f, padding='same')(x)
     x = layers.BatchNormalization(axis=3)(x)
     if use_shortcut:
-        x_shortcut = layers.Conv2D(filters, 1, strides=(s, s),
-                                   padding='valid')(x_shortcut)
+        x_shortcut = layers.Conv2D(filters, 1, strides=(s, s), padding='valid')(
+            x_shortcut
+        )
         x_shortcut = layers.BatchNormalization(axis=3)(x_shortcut)
         x = x + x_shortcut
     x = layers.ReLU()(x)
@@ -59,19 +60,18 @@ def convolution_block_3(x, f, filters1, filters2, s: int, use_shortcut=True):
     x = layers.Conv2D(filters2, 1, padding='valid')(x)
     x = layers.BatchNormalization(axis=3)(x)
     if use_shortcut:
-        x_shortcut = layers.Conv2D(filters2,
-                                   1,
-                                   strides=(s, s),
-                                   padding='valid')(x_shortcut)
+        x_shortcut = layers.Conv2D(filters2, 1, strides=(s, s), padding='valid')(
+            x_shortcut
+        )
         x_shortcut = layers.BatchNormalization(axis=3)(x_shortcut)
         x = x + x_shortcut
     x = layers.ReLU()(x)
     return x
 
 
-def init_model(input_shape=(224, 224, 3),
-               model_name='ResNet18',
-               use_shortcut=True) -> tf.keras.models.Model:
+def init_model(
+    input_shape=(224, 224, 3), model_name='ResNet18', use_shortcut=True
+) -> tf.keras.models.Model:
     # Initialize input
     input = layers.Input(input_shape)
 
@@ -115,9 +115,8 @@ def init_model(input_shape=(224, 224, 3),
 
 def main():
     train_X, train_Y, test_X, test_Y = get_cat_set(
-        'dldemos/LogisticRegression/data/archive/dataset',
-        train_size=500,
-        test_size=50)
+        'dldemos/LogisticRegression/data/archive/dataset', train_size=500, test_size=50
+    )
     print(train_X.shape)  # (m, 224, 224, 3)
     print(train_Y.shape)  # (m , 1)
 
@@ -125,9 +124,7 @@ def main():
     # model = init_model(use_shortcut=False)
     model = init_model(model_name='ResNet50')
     # model = init_model(model_name='ResNet50', use_shortcut=False)
-    model.compile(optimizer='adam',
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     model.fit(train_X, train_Y, epochs=20, batch_size=16)
     model.evaluate(test_X, test_Y)
