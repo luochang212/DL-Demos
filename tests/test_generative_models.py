@@ -1,9 +1,11 @@
 import unittest
 from unittest.mock import patch
 
+import numpy as np
 import torch
 import torch.nn as nn
 
+from dldemos.Regularization.main import DeepNetwork
 from dldemos.ddim.ddim import DDIM
 from dldemos.pixelcnn.model import GatedPixelCNN, PixelCNN
 
@@ -57,6 +59,23 @@ class PixelCNNTest(unittest.TestCase):
         future_grad = x.grad[0, 0, 2, 3:].abs().sum()
         future_grad += x.grad[0, 0, 3:, :].abs().sum()
         self.assertEqual(future_grad.item(), 0)
+
+
+class RegularizationTest(unittest.TestCase):
+
+    def test_dropout_mask_is_applied_during_backward(self):
+        model = DeepNetwork([1, 2, 1], ['relu'], 'dropout')
+        model.W[0] = np.ones((2, 1))
+        model.W[1] = np.ones((1, 2))
+        model.b[0] = np.zeros((2, 1))
+        model.b[1] = np.zeros((1, 1))
+
+        with patch('numpy.random.rand',
+                   return_value=np.array([[0.0], [1.0]])):
+            model.forward(np.ones((1, 1)))
+        model.backward(np.zeros((1, 1)))
+
+        self.assertEqual(model.dW_cache[0][1, 0], 0)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 id: distributed
 title: 分布式训练 — PyTorch DDP 实战
 sidebar_label: 2. 分布式训练
-description: 理解数据并行训练的原理，掌握 PyTorch DistributedDataParallel（DDP）的完整流程，包括进程初始化、数据分片、梯度同步和断点续训。
+description: 理解数据并行训练的原理，掌握 PyTorch DistributedDataParallel（DDP）的完整流程，包括进程初始化、数据分片、梯度同步和权重加载。
 keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel, 多GPU]
 ---
 
@@ -69,7 +69,7 @@ keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel,
 | **rank** | 当前进程的全局编号（0, 1, 2, ...） |
 | **world_size** | 总进程数（通常 = GPU 数量） |
 | **local_rank** | 当前节点内的 GPU 编号 |
-| **DistributedSampler** | 确保每个进程拿到不同的数据分片，不重叠 |
+| **DistributedSampler** | 为每个进程分配数据分片；数据量不能整除时默认会补齐少量重复样本 |
 | **AllReduce** | 跨所有进程的规约操作（如求和、求平均） |
 | **barrier** | 同步屏障，所有进程到达后才能继续 |
 
@@ -118,7 +118,7 @@ dataloader = DataLoader(dataset, batch_size=2, sampler=sampler)
 # key-end
 ```
 
-**为什么用 DistributedSampler 而不是普通采样器**：它保证每个 GPU 拿到**不重叠**的数据分片。普通 DataLoader 会让每个 GPU 都看到完整数据集。
+**为什么用 DistributedSampler 而不是普通采样器**：它让每个 GPU 主要处理不同的数据分片。普通 DataLoader 会让每个 GPU 都看到完整数据集。当前示例的 4 条数据可被 2 个进程整除，因此分片不重叠。
 
 ### 3.3 模型包装
 
@@ -217,8 +217,11 @@ torchrun --nproc_per_node=2 dldemos/PyTorchDistributed/main.py
 # 单机 4 GPU
 torchrun --nproc_per_node=4 dldemos/PyTorchDistributed/main.py
 
-# 双机，每机 2 GPU（需要在两台机器上分别执行）
-torchrun --nnodes=2 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
+# 双机，每机 2 GPU：主节点执行
+torchrun --nnodes=2 --node_rank=0 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
+
+# 第二个节点执行
+torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
 ```
 
 `torchrun` 会自动设置 `RANK`、`WORLD_SIZE`、`MASTER_ADDR` 等环境变量，`init_process_group` 会读取这些变量完成初始化。
@@ -231,7 +234,7 @@ torchrun --nnodes=2 --nproc_per_node=2 --master_addr=主节点IP --master_port=2
 |------|------|---------|
 | 忘记 `set_epoch` | 每个 epoch 数据顺序相同 | 每轮循环开头调用 `sampler.set_epoch(epoch)` |
 | 所有 rank 都保存模型 | 多进程同时写文件导致冲突 | 只在 `rank == 0` 时保存 |
-| `map_location` 缺失 | 加载的权重在错误的 GPU 上 | 用 `{'cuda:0': f'cuda:{rank}'}` 映射 |
+| `map_location` 缺失 | 加载的权重在错误的 GPU 上 | 用 `{'cuda:0': f'cuda:{device_id}'}` 映射 |
 | 忘记 `cleanup()` | 进程组未销毁，资源泄漏 | 在 `finally` 或函数末尾调用 `cleanup()` |
 | `batch_size` 含义 | 是每个 GPU 的 batch size | 全局 batch size = batch_size × world_size |
 

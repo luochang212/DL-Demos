@@ -61,7 +61,7 @@ $$
 
 **直观理解**：每次更新时，权重都会被**稍微缩小**（乘以 $1 - \frac{\eta\lambda}{m}$），防止权重增长过大。这也是「Weight Decay」（权重衰减）名称的由来。
 
-注意：**偏置 $b$ 通常不参与正则化**，因为每一层只有一个偏置，参数量远少于权重，正则化偏置的意义不大。
+注意：**偏置 $b$ 通常不参与正则化**，因为偏置参数量通常远少于权重，而且不会直接放大输入特征。
 
 ### 2.2 Dropout
 
@@ -76,7 +76,7 @@ $$
 **为什么 Dropout 有效**：
 
 1. **打破共适应**：每个神经元不能依赖特定的其他神经元，被迫学到更鲁棒的特征
-2. **隐式模型平均**：每次训练相当于采样一个子网络，最终模型等效于指数级数量子网络的平均
+2. **近似模型平均**：每次训练相当于采样一个子网络，推断时使用完整网络近似集成这些子网络
 3. **类似 L2 正则的效果**：鼓励权重分布更均匀，避免单个权重过大
 
 ---
@@ -126,6 +126,7 @@ class DeepNetwork(BaseRegressionModel):
                 keep_prob = 0.5
                 d = np.random.rand(*A.shape) < keep_prob  # 随机 mask
                 A = A * d / keep_prob                       # 缩放保持期望不变
+                self.dropout_mask_cache[i] = d               # 反向传播复用同一 mask
             # key-end
             if train_mode:
                 self.Z_cache[i] = Z
@@ -136,8 +137,28 @@ class DeepNetwork(BaseRegressionModel):
 两个关键细节：
 1. **`train_mode` 检查**：测试时不做 Dropout，直接使用全部神经元
 2. **`/ keep_prob` 缩放**：保证该层输出的期望值在训练和测试时一致
+3. **缓存 mask**：反向传播必须复用前向传播的同一份 mask
 
-### 3.3 梯度更新：Weight Decay 实现
+### 3.3 反向传播：复用 Dropout mask
+
+```python title="dldemos/Regularization/main.py" showLineNumbers
+    def backward(self, Y):
+        # ...
+        for i in range(self.num_layer - 1, -1, -1):
+            if i == self.num_layer - 1:
+                dZ = self.A_cache[-1] - Y
+            else:
+                # key-start
+                # 被前向传播丢弃的神经元不能继续传播梯度
+                if self.dropout:
+                    keep_prob = 0.5
+                    dA = dA * self.dropout_mask_cache[i] / keep_prob
+                # key-end
+                dZ = dA * get_activation_de_func(self.activation_func[i])(
+                    self.Z_cache[i])
+```
+
+### 3.4 梯度更新：Weight Decay 实现
 
 ```python title="dldemos/Regularization/main.py" showLineNumbers
     def gradient_descent(self, learning_rate):
@@ -155,7 +176,7 @@ class DeepNetwork(BaseRegressionModel):
             # key-end
 ```
 
-### 3.4 损失函数：Weight Decay 的惩罚项
+### 3.5 损失函数：Weight Decay 的惩罚项
 
 ```python title="dldemos/Regularization/main.py" showLineNumbers
     def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
@@ -171,7 +192,7 @@ class DeepNetwork(BaseRegressionModel):
             return np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
 ```
 
-### 3.5 主函数：三种设置对比
+### 3.6 主函数：三种设置对比
 
 ```python title="dldemos/Regularization/main.py" showLineNumbers
 def main():
@@ -208,7 +229,7 @@ def main():
 |-----------|---------|------|
 | **无正则化** | 边界扭曲，出现不规则凸起 | 过拟合训练数据 |
 | **Weight Decay（λ=4）** | 边界更平滑 | 权重被约束，不能太复杂 |
-| **Dropout（p=0.5）** | 边界最平滑 | 神经元不依赖彼此，泛化最好 |
+| **Dropout（p=0.5）** | 边界通常更平滑 | 减少神经元之间的共适应 |
 
 ---
 

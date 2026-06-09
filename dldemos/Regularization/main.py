@@ -71,6 +71,7 @@ class DeepNetwork(BaseRegressionModel):
 
         self.Z_cache = [None] * self.num_layer
         self.A_cache = [None] * (self.num_layer + 1)
+        self.dropout_mask_cache = [None] * (self.num_layer - 1)
         self.dW_cache = [None] * self.num_layer
         self.db_cache = [None] * self.num_layer
 
@@ -89,6 +90,7 @@ class DeepNetwork(BaseRegressionModel):
                 keep_prob = 0.5
                 d = np.random.rand(*A.shape) < keep_prob
                 A = A * d / keep_prob
+                self.dropout_mask_cache[i] = d
             if train_mode:
                 self.Z_cache[i] = Z
                 self.A_cache[i + 1] = A
@@ -103,6 +105,9 @@ class DeepNetwork(BaseRegressionModel):
             if i == self.num_layer - 1:
                 dZ = self.A_cache[-1] - Y
             else:
+                if self.dropout:
+                    keep_prob = 0.5
+                    dA = dA * self.dropout_mask_cache[i] / keep_prob
                 dZ = dA * get_activation_de_func(self.activation_func[i])(
                     self.Z_cache[i])
             dW = np.dot(dZ, self.A_cache[i].T) / self.m
