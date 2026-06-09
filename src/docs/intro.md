@@ -38,6 +38,20 @@ slug: /
 | 1 | [傅里叶特征](./engineering/fourier-feature) | 频谱偏置 + Fourier Feature 映射 |
 | 2 | [分布式训练](./engineering/distributed) | PyTorch DDP 数据并行 |
 
+## 🖼️ CNN 与视觉系列
+
+| 章节 | 算法 | 核心思想 |
+|------|------|---------|
+| 1 | [CNN 基础](./cv/basic-cnn) | 卷积运算 + NumPy 手写实现 |
+| 2 | [ResNet](./cv/resnet) | 残差连接 + 深层网络训练 |
+
+## 🔗 序列模型系列
+
+| 章节 | 算法 | 核心思想 |
+|------|------|---------|
+| 1 | [RNN](./sequence-models/rnn) | 循环结构 + 字符级语言模型 |
+| 2 | [情感分析](./sequence-models/sentiment-analysis) | GloVe 词向量 + GRU 文本分类 |
+
 ---
 
 ## 快速开始

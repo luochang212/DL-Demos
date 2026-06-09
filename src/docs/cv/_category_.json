@@ -1,0 +1,8 @@
+{
+  "label": "🖼️ CNN 与视觉",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "从卷积运算的基础实现到残差网络，系统讲解 CNN 的核心原理与代码实现。"
+  }
+}

@@ -1,0 +1,217 @@
+---
+id: sentiment-analysis
+title: 情感分析 — RNN 的 NLP 实战
+sidebar_label: 2. 情感分析
+description: 使用 GloVe 词向量和 GRU 构建 IMDB 影评情感分类器，掌握文本数据的预处理、词嵌入和序列分类的完整流程。
+keywords: [情感分析, GloVe, 词向量, GRU, IMDB, NLP, PyTorch]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 情感分析 — RNN 的 NLP 实战
+
+:::tip 本章要点
+- 理解 **GloVe 词向量**：如何把词语编码成有意义的实数向量
+- 掌握**文本分类流程**：分词 → 词嵌入 → GRU 编码 → 分类
+- 理解 **变长序列处理**：`pad_sequence` 和 `collate_fn`
+- 读懂 [`dldemos/SentimentAnalysis/main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/SentimentAnalysis/main.py) 的完整实现
+:::
+
+---
+
+## 1. 任务定义
+
+**情感分析**（Sentiment Analysis）：给定一段影评文本，判断其情感极性（正面/负面）。
+
+数据集：[IMDB Movie Review](https://ai.stanford.edu/~amaas/data/sentiment/)，包含 50,000 条影评，正面和负面各占一半。
+
+这是一个典型的**序列分类**任务：
+- 输入：变长文本序列
+- 输出：二分类标签（positive / negative）
+
+---
+
+## 2. 数学原理
+
+### 2.1 词嵌入
+
+文本不能直接输入神经网络，需要先把每个词编码成数值向量。最简单的方式是 one-hot，但 one-hot 有两个问题：
+1. **维度极高**（词汇表可能有几万个词）
+2. **无法表达词义关系**（「猫」和「狗」的向量距离和「猫」和「汽车」一样远）
+
+**GloVe**（Global Vectors for Word Representation）通过在大规模语料上统计词共现矩阵，将每个词映射到一个低维稠密向量（如 100 维），使得语义相近的词在向量空间中距离相近。
+
+### 2.2 词向量类比
+
+GloVe 词向量有一个著名的性质——**类比推理**：
+
+$$
+\vec{king} - \vec{man} + \vec{woman} \approx \vec{queen}
+$$
+
+本项目 [`dldemos/SentimentAnalysis/glove.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/SentimentAnalysis/glove.py) 中实现了类比推理的验证：
+
+```python title="dldemos/SentimentAnalysis/glove.py"
+def get_counterpart(x1, y1, x2):
+    """Find y2 that makes x1-y1 = x2-y2."""
+    target = x2_vec - x1_vec + y1_vec
+    # 在词汇表中找与 target 最相似的词向量
+    # ...
+
+print(get_counterpart('man', 'woman', 'king'))    # → queen
+print(get_counterpart('more', 'less', 'long'))    # → shorter
+print(get_counterpart('apple', 'red', 'banana'))  # → yellow
+```
+
+### 2.3 序列分类的 RNN 架构
+
+```
+"This movie is great"
+     ↓   ↓    ↓    ↓
+   [G] [G]  [G]  [G]    ← GloVe 词向量 (100维)
+     ↓   ↓    ↓    ↓
+   [GRU]→[GRU]→[GRU]→[GRU]  ← GRU 逐词编码
+                       ↓
+                    取最后隐藏状态
+                       ↓
+                  Linear → Sigmoid
+                       ↓
+                   正面 / 负面
+```
+
+RNN 从左到右处理每个词，最后取**最后一个时间步的隐藏状态**作为整个句子的表示，送入分类器。
+
+---
+
+## 3. 代码解析
+
+### 3.1 数据加载与预处理
+
+```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+GLOVE_DIM = 100
+GLOVE = GloVe(name='6B', dim=GLOVE_DIM)
+
+class IMDBDataset(Dataset):
+    def __init__(self, is_train=True, dir='data/aclImdb'):
+        self.tokenizer = get_tokenizer('basic_english')
+        pos_lines = read_imdb(dir, 'pos', is_train)
+        neg_lines = read_imdb(dir, 'neg', is_train)
+        self.lines = pos_lines + neg_lines
+        self.pos_length = len(pos_lines)
+
+    def __getitem__(self, index):
+        sentence = self.tokenizer(self.lines[index])
+        # key-start
+        x = GLOVE.get_vecs_by_tokens(sentence)  # 每个词 → 100维 GloVe 向量
+        label = 1 if index < self.pos_length else 0
+        # key-end
+        return x, label
+```
+
+### 3.2 变长序列的批处理
+
+不同影评长度不同，无法直接组成 batch。用 `pad_sequence` 填充到同一长度：
+
+```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+def get_dataloader(dir='data/aclImdb'):
+    # key-start
+    def collate_fn(batch):
+        x, y = zip(*batch)
+        x_pad = pad_sequence(x, batch_first=True)  # 填充到 batch 内最大长度
+        y = torch.Tensor(y)
+        return x_pad, y
+    # key-end
+    train_dataloader = DataLoader(IMDBDataset(True, dir),
+                                  batch_size=32, shuffle=True,
+                                  collate_fn=collate_fn)
+    return train_dataloader, ...
+```
+
+### 3.3 分类模型
+
+```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+class RNN(torch.nn.Module):
+    def __init__(self, hidden_units=64, dropout_rate=0.5):
+        super().__init__()
+        self.drop = nn.Dropout(dropout_rate)
+        # key-start
+        self.rnn = nn.GRU(GLOVE_DIM, hidden_units, 1, batch_first=True)
+        self.linear = nn.Linear(hidden_units, 1)
+        self.sigmoid = nn.Sigmoid()
+        # key-end
+
+    def forward(self, x):
+        emb = self.drop(x)                # Dropout 正则化
+        output, _ = self.rnn(emb)         # GRU 编码
+        # key-start
+        output = output[:, -1]            # 取最后一个时间步的隐藏状态
+        output = self.linear(output)      # 线性分类
+        output = self.sigmoid(output)     # 二分类概率
+        # key-end
+        return output
+```
+
+### 3.4 训练与评估
+
+```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+# 训练
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+citerion = nn.BCELoss()
+for epoch in range(100):
+    for x, y in train_dataloader:
+        hat_y = model(x)
+        loss = citerion(hat_y.squeeze(-1), y)
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 梯度裁剪
+        optimizer.step()
+
+# 评估
+model.eval()
+for x, y in test_dataloader:
+    with torch.no_grad():
+        hat_y = model(x)
+    predictions = torch.where(hat_y > 0.5, 1, 0)
+    accuracy = torch.mean((predictions == y).float())
+```
+
+### 3.5 推理：对新文本做情感判断
+
+```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+tokenizer = get_tokenizer('basic_english')
+article = 'U.S. stock indexes fell Tuesday, driven by expectations for ' \
+    'tighter Federal Reserve policy...'
+
+# key-start
+x = GLOVE.get_vecs_by_tokens(tokenizer(article)).unsqueeze(0).to(device)
+with torch.no_grad():
+    hat_y = model(x)
+result = 'positive' if hat_y.item() > 0.5 else 'negative'
+# key-end
+```
+
+---
+
+## 4. 模型架构总结
+
+```
+输入: 变长英文文本
+  ↓ basic_english tokenizer 分词
+  ↓ GloVe(6B, 100d) 词嵌入
+  ↓ Dropout(0.5)
+  ↓ GRU(input=100, hidden=64, layers=1)
+  ↓ 取最后时间步隐藏状态 (64维)
+  ↓ Linear(64 → 1)
+  ↓ Sigmoid
+输出: 情感概率 [0, 1]
+```
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [GloVe: Global Vectors for Word Representation（Pennington et al.，2014）](https://nlp.stanford.edu/pubs/glove.pdf)
+- 📄 [IMDB Dataset（Maas et al.，2011）](https://ai.stanford.edu/~amaas/data/sentiment/)
+- 🔗 [本章源码：`dldemos/SentimentAnalysis/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/SentimentAnalysis)
+- ⬅️ **上一章**：[RNN — 循环神经网络](./rnn)

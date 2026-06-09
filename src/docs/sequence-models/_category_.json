@@ -1,0 +1,8 @@
+{
+  "label": "🔗 序列模型",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "从循环神经网络到情感分析实战，掌握序列建模的核心方法。"
+  }
+}

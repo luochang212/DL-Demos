@@ -101,6 +101,56 @@ const sidebars = {
         },
       ],
     },
+    {
+      type: 'category',
+      label: '🖼️ CNN 与视觉',
+      collapsible: true,
+      collapsed: false,
+      link: {
+        type: 'generated-index',
+        title: 'CNN 与视觉系列',
+        description:
+          '从卷积运算的基础实现到残差网络，系统讲解 CNN 的核心原理与代码实现。',
+        slug: '/cv',
+      },
+      items: [
+        {
+          type: 'doc',
+          id: 'cv/basic-cnn',
+          label: '1. CNN 基础',
+        },
+        {
+          type: 'doc',
+          id: 'cv/resnet',
+          label: '2. ResNet — 残差网络',
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: '🔗 序列模型',
+      collapsible: true,
+      collapsed: false,
+      link: {
+        type: 'generated-index',
+        title: '序列模型系列',
+        description:
+          '从循环神经网络到情感分析实战，掌握序列建模的核心方法。',
+        slug: '/sequence-models',
+      },
+      items: [
+        {
+          type: 'doc',
+          id: 'sequence-models/rnn',
+          label: '1. RNN — 循环神经网络',
+        },
+        {
+          type: 'doc',
+          id: 'sequence-models/sentiment-analysis',
+          label: '2. 情感分析',
+        },
+      ],
+    },
   ],
 };
 

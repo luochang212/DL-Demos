@@ -1,0 +1,228 @@
+---
+id: basic-cnn
+title: CNN 基础 — 从卷积运算到图像分类
+sidebar_label: 1. CNN 基础
+description: 理解卷积运算的数学原理，用 NumPy 从零实现 2D 卷积的前向和反向传播，并用 PyTorch 完成猫狗分类。
+keywords: [CNN, 卷积神经网络, 卷积, 池化, NumPy, PyTorch, 图像分类]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# CNN 基础 — 从卷积运算到图像分类
+
+:::tip 本章要点
+- 理解**卷积运算**：滑动窗口、填充、步幅的数学定义
+- 用 NumPy 手写 **2D 卷积的前向传播**和**反向传播**
+- 理解 **池化层**和 **BatchNorm** 的作用
+- 读懂 [`dldemos/BasicCNN/pt_main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/BasicCNN/pt_main.py) 的 PyTorch 猫狗分类实现
+:::
+
+---
+
+## 1. 为什么用卷积
+
+全连接层处理图像时，把图像展平成一维向量，丢失了**空间结构**信息。一个 224×224×3 的图片展平后有 150,528 个输入，第一层如果有 1024 个神经元，就有 1.5 亿个参数——参数爆炸。
+
+卷积层用**局部连接 + 权重共享**解决这两个问题：
+
+| 特性 | 全连接层 | 卷积层 |
+|------|---------|--------|
+| 连接方式 | 每个神经元连所有输入 | 每个神经元只连局部区域 |
+| 权重数量 | $N_{in} \times N_{out}$ | $F \times F \times C_{in} \times C_{out}$ |
+| 空间信息 | ❌ 丢失 | ✅ 保留 |
+| 平移不变性 | ❌ | ✅ 同一 filter 扫描全图 |
+
+---
+
+## 2. 数学原理
+
+### 2.1 2D 卷积运算
+
+给定输入 $A \in \mathbb{R}^{H \times W \times C_{in}}$ 和卷积核 $W \in \mathbb{R}^{F \times F \times C_{in} \times C_{out}}$，输出特征图的每个元素：
+
+$$
+Z[h, w, c_o] = \sum_{c_k} \sum_{i} \sum_{j} A[h \cdot s + i, w \cdot s + j, c_k] \cdot W[i, j, c_k, c_o] + b[c_o]
+$$
+
+其中 $s$ 是步幅（stride），$F$ 是卷积核大小。
+
+### 2.2 输出尺寸计算
+
+填充 $p$、步幅 $s$、卷积核 $F$ 时，输出空间尺寸：
+
+$$
+H_{out} = \left\lfloor \frac{H + 2p - F}{s} \right\rfloor + 1
+$$
+
+### 2.3 卷积的反向传播
+
+前向传播中，输出元素 $Z[h,w,c_o]$ 依赖于输入的局部切片 $A_{slice}$ 和对应的卷积核 $W[c_o]$。反向传播时：
+
+$$
+\frac{\partial L}{\partial W[c_o]} += A_{slice} \cdot \frac{\partial L}{\partial Z[h,w,c_o]}
+$$
+
+$$
+\frac{\partial L}{\partial A_{slice}} += W[c_o] \cdot \frac{\partial L}{\partial Z[h,w,c_o]}
+$$
+
+$$
+\frac{\partial L}{\partial b[c_o]} += \frac{\partial L}{\partial Z[h,w,c_o]}
+$$
+
+直观理解：梯度沿着前向传播中「乘法」的路径回传——输入梯度是卷积核的转置卷积，权重梯度是输入和输出梯度的外积。
+
+---
+
+## 3. 代码解析
+
+本项目包含三个层次的实现：
+- **NumPy 前向传播**：`np_conv.py`，支持 stride/padding/dilation/groups
+- **NumPy 前向 + 反向**：`np_conv_backward.py`，用梯度传播验证
+- **PyTorch 实现**：`pt_main.py`，猫狗分类实战
+
+### 3.1 NumPy 卷积前向传播
+
+```python title="dldemos/BasicCNN/np_conv.py" showLineNumbers
+def conv2d(input: np.ndarray, weight: np.ndarray,
+           stride: int, padding: int, dilation: int, groups: int,
+           bias: np.ndarray = None) -> np.ndarray:
+    h_i, w_i, c_i = input.shape
+    c_o, f, f_2, c_k = weight.shape
+
+    # key-start
+    # dilation：在卷积核元素之间插入 (dilation-1) 个零
+    f_new = f + (f - 1) * (dilation - 1)
+    weight_new = np.zeros((c_o, f_new, f_new, c_k))
+    for i_c_o in range(c_o):
+        for i_c_k in range(c_k):
+            for i_f in range(f):
+                for j_f in range(f):
+                    weight_new[i_c_o, i_f * dilation, j_f * dilation, i_c_k] = \
+                        weight[i_c_o, i_f, j_f, i_c_k]
+    # key-end
+
+    input_pad = np.pad(input, [(padding, padding), (padding, padding), (0, 0)])
+
+    h_o = (h_i + 2 * padding - f_new) // stride + 1
+    w_o = (w_i + 2 * padding - f_new) // stride + 1
+    output = np.empty((h_o, w_o, c_o))
+
+    c_o_per_group = c_o // groups
+    for i_h in range(h_o):
+        for i_w in range(w_o):
+            for i_c in range(c_o):
+                # highlight-start
+                # 提取输入切片，与对应卷积核逐元素相乘求和
+                i_g = i_c // c_o_per_group
+                input_slice = input_pad[
+                    i_h*stride : i_h*stride+f_new,
+                    i_w*stride : i_w*stride+f_new,
+                    i_g*c_k : (i_g+1)*c_k]
+                output[i_h, i_w, i_c] = np.sum(input_slice * weight_new[i_c])
+                # highlight-end
+                if bias is not None:
+                    output[i_h, i_w, i_c] += bias[i_c]
+    return output
+```
+
+### 3.2 NumPy 卷积反向传播
+
+```python title="dldemos/BasicCNN/np_conv_backward.py" showLineNumbers
+def conv2d_backward(dZ, cache, stride, padding):
+    W, A_prev = cache['W'], cache['A_prev']
+    dW = np.zeros(W.shape)
+    dA_prev_pad = np.pad(np.zeros(A_prev.shape),
+                         [(padding, padding), (padding, padding), (0, 0)])
+
+    for i_h in range(h_o):
+        for i_w in range(w_o):
+            for i_c in range(c_o):
+                input_slice = A_prev_pad[
+                    i_h*stride : i_h*stride+f,
+                    i_w*stride : i_w*stride+f, :]
+                # key-start
+                dW[i_c] += input_slice * dZ[i_h, i_w, i_c]            # 权重梯度
+                dA_prev_pad[i_h*stride:i_h*stride+f,
+                            i_w*stride:i_w*stride+f, :] += W[i_c] * dZ[i_h, i_w, i_c]  # 输入梯度
+                # key-end
+    return dW, db, dA_prev
+```
+
+### 3.3 PyTorch 猫狗分类网络
+
+```python title="dldemos/BasicCNN/pt_main.py" showLineNumbers
+def init_model(device='cpu'):
+    model = nn.Sequential(
+        # highlight-start
+        # 第一组：大卷积核提取低级特征（边缘、纹理）
+        nn.Conv2d(3, 16, 11, 3), nn.BatchNorm2d(16), nn.ReLU(True), nn.MaxPool2d(2, 2),
+        # 第二组：中等卷积核提取中级特征（形状、部件）
+        nn.Conv2d(16, 32, 5),    nn.BatchNorm2d(32), nn.ReLU(True), nn.MaxPool2d(2, 2),
+        # 第三组：小卷积核提取高级特征（整体结构）
+        nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(True),
+        nn.Conv2d(64, 64, 3),            nn.BatchNorm2d(64), nn.ReLU(True),
+        nn.MaxPool2d(2, 2),
+        # highlight-end
+        nn.Flatten(),
+        nn.Linear(3136, 2048), nn.ReLU(True),
+        nn.Linear(2048, 1), nn.Sigmoid()
+    ).to(device)
+
+    # He 初始化
+    def weights_init(m):
+        if isinstance(m, nn.Conv2d):
+            torch.nn.init.xavier_normal_(m.weight)
+        elif isinstance(m, nn.Linear):
+            torch.nn.init.xavier_normal_(m.weight)
+
+    model.apply(weights_init)
+    return model
+```
+
+设计规律：
+- **卷积核从大到小**（11→5→3→3）：先看大范围低级特征，再看小范围高级特征
+- **通道数逐渐增加**（3→16→32→64）：低级特征少，高级特征多
+- **BatchNorm + ReLU** 跟在每个 Conv 后面，稳定训练
+- **MaxPool** 在每组卷积后下采样，减少计算量
+
+---
+
+## 4. 训练细节
+
+<Tabs>
+  <TabItem value="hyperparams" label="超参数" default>
+
+| 超参数 | 值 | 说明 |
+|--------|-----|------|
+| 输入尺寸 | 224×224×3 | 标准 ImageNet 尺寸 |
+| batch_size | 16 | |
+| lr | 5e-4 | Adam 学习率 |
+| num_epoch | 20 | |
+| 数据集 | 猫狗分类 | 需自行下载 |
+
+  </TabItem>
+  <TabItem value="layers" label="网络结构">
+
+```
+输入 (3, 224, 224)
+  → Conv(3→16, 11×11, s=3) → BN → ReLU → MaxPool(2)
+  → Conv(16→32, 5×5) → BN → ReLU → MaxPool(2)
+  → Conv(32→64, 3×3, p=1) → BN → ReLU
+  → Conv(64→64, 3×3) → BN → ReLU → MaxPool(2)
+  → Flatten(3136) → Linear(2048) → ReLU
+  → Linear(1) → Sigmoid
+输出: 猫/狗概率
+```
+
+  </TabItem>
+</Tabs>
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [CS231n: Convolutional Neural Networks for Visual Recognition](https://cs231n.github.io/)
+- 🔗 [本章源码：`dldemos/BasicCNN/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/BasicCNN)
+- ➡️ **下一章**：[ResNet — 残差网络](./resnet)

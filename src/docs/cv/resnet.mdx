@@ -1,0 +1,205 @@
+---
+id: resnet
+title: ResNet — 残差网络
+sidebar_label: 2. ResNet — 残差网络
+description: 理解残差连接为什么能让网络变深，掌握 ResNet18 和 ResNet50 的网络结构，并逐行解析 TensorFlow 实现。
+keywords: [ResNet, 残差连接, skip connection, 深层网络, 梯度消失, TensorFlow]
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# ResNet — 残差网络
+
+:::tip 本章要点
+- 理解**退化问题**：为什么网络更深反而表现更差
+- 掌握**残差连接**（skip connection）的数学形式和直觉
+- 区分 **Identity Block** 和 **Convolution Block**
+- 读懂 [`dldemos/ResNet/tf_main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ResNet/tf_main.py) 的 ResNet18/50 实现
+:::
+
+> 💡 本章代码使用 TensorFlow/Keras 实现，与本项目其他教程的 PyTorch 风格不同。
+
+---
+
+## 1. 为什么需要残差连接
+
+直觉上，网络越深应该效果越好——至少不会更差，因为多出来的层可以学成恒等映射。但实验发现：**56 层网络的训练误差比 20 层还高**。这不是过拟合（训练集上就更差），而是**退化问题**——深层网络更难优化。
+
+ResNet 的核心洞见：与其让网络直接学习期望的映射 $\mathcal{H}(x)$，不如让它学习**残差**：
+
+$$
+\mathcal{H}(x) = \mathcal{F}(x) + x
+$$
+
+网络只需学习 $\mathcal{F}(x) = \mathcal{H}(x) - x$。如果最优映射是恒等映射，残差 $\mathcal{F}(x) = 0$，把权重推向零比学恒等映射容易得多。
+
+---
+
+## 2. 数学原理
+
+### 2.1 残差块
+
+一个基本的残差块：
+
+$$
+y = \mathcal{F}(x, \{W_i\}) + x
+$$
+
+其中 $\mathcal{F}(x)$ 是两层（或三层）卷积的堆叠：
+
+```
+输入 x ──────────────────────────┐ (shortcut)
+  │                               │
+  ▼ Conv → BN → ReLU → Conv → BN │
+  │                               │
+  ▼ (+) ←────────────────────────┘
+  │
+  ▼ ReLU
+  │
+输出 y
+```
+
+### 2.2 为什么残差连接有效
+
+**梯度流动角度**：反向传播时，梯度可以通过 shortcut 直接流向前面的层：
+
+$$
+\frac{\partial \mathcal{L}}{\partial x} = \frac{\partial \mathcal{L}}{\partial y} \cdot \left(\frac{\partial \mathcal{F}}{\partial x} + 1\right)
+$$
+
+多出的 $+1$ 意味着即使 $\frac{\partial \mathcal{F}}{\partial x}$ 很小，梯度也不会消失——至少有 1 的「保底」梯度直接传过残差块。
+
+**优化角度**：残差学习让损失曲面更平滑。实验表明残差网络的损失曲面比普通网络有更少的局部最小值和更温和的梯度。
+
+### 2.3 维度匹配问题
+
+当 shortcut 跨越的层改变了空间尺寸或通道数时，$x$ 和 $\mathcal{F}(x)$ 形状不匹配，无法直接相加。两种解决方案：
+
+| 方案 | 做法 | 使用场景 |
+|------|------|---------|
+| **Identity Block** | 直接 $x + \mathcal{F}(x)$ | 输入输出维度相同 |
+| **Convolution Block** | 对 $x$ 做 1×1 卷积调整维度 | 输入输出维度不同 |
+
+---
+
+## 3. 代码解析
+
+### 3.1 Identity Block（2 层，ResNet18 用）
+
+```python title="dldemos/ResNet/tf_main.py" showLineNumbers
+def identity_block_2(x, f, use_shortcut=True):
+    _, _, _, C = x.shape
+    x_shortcut = x
+    # key-start
+    x = layers.Conv2D(C, f, padding='same')(x)       # 3×3 Conv，通道不变
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.ReLU()(x)
+    x = layers.Conv2D(C, f, padding='same')(x)       # 3×3 Conv，通道不变
+    x = layers.BatchNormalization(axis=3)(x)
+    if use_shortcut:
+        x = x + x_shortcut                            # 残差连接：直接相加
+    x = layers.ReLU()(x)
+    # key-end
+    return x
+```
+
+`use_shortcut=False` 时退化为普通网络，可以对比有无残差连接的效果。
+
+### 3.2 Convolution Block（2 层，ResNet18 用）
+
+```python title="dldemos/ResNet/tf_main.py" showLineNumbers
+def convolution_block_2(x, f, filters, s: int, use_shortcut=True):
+    x_shortcut = x
+    # key-start
+    # 主路径：用 stride=s 降低空间分辨率，调整通道数
+    x = layers.Conv2D(filters, f, strides=(s, s), padding='same')(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.ReLU()(x)
+    x = layers.Conv2D(filters, f, padding='same')(x)
+    x = layers.BatchNormalization(axis=3)(x)
+
+    # shortcut 路径：用 1×1 Conv 匹配维度
+    if use_shortcut:
+        x_shortcut = layers.Conv2D(filters, 1, strides=(s, s),
+                                   padding='valid')(x_shortcut)
+        x_shortcut = layers.BatchNormalization(axis=3)(x_shortcut)
+        x = x + x_shortcut
+    # key-end
+    x = layers.ReLU()(x)
+    return x
+```
+
+关键：shortcut 分支用 **1×1 卷积** 将 $x$ 的通道数和空间尺寸调整到与主路径一致。
+
+### 3.3 ResNet18 完整结构
+
+```python title="dldemos/ResNet/tf_main.py" showLineNumbers
+def init_model(input_shape=(224, 224, 3), model_name='ResNet18', use_shortcut=True):
+    input = layers.Input(input_shape)
+    x = layers.Conv2D(64, 7, (2, 2), padding='same')(input)
+    x = layers.MaxPool2D((3, 3), (2, 2))(x)
+
+    # highlight-start
+    # ResNet18: 4 组残差块，每组 2 个 block
+    # conv2_x: 64 通道，不降采样
+    x = identity_block_2(x, 3, use_shortcut)
+    x = identity_block_2(x, 3, use_shortcut)
+    # conv3_x: 128 通道，降采样 2×
+    x = convolution_block_2(x, 3, 128, 2, use_shortcut)
+    x = identity_block_2(x, 3, use_shortcut)
+    # conv4_x: 256 通道，降采样 2×
+    x = convolution_block_2(x, 3, 256, 2, use_shortcut)
+    x = identity_block_2(x, 3, use_shortcut)
+    # conv5_x: 512 通道，降采样 2×
+    x = convolution_block_2(x, 3, 512, 2, use_shortcut)
+    x = identity_block_2(x, 3, use_shortcut)
+    # highlight-end
+
+    x = layers.AveragePooling2D((2, 2), (2, 2))(x)
+    x = layers.Flatten()(x)
+    output = layers.Dense(1, 'sigmoid')(x)
+    return models.Model(inputs=input, outputs=output)
+```
+
+### 3.4 ResNet50 的 3 层 Bottleneck
+
+ResNet50 用 **Bottleneck** 结构：1×1 → 3×3 → 1×1，先降通道再恢复，减少计算量。
+
+```python title="dldemos/ResNet/tf_main.py" showLineNumbers
+def identity_block_3(x, f, filters1, filters2, use_shortcut=True):
+    x_shortcut = x
+    # key-start
+    x = layers.Conv2D(filters1, 1, padding='valid')(x)     # 1×1 降维
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Conv2D(filters1, f, padding='same')(x)      # 3×3 提特征
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.ReLU()(x)
+    x = layers.Conv2D(filters2, 1, padding='valid')(x)     # 1×1 升维
+    x = layers.BatchNormalization(axis=3)(x)
+    if use_shortcut:
+        x = x + x_shortcut
+    x = layers.ReLU()(x)
+    # key-end
+    return x
+```
+
+---
+
+## 4. ResNet 系列对比
+
+| 变体 | 残差块类型 | 每组 block 数 | 总层数 | 参数量 |
+|------|-----------|-------------|--------|--------|
+| ResNet18 | 2 层 BasicBlock | [2, 2, 2, 2] | 18 | 11.7M |
+| ResNet34 | 2 层 BasicBlock | [3, 4, 6, 3] | 34 | 21.8M |
+| ResNet50 | 3 层 Bottleneck | [3, 4, 6, 3] | 50 | 25.6M |
+| ResNet101 | 3 层 Bottleneck | [3, 4, 23, 3] | 101 | 44.5M |
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Deep Residual Learning for Image Recognition（He et al.，2016）](https://arxiv.org/abs/1512.03385)
+- 📄 [Identity Mappings in Deep Residual Networks（He et al.，2016）](https://arxiv.org/abs/1603.05027) — 改进的 pre-activation ResNet
+- 🔗 [本章源码：`dldemos/ResNet/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/ResNet)
+- ⬅️ **上一章**：[CNN 基础](./basic-cnn)
