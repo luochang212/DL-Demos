@@ -8,8 +8,8 @@ const config = {
   tagline: '从原理到代码，深度学习经典算法的逐行解析',
   favicon: 'img/favicon.ico',
 
-  url: 'http://localhost:3000',
-  baseUrl: '/',
+  url: 'https://luochang212.github.io',
+  baseUrl: '/DL-Demos/',
 
   onBrokenLinks: 'throw',
 
@@ -80,7 +80,7 @@ const config = {
             label: '📚 教程',
           },
           {
-            href: 'https://github.com/SingleZombie/DL-Demos',
+            href: 'https://github.com/luochang212/DL-Demos',
             label: 'GitHub',
             position: 'right',
           },
@@ -101,7 +101,7 @@ const config = {
             items: [
               {
                 label: 'GitHub 仓库',
-                href: 'https://github.com/SingleZombie/DL-Demos',
+                href: 'https://github.com/luochang212/DL-Demos',
               },
             ],
           },

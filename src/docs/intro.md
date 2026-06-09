@@ -28,7 +28,7 @@ slug: /
 ## 快速开始
 
 ```bash
-git clone https://github.com/SingleZombie/DL-Demos.git
+git clone https://github.com/luochang212/DL-Demos.git
 cd DL-Demos
 python setup.py develop
 pip install -r requirements.txt
@@ -37,4 +37,4 @@ mkdir work_dirs
 
 ## 源码仓库
 
-[https://github.com/SingleZombie/DL-Demos](https://github.com/SingleZombie/DL-Demos)
+[https://github.com/luochang212/DL-Demos](https://github.com/luochang212/DL-Demos)

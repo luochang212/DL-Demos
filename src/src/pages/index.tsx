@@ -27,7 +27,7 @@ export default function Home() {
         </Link>
         <Link
           className="button button--secondary button--lg"
-          to="https://github.com/SingleZombie/DL-Demos">
+          to="https://github.com/luochang212/DL-Demos">
           GitHub 仓库
         </Link>
       </div>
