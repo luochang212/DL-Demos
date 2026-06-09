@@ -140,3 +140,4 @@ nohup.out
 src/node_modules/
 src/build/
 src/.docusaurus/
+src/package-lock.json
