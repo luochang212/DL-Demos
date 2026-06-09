@@ -1,0 +1,112 @@
+---
+id: iou-nms
+title: 目标检测基础 — IoU 与 NMS
+sidebar_label: 4. IoU 与 NMS
+description: 理解目标框表示、交并比与非极大值抑制，并逐步解析 NumPy 教学实现。
+keywords: [目标检测, Bounding Box, IoU, NMS, Non-Maximum Suppression]
+---
+
+# 目标检测基础 — IoU 与 NMS
+
+目标检测模型通常会为同一个物体输出多个重叠候选框。IoU 衡量两个框的重叠程度，NMS 根据置信度与 IoU 删除重复预测。
+
+## 1. Bounding Box 表示
+
+本项目统一使用：
+
+$$b=(x_1,y_1,x_2,y_2)$$
+
+其中 $(x_1,y_1)$ 是左上角，$(x_2,y_2)$ 是右下角。宽高与面积为：
+
+$$w=\max(x_2-x_1,0),\qquad h=\max(y_2-y_1,0),\qquad A=wh$$
+
+使用 `max(..., 0)` 可以让不相交区域的面积保持为零。
+
+## 2. IoU
+
+交并比（Intersection over Union）定义为：
+
+$$\mathrm{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}
+=\frac{|A\cap B|}{|A|+|B|-|A\cap B|}$$
+
+IoU 越接近 1，两个框越相似；完全不相交时为 0。两个框都没有面积时并集也为零，源码将结果定义为 0，避免除零。
+
+```python title="dldemos/nms/iou.py"
+def iou(b1, b2):
+    intersection = box_intersection(b1, b2)
+    inter_area = area(intersection)
+    union_area = area(b1) + area(b2) - inter_area
+    if union_area == 0:
+        return 0.0
+    return inter_area / union_area
+```
+
+## 3. Non-Maximum Suppression
+
+NMS 对候选框重复执行以下步骤：
+
+1. 删除低于 `score_thresh` 的候选框。
+2. 从剩余框中选择置信度最高的框并保留。
+3. 删除与该框 IoU 高于 `iou_thresh` 的其他框。
+4. 直到没有候选框。
+
+```python
+while remaining_boxes:
+    best = highest_score_box(remaining_boxes)
+    output.append(best)
+    remaining_boxes = [
+        box for box in remaining_boxes
+        if iou(box, best) <= iou_thresh
+    ]
+```
+
+较低的 IoU 阈值会更积极地删除重叠框，可能漏掉靠得很近的物体；较高阈值会保留更多重复框。
+
+## 4. 代码解析
+
+`dldemos/nms/nms.py` 的每行预测格式为：
+
+```text
+[score, x1, y1, x2, y2]
+```
+
+函数同时返回保留的预测和原始索引：
+
+```python
+filtered_predicts, indices = nms(
+    predicts,
+    score_thresh=0.3,
+    iou_thresh=0.45,
+)
+```
+
+实现使用显式循环，时间复杂度约为 $O(N^2)$。它适合解释算法，不适合替代框架中经过向量化或硬件优化的 NMS。
+
+## 5. 类别边界
+
+本项目实现是**类别无关 NMS**：只根据分数和几何重叠做抑制。如果把不同类别的框一起输入，重叠的“人”和“自行车”也可能互相删除。
+
+多类别检测器通常应先按类别分组，再分别执行 NMS；完整检测框架还会处理批次、每类阈值和最大输出数量。这些内容不属于当前教学实现。
+
+## 6. 运行与验证
+
+核心算法不依赖外部图片，可直接运行测试：
+
+```bash
+uv run pytest tests/test_tutorial_models.py -k DetectionPostprocessing
+```
+
+测试覆盖相同框、无重叠框、零面积框、低分过滤和高重叠框抑制。
+
+可视化脚本需要自行准备 `work_dirs/detection_demo.jpg`：
+
+```bash
+uv run python dldemos/nms/iou.py
+uv run python dldemos/nms/nms.py
+```
+
+## 7. 延伸阅读
+
+- Soft-NMS：不直接删除重叠框，而是降低其分数。
+- DIoU-NMS：在 IoU 之外考虑中心点距离。
+- `torchvision.ops.nms`：生产代码优先使用框架优化实现。

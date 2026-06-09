@@ -1,0 +1,50 @@
+---
+id: attention
+title: Attention — 让解码器选择信息
+sidebar_label: 3. Attention
+description: 用日期格式转换理解 Encoder、Decoder、对齐分数和上下文向量。
+---
+
+# Attention — 让解码器选择信息
+
+固定长度向量要求 Encoder 把所有输入信息压缩到一个状态。Attention 允许 Decoder 在每个输出步骤重新选择输入序列中的相关位置。
+
+## 1. 计算过程
+
+编码器输出每个输入位置的表示 $a_i$。第 $t$ 个解码步骤根据上一状态计算对齐分数：
+
+$$e_{t,i}=f(s_{t-1},a_i),\qquad
+\alpha_{t,i}=\mathrm{softmax}(e_{t,i})$$
+
+上下文向量是编码器状态的加权和：
+
+$$c_t=\sum_i\alpha_{t,i}a_i$$
+
+Decoder 使用 $c_t$ 与上一输出生成当前字符。
+
+## 2. Padding Mask
+
+同一 batch 中的日期字符串长度不同。源码先用 `pack_padded_sequence` 让双向 LSTM 跳过 padding，再把 padding 位置的对齐分数设为负无穷，确保 Softmax 不会为其分配概率。
+
+```python
+packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True,
+                              enforce_sorted=False)
+packed_a, _ = self.encoder(packed)
+a, _ = pad_packed_sequence(packed_a, batch_first=True,
+                           total_length=n_sequence)
+scores = scores.masked_fill(padding_mask, float('-inf'))
+```
+
+## 3. 解码循环
+
+每一步重复上一 Decoder 状态，与全部 Encoder 状态拼接计算对齐分数。得到上下文向量后，Decoder 产生下一字符的 logits，并把它作为下一步输入。
+
+## 4. 运行
+
+```bash
+uv run python dldemos/attention/main.py
+```
+
+首次运行会生成训练与测试日期数据。脚本自动选择 CUDA 或 CPU，并输出完整日期字符串匹配准确率。
+
+该实现用于解释 Attention，Decoder 不使用 teacher forcing，也没有 beam search，因此不代表生产级序列转换系统。

@@ -13,6 +13,15 @@ slug: /
 
 ---
 
+## 🧠 基础神经网络系列
+
+| 章节 | 算法 | 核心思想 |
+|------|------|---------|
+| 1 | [Logistic Regression](./fundamentals/logistic-regression) | Sigmoid + 二元交叉熵 |
+| 2 | [浅层神经网络](./fundamentals/shallow-network) | 隐藏层 + 链式法则 |
+| 3 | [深层 MLP](./fundamentals/deep-network) | 通用前向与反向传播 |
+| 4 | [多分类](./fundamentals/multiclass-classification) | Logits + Softmax 交叉熵 |
+
 ## 🎨 生成模型系列
 
 | 章节 | 算法 | 核心思想 |
@@ -44,6 +53,8 @@ slug: /
 |------|------|---------|
 | 1 | [CNN 基础](./cv/basic-cnn) | 卷积运算 + NumPy 手写实现 |
 | 2 | [ResNet](./cv/resnet) | 残差连接 + 深层网络训练 |
+| 3 | [Style Transfer](./cv/style-transfer) | VGG 特征 + Gram Matrix |
+| 4 | [IoU 与 NMS](./cv/iou-nms) | 目标框重叠度 + 重复预测抑制 |
 
 ## 🔗 序列模型系列
 
@@ -51,6 +62,8 @@ slug: /
 |------|------|---------|
 | 1 | [RNN](./sequence-models/rnn) | 循环结构 + 字符级语言模型 |
 | 2 | [情感分析](./sequence-models/sentiment-analysis) | GloVe 词向量 + GRU 文本分类 |
+| 3 | [Attention](./sequence-models/attention) | 对齐分数 + 上下文向量 |
+| 4 | [Transformer](./sequence-models/transformer) | 多头注意力 + Mask |
 
 ---
 
@@ -59,10 +72,13 @@ slug: /
 ```bash
 git clone https://github.com/luochang212/DL-Demos.git
 cd DL-Demos
-python setup.py develop
-pip install -r requirements.txt
+uv sync --group dev
 mkdir work_dirs
 ```
+
+完整运行与验证方式见[环境、运行与验证](./getting-started/environment)。
+
+> 默认 Python 3.13 环境覆盖 PyTorch 教程。TensorFlow 与 `torchtext` 示例作为 legacy 材料保留。
 
 ## 源码仓库
 

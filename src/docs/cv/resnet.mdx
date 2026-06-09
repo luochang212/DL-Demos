@@ -20,6 +20,10 @@ import TabItem from '@theme/TabItem';
 
 > 💡 本章代码使用 TensorFlow/Keras 实现，与本项目其他教程的 PyTorch 风格不同。
 
+:::caution Legacy 环境
+该实现不属于项目默认的 Python 3.13 + PyTorch 环境，作为 TensorFlow 教学对照保留。
+:::
+
 :::warning 教学简化实现
 项目源码保留了 ResNet 的残差块与分组结构，但不是论文中的标准 ResNet18/50：stem 缺少 BN/ReLU，ResNet50 第一组会降采样，分类头使用固定平均池化。下方系列对比表描述的是标准 ResNet。
 :::

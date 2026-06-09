@@ -1,7 +1,7 @@
-1. Install the repository
+1. Sync the default project environment:
 
 ```shell
-python setup.py develop
+uv sync
 ```
 
 2. Download the dataset from https://www.kaggle.com/datasets/fusicfenta/cat-and-dog?resource=download and organize the directory as follows:
@@ -28,4 +28,4 @@ train_X, train_Y, test_X, test_Y = get_cat_set(
 
 Replace 'dldemos/LogisticRegression/data/archive/dataset' with your path.
 
-4. Run `tf_main.py`.
+4. `tf_main.py` is a legacy TensorFlow example and requires a separate compatible environment.

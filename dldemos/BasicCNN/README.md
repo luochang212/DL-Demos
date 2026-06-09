@@ -1,7 +1,7 @@
-1. Install the repository
+1. Sync the project environment:
 
 ```shell
-python setup.py develop
+uv sync
 ```
 
 2. Download the dataset from https://www.kaggle.com/datasets/fusicfenta/cat-and-dog?resource=download and organize the directory as follows:
@@ -28,6 +28,8 @@ train_X, train_Y, test_X, test_Y = get_cat_set(
 
 Replace 'dldemos/LogisticRegression/data/archive/dataset' with your path.
 
-4. Run `tf_main.py` or `pt_main.py`.
+4. Run `uv run python dldemos/BasicCNN/pt_main.py`.
+
+The TensorFlow implementation is retained as a legacy comparison.
 
 The NumPy implementation of convolution is in `np_conv` and `np_conv_backward`

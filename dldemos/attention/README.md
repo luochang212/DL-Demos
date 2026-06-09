@@ -1,7 +1,7 @@
-1. Install `babel`, `faker`.
+Run the date Attention demo from the repository root:
 
 ```shell
-pip install babel faker
+uv run python dldemos/attention/main.py
 ```
 
-2. Run `main.py` .
+The script generates its train and test data on first run.

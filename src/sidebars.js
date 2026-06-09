@@ -7,6 +7,30 @@ const sidebars = {
       label: '🏠 项目简介',
     },
     {
+      type: 'doc',
+      id: 'getting-started/environment',
+      label: '🧰 环境、运行与验证',
+    },
+    {
+      type: 'category',
+      label: '🧠 基础神经网络',
+      collapsible: true,
+      collapsed: false,
+      link: {
+        type: 'generated-index',
+        title: '基础神经网络系列',
+        description:
+          '从 Logistic Regression 到深层 MLP，建立前向传播、反向传播与分类损失的完整基础。',
+        slug: '/fundamentals',
+      },
+      items: [
+        'fundamentals/logistic-regression',
+        'fundamentals/shallow-network',
+        'fundamentals/deep-network',
+        'fundamentals/multiclass-classification',
+      ],
+    },
+    {
       type: 'category',
       label: '🎨 生成模型',
       collapsible: true,
@@ -124,6 +148,16 @@ const sidebars = {
           id: 'cv/resnet',
           label: '2. ResNet — 残差网络',
         },
+        {
+          type: 'doc',
+          id: 'cv/style-transfer',
+          label: '3. Style Transfer',
+        },
+        {
+          type: 'doc',
+          id: 'cv/iou-nms',
+          label: '4. IoU 与 NMS',
+        },
       ],
     },
     {
@@ -148,6 +182,16 @@ const sidebars = {
           type: 'doc',
           id: 'sequence-models/sentiment-analysis',
           label: '2. 情感分析',
+        },
+        {
+          type: 'doc',
+          id: 'sequence-models/attention',
+          label: '3. Attention',
+        },
+        {
+          type: 'doc',
+          id: 'sequence-models/transformer',
+          label: '4. Transformer',
         },
       ],
     },

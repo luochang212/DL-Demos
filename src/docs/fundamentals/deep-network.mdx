@@ -1,0 +1,49 @@
+---
+id: deep-network
+title: 深层 MLP — 把两层网络推广到任意深度
+sidebar_label: 3. 深层 MLP
+description: 使用列表化参数和缓存实现任意深度的全连接网络。
+---
+
+# 深层 MLP — 把两层网络推广到任意深度
+
+深层网络的核心不是新的公式，而是把“线性层 + 激活函数”的计算稳定地重复多次。
+
+## 1. 通用前向传播
+
+第 $l$ 层统一写作：
+
+$$Z^{[l]}=W^{[l]}A^{[l-1]}+b^{[l]},\qquad A^{[l]}=g^{[l]}(Z^{[l]})$$
+
+源码用 `W`、`b`、`Z_cache` 和 `A_cache` 列表保存每层状态，因此网络深度由配置决定，而不是复制函数。
+
+## 2. 通用反向传播
+
+反向循环从最后一层走到第一层：
+
+$$dZ^{[l]}=dA^{[l]}\odot g'^{[l]}(Z^{[l]})$$
+
+$$dW^{[l]}=\frac{1}{m}dZ^{[l]}(A^{[l-1]})^T,\qquad
+dA^{[l-1]}=(W^{[l]})^TdZ^{[l]}$$
+
+实现位于 `dldemos/DeepNetwork/model.py`。
+
+## 3. 代码解析
+
+```python
+for i in range(self.num_layer):
+    Z = np.dot(self.W[i], A) + self.b[i]
+    A = get_activation_func(self.activation_func[i])(Z)
+```
+
+反向传播使用倒序索引遍历同一组层。激活函数名称与导数函数通过统一查找接口对应，新增层数不需要修改传播逻辑。
+
+## 4. 运行
+
+准备猫狗数据集后运行：
+
+```bash
+uv run python dldemos/DeepNetwork/main.py
+```
+
+深层网络更难优化。继续学习参数初始化、正则化和优化器，才能理解如何让它可靠训练。

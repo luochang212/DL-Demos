@@ -1,7 +1,7 @@
-1. Install the repository
+1. Sync the project environment:
 
 ```shell
-python setup.py develop
+uv sync
 ```
 
 2. Download the dataset from https://www.kaggle.com/datasets/fusicfenta/cat-and-dog?resource=download and organize the directory as follows:
@@ -28,6 +28,6 @@ train_X, train_Y, test_X, test_Y = get_cat_set(
 
 Replace 'dldemos/LogisticRegression/data/archive/dataset' with your path.
 
-4. Run `main.py`. (You can open and close `save()` and `load()`  using comment)
+4. Run `uv run python dldemos/DeepNetwork/main.py`.
 
 You can edit the model hyper-parameters and see what will happen.

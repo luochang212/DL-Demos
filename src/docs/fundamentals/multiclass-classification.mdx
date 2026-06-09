@@ -1,0 +1,46 @@
+---
+id: multiclass-classification
+title: 多分类 — Softmax 与交叉熵
+sidebar_label: 4. 多分类
+description: 从二分类推广到互斥多类别分类，并解释 logits 与概率的边界。
+---
+
+# 多分类 — Softmax 与交叉熵
+
+多分类网络为每个类别输出一个分数（logit）。Softmax 把 logits 转为概率：
+
+$$p_k=\frac{e^{z_k}}{\sum_j e^{z_j}}$$
+
+## 1. 为什么模型返回 logits
+
+PyTorch 的 `CrossEntropyLoss` 内部已经组合了数值稳定的 LogSoftmax 与负对数似然。因此训练时模型必须直接返回 logits，不能先调用 Softmax 再交给损失函数。
+
+```python
+logits = model.forward(x)
+loss = torch.nn.CrossEntropyLoss()(logits.T, labels)
+prediction = torch.argmax(logits, dim=0)
+```
+
+Softmax 只在需要展示概率时显式调用。
+
+## 2. 参数初始化
+
+权重使用适合 ReLU 的 Kaiming 初始化，bias 使用零初始化。随机初始化 bias 不增加表达能力，反而给训练引入无意义噪声。
+
+## 3. 代码解析
+
+```python
+for i in range(self.num_layer):
+    Z = torch.matmul(self.W[i], A) + self.b[i]
+    A = Z if i == self.num_layer - 1 else F.relu(Z)
+```
+
+隐藏层应用 ReLU，最后一层保留 logits。评估时 `argmax` 对 logits 与 Softmax 概率给出相同类别，因此同样不需要先计算 Softmax。
+
+## 4. 运行
+
+```bash
+uv run python dldemos/MulticlassClassification/pt_main.py
+```
+
+该示例学习二维平面上的三分类边界。默认教程只覆盖 PyTorch 实现；同目录 TensorFlow 文件作为 legacy 对照保留。

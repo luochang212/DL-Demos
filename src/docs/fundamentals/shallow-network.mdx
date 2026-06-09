@@ -1,0 +1,47 @@
+---
+id: shallow-network
+title: 浅层神经网络 — 学习非线性边界
+sidebar_label: 2. 浅层神经网络
+description: 用一个 ReLU 隐藏层理解前向传播、缓存和链式法则。
+---
+
+# 浅层神经网络 — 学习非线性边界
+
+Logistic Regression 只能画一条线。加入一个隐藏层后，网络可以组合多个线性分割，学习非线性决策边界。
+
+## 1. 前向传播
+
+$$Z^{[1]}=W^{[1]}X+b^{[1]},\quad A^{[1]}=\mathrm{ReLU}(Z^{[1]})$$
+
+$$Z^{[2]}=W^{[2]}A^{[1]}+b^{[2]},\quad A^{[2]}=\sigma(Z^{[2]})$$
+
+训练时必须缓存 $X$、$Z^{[1]}$、$A^{[1]}$ 和 $A^{[2]}$，反向传播会复用这些中间结果。
+
+## 2. 反向传播
+
+反向传播从输出误差开始，按链式法则逐层向输入方向计算：
+
+$$dZ^{[2]}=A^{[2]}-Y,\qquad dA^{[1]}=(W^{[2]})^TdZ^{[2]}$$
+
+$$dZ^{[1]}=dA^{[1]}\odot \mathrm{ReLU}'(Z^{[1]})$$
+
+对应代码位于 `dldemos/ShallowNetwork/model.py`。
+
+## 3. 代码解析
+
+```python
+Z1 = np.dot(self.W1, X) + self.b1
+A1 = relu(Z1)
+Z2 = np.dot(self.W2, A1) + self.b2
+A2 = sigmoid(Z2)
+```
+
+`forward` 在训练模式下保存缓存，`backward` 只消费缓存并产生梯度，`gradient_descent` 再统一更新参数。分离这三个职责后，每一步都可以独立验证。
+
+## 4. 实验
+
+```bash
+uv run python dldemos/ShallowNetwork/points_classification.py
+```
+
+脚本对比 Logistic Regression 与不同隐藏单元数量的浅层网络。隐藏单元增加会提高表达能力，也会增加过拟合和优化成本。

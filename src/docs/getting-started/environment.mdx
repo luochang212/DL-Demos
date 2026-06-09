@@ -1,0 +1,55 @@
+---
+id: environment
+title: 环境、运行与验证
+sidebar_label: 环境、运行与验证
+description: 使用 uv 管理 DL-Demos 的 Python 3.13 环境，并运行质量检查与教程示例。
+---
+
+# 环境、运行与验证
+
+项目默认环境是 **Python 3.13 + PyTorch**，使用 [uv](https://docs.astral.sh/uv/) 解析、锁定和运行依赖。
+
+## 1. 创建环境
+
+```bash
+uv sync --group dev
+```
+
+`uv.lock` 锁定所有直接与间接依赖。不要使用全局 Python 直接运行示例，也不要手工维护虚拟环境。
+
+## 2. 运行示例
+
+```bash
+uv run python dldemos/ShallowNetwork/points_classification.py
+uv run python dldemos/Transformer/train.py
+uv run python dldemos/StyleTransfer/style_transfer.py --steps 50
+```
+
+部分训练脚本需要提前下载数据集，具体目录结构见对应章节。
+
+## 3. 验证修改
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+cd src && npm run build
+```
+
+安装 Git 提交检查：
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+pre-commit 只检查，不会在提交过程中隐式改写文件。需要修复格式时显式运行：
+
+```bash
+uv run ruff check --fix .
+uv run ruff format .
+```
+
+## 4. Legacy 示例
+
+默认环境不包含 TensorFlow 和已停止维护的 `torchtext`。ResNet 的 TensorFlow 实现和情感分析的 `torchtext` 实现作为 legacy 教学材料保留，但不属于默认环境的可运行性承诺。

@@ -1,7 +1,7 @@
-1. Install the repository
+1. Sync the project environment:
 
 ```shell
-python setup.py develop
+uv sync
 ```
 
 2. Download the dataset from https://www.kaggle.com/datasets/fusicfenta/cat-and-dog?resource=download and organize the directory as follows:

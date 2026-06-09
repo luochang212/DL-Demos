@@ -1,0 +1,59 @@
+---
+id: transformer
+title: Transformer — 从注意力到序列转换
+sidebar_label: 4. Transformer
+description: 从零实现多头注意力、位置编码、Mask 和英译中推理。
+---
+
+# Transformer — 从注意力到序列转换
+
+Transformer 用 Attention 替代循环结构，使序列位置可以并行计算。项目实现一个英语到中文的 Encoder-Decoder Transformer。
+
+## 1. Scaled Dot-Product Attention
+
+$$\mathrm{Attention}(Q,K,V)=
+\mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}+M\right)V$$
+
+$1/\sqrt{d_k}$ 防止点积随维度增大而让 Softmax 饱和。Multi-Head Attention 将特征拆成多个头，分别学习不同关系后再拼接。
+
+## 2. 位置与 Mask
+
+- 位置编码：为并行输入加入顺序信息。
+- Source padding mask：忽略英文输入中的补齐 token。
+- Target causal mask：禁止 Decoder 查看未来中文 token。
+- Source-target mask：Decoder 交叉注意力忽略英文 padding。
+
+## 3. 训练契约
+
+`load_train_data()` 明确返回 `(english_source, chinese_target)`。训练输入使用中文目标序列去掉最后一个 token，标签使用去掉第一个 token 的序列。
+
+```python
+y_input = y_batch[:, :-1]
+y_label = y_batch[:, 1:]
+logits = model(x_batch, y_input)
+```
+
+## 4. 自回归推理
+
+解码从中文词表的 `<S>` 开始，每一步选择当前最后位置的预测；生成 `</S>` 后停止，其余位置保持 padding。
+
+```python
+y[:, 0] = start_id
+finished = torch.zeros(x.shape[0], dtype=torch.bool, device=x.device)
+for i in range(1, max_len):
+    logits = model(x, y[:, :i])
+    next_token = torch.argmax(logits[:, -1], dim=-1)
+    next_token = torch.where(finished, pad_id, next_token)
+    y[:, i] = next_token
+    finished |= next_token == end_id
+    if torch.all(finished):
+        break
+```
+
+```bash
+uv run python dldemos/Transformer/data_load.py
+uv run python dldemos/Transformer/train.py
+uv run python dldemos/Transformer/translate.py
+```
+
+默认实现使用贪心解码，没有 beam search、学习率 warmup 或 KV cache，重点是展示 Transformer 数据流。

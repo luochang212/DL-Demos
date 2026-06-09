@@ -1,0 +1,54 @@
+---
+id: logistic-regression
+title: Logistic Regression — 二分类起点
+sidebar_label: 1. Logistic Regression
+description: 从线性打分、Sigmoid 和二元交叉熵推导二分类模型。
+---
+
+# Logistic Regression — 二分类起点
+
+Logistic Regression 是最小的可训练神经网络：它没有隐藏层，却完整包含参数、前向传播、损失函数、反向传播和梯度下降。
+
+## 1. 模型
+
+给定样本 $x$，先计算线性分数，再通过 Sigmoid 转为正类概率：
+
+$$z=w^Tx+b,\qquad \hat y=\sigma(z)=\frac{1}{1+e^{-z}}$$
+
+二元交叉熵衡量预测概率与标签的差异：
+
+$$L=-\frac{1}{m}\sum_i[y_i\log\hat y_i+(1-y_i)\log(1-\hat y_i)]$$
+
+实现计算对数前会把概率裁剪到安全区间，避免 `log(0)` 产生无穷值。
+
+## 2. 梯度
+
+Sigmoid 与交叉熵组合后，输出层梯度简化为：
+
+$$dZ=\hat Y-Y,\quad dW=\frac{1}{m}X(dZ)^T,\quad db=\mathrm{mean}(dZ)$$
+
+对应实现位于 `dldemos/LogisticRegression/main.py` 的 `train_step`。
+
+## 3. 代码解析
+
+```python
+def train_step(w, b, X, Y, lr):
+    m = X.shape[1]
+    A = sigmoid(np.dot(w.T, X) + b)
+    d_Z = A - Y
+    d_w = np.dot(X, d_Z.T) / m
+    d_b = np.mean(d_Z)
+    return w - lr * d_w, b - lr * d_b
+```
+
+样本沿列排列，因此 `X` 的形状是 `[特征数, 样本数]`。矩阵乘法一次完成整个 batch 的预测与梯度聚合。
+
+## 4. 运行与验证
+
+猫狗图片需按模块 README 准备。运行：
+
+```bash
+uv run python dldemos/LogisticRegression/main.py
+```
+
+验证重点：训练损失应总体下降，测试准确率应高于随机猜测。该模型只能学习线性决策边界，复杂图像任务上能力有限。

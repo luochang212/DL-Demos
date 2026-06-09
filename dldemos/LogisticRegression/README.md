@@ -13,4 +13,8 @@
                 └─dogs
 ```
 
-2. Run `python main.py` on `./LogisticRegression` directory (Or modify the data path in the `main.py`).
+2. Run from the repository root:
+
+```shell
+uv run python dldemos/LogisticRegression/main.py
+```

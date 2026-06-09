@@ -1,9 +1,13 @@
-1. Install the repository
+1. Sync the project environment:
 
 ```shell
-python setup.py develop
+uv sync
 ```
 
-2. Install TensorFlow or PyTorch
+2. Run the default PyTorch implementation:
 
-3. Run `tf_main.py` or `pt_main.py`.
+```shell
+uv run python dldemos/MulticlassClassification/pt_main.py
+```
+
+The TensorFlow implementation is retained as a legacy comparison and is not part of the default Python 3.13 environment.

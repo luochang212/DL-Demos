@@ -1,55 +1,49 @@
-# Installation
+# DL-Demos
 
-1. Clone the git repo:
+从公式到代码的深度学习教学实现，配套中文 Docusaurus 教程站。
 
-```shell
-git clone https://github.com/SingleZombie/DL-Demos.git
+## 环境
+
+默认环境为 Python 3.13 + PyTorch，使用 uv 管理：
+
+```bash
+uv sync --group dev
 ```
 
-2. Run the installation command:
+运行示例：
 
-```shell
-python setup.py develop
-pip install -r requirements.txt
+```bash
+uv run python dldemos/ShallowNetwork/points_classification.py
+uv run python dldemos/Transformer/train.py
+uv run python dldemos/StyleTransfer/style_transfer.py --steps 50
 ```
 
-It is recommended to create a directory named `work_dirs` and put temporary results into it.
+质量检查：
 
-# Description
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+uv run pre-commit run --all-files
+```
 
-Demos for deep learning.
+## 教程内容
 
-# Project
+- 基础神经网络：Logistic Regression、浅层网络、深层 MLP、多分类
+- 训练技巧：初始化、正则化、优化器
+- CNN 与视觉：卷积、ResNet、Style Transfer
+- 序列模型：RNN、情感分析、Attention、Transformer
+- 生成模型：VAE、DDPM、DDIM、PixelCNN、VQVAE
+- 工程实践：Fourier Feature、PyTorch DDP
 
-## Andrew Ng Deep Learning Specialization
+教程站源码位于 `src/`：
 
-01. Logistic Regression
-02. Shallow Nerual Network
-03. Deep Nerual Network (MLP)
-04. Parameter Initialization
-05. Regularization
-06. Advanced Optimizer (mini-batch, momentum, Adam)
-07. Multiclass Classification with TensorFlow and PyTorch
-08. NumPy Convolution 2D
-09. Basic CNN
-10. ResNet
-11. NMS
-12. ~~My YOLO model~~
-13. Letter level language model with PyTorch
-14. Sentiment analysis using Glove with PyTorch
-15. Date translation attention model with PyTorch
-16. Transformer cn-en translation with PyTorch
+```bash
+cd src
+npm install
+npm run build
+```
 
-## Generative Model
+## Legacy 示例
 
-1. VAE with PyTorch
-2. DDPM with PyTorch
-3. PixelCNN with PyTorch
-4. VQVAE with PyTorch
-5. DDIM with PyTorch
-
-## Others
-
-1. Style Transfer with PyTorch
-2. PyTorch DDP Demo
-3. Fourier Feature
+默认环境不包含 TensorFlow 和已停止维护的 `torchtext`。相关实现作为教学对照保留，但不属于默认 Python 3.13 环境的可运行性承诺。
