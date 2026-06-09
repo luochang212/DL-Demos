@@ -1,22 +1,33 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from dldemos.attention.main import AttentionModel
+from dldemos.AdvancedOptimizer.model import DeepNetwork as OptimizerNetwork
+from dldemos.AdvancedOptimizer.optimizer import Adam, Momentum, RMSProp
+from dldemos.attention.main import AttentionModel, sequence_accuracy
+from dldemos.BasicRNN.main import load_model as load_rnn_model
+from dldemos.BasicRNN.models import RNN1, RNN2
+from dldemos.Initialization.main import DeepNetwork as InitializationNetwork
 from dldemos.LogisticRegression.main import loss as binary_cross_entropy
 from dldemos.MulticlassClassification.pt_main import MulticlassClassificationNet
 from dldemos.nms.iou import iou
 from dldemos.nms.nms import nms
+from dldemos.Regularization.main import DeepNetwork as RegularizationNetwork
 from dldemos.StyleTransfer.style_transfer import (
     get_model_and_losses,
     gram,
     run_style_transfer,
 )
-from dldemos.Transformer.data_load import create_data, get_batch_indices
+from dldemos.Transformer.data_load import create_data, encode_source, get_batch_indices
 from dldemos.Transformer.translate import greedy_decode
+from dldemos.VAE.main import load_model as load_vae_model
+from dldemos.VAE.main import loss_fn as vae_loss
+from dldemos.VAE.model import VAE
 
 
 class BasicNetworkTest(unittest.TestCase):
@@ -33,6 +44,48 @@ class BasicNetworkTest(unittest.TestCase):
         loss = model.loss(torch.tensor([0, 1, 2, 0]), logits)
         self.assertTrue(torch.isfinite(loss))
 
+    def test_numpy_tutorial_losses_are_finite_at_probability_limits(self):
+        target = np.array([[0.0, 1.0]])
+        prediction = np.array([[0.0, 1.0]])
+        models = [
+            InitializationNetwork([1, 1], []),
+            RegularizationNetwork([1, 1], []),
+            OptimizerNetwork([1, 1], ['sigmoid']),
+        ]
+
+        for model in models:
+            with self.subTest(model=type(model).__module__):
+                self.assertTrue(np.isfinite(model.loss(target, prediction)))
+
+
+class AdvancedOptimizerTest(unittest.TestCase):
+    def test_stateful_optimizers_work_with_default_constructor(self):
+        for optimizer_type in [Momentum, RMSProp, Adam]:
+            params = {'weight': np.array([1.0])}
+            optimizer = optimizer_type(params, learning_rate=0.1)
+            optimizer.add_grad({'weight': np.array([1.0])})
+
+            optimizer.step()
+
+            self.assertLess(params['weight'][0], 1.0)
+
+    def test_stateful_optimizer_state_can_be_restored(self):
+        params = {'weight': np.array([1.0])}
+        optimizer = Adam(params, learning_rate=0.1)
+        optimizer.add_grad({'weight': np.array([1.0])})
+        optimizer.step()
+
+        restored = Adam({'weight': params['weight'].copy()}, learning_rate=0.1)
+        restored.load(optimizer.save())
+
+        self.assertEqual(restored.epoch, optimizer.epoch)
+        np.testing.assert_array_equal(
+            restored.v_dict['weight'], optimizer.v_dict['weight']
+        )
+        np.testing.assert_array_equal(
+            restored.s_dict['weight'], optimizer.s_dict['weight']
+        )
+
 
 class AttentionTest(unittest.TestCase):
     def test_padding_does_not_change_attention_output(self):
@@ -46,6 +99,12 @@ class AttentionTest(unittest.TestCase):
             actual = model(padded_batch, torch.tensor([3, 5]), n_output=2)[0:1]
 
         torch.testing.assert_close(actual, expected)
+
+    def test_sequence_accuracy_does_not_allow_errors_to_cancel(self):
+        prediction = torch.tensor([[1, 3], [1, 2]])
+        target = torch.tensor([[2, 2], [1, 2]])
+
+        self.assertEqual(sequence_accuracy(prediction, target).item(), 0.5)
 
 
 class EndTokenModel(nn.Module):
@@ -79,6 +138,11 @@ class TransformerTest(unittest.TestCase):
         np.testing.assert_array_equal(source[0, :3], [2, 4, 3])
         np.testing.assert_array_equal(target[0, :3], [2, 5, 3])
 
+    def test_encode_source_adds_boundaries_and_maps_unknown_words(self):
+        vocab = {'<PAD>': 0, '<UNK>': 1, '<S>': 2, '</S>': 3, 'hello': 4}
+
+        self.assertEqual(encode_source(['hello', 'missing'], vocab), [2, 4, 1, 3])
+
     def test_batch_indices_include_every_sample_once(self):
         torch.manual_seed(0)
         batches = [batch for batch, _ in get_batch_indices(10, 4)]
@@ -94,6 +158,49 @@ class TransformerTest(unittest.TestCase):
         )
 
         torch.testing.assert_close(result, torch.tensor([[2, 3]]))
+
+
+class SequenceAndGenerativeSmokeTest(unittest.TestCase):
+    def test_rnn_models_forward_and_sample_on_cpu(self):
+        with patch('numpy.random.choice', return_value=' '):
+            rnn1 = RNN1(hidden_units=4)
+            output1 = rnn1(torch.zeros(2, 3, 27))
+            sample1 = rnn1.sample_word()
+
+            rnn2 = RNN2(hidden_units=4, embeding_dim=4, dropout_rate=0)
+            output2 = rnn2(torch.zeros(2, 3, dtype=torch.long))
+            sample2 = rnn2.sample_word()
+
+        self.assertEqual(output1.shape, (2, 3, 27))
+        self.assertEqual(output2.shape, (2, 3, 27))
+        self.assertEqual(sample1, ' ')
+        self.assertEqual(sample2, ' ')
+
+    def test_rnn_checkpoint_loads_on_cpu(self):
+        with TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / 'rnn1.pth'
+            torch.save(RNN1().state_dict(), checkpoint)
+
+            model = load_rnn_model('rnn1', checkpoint, torch.device('cpu'))
+
+        self.assertEqual(next(model.parameters()).device.type, 'cpu')
+
+    def test_vae_missing_checkpoint_has_clear_error(self):
+        with self.assertRaisesRegex(FileNotFoundError, 'Checkpoint not found'):
+            load_vae_model('missing.pth', torch.device('cpu'))
+
+    def test_vae_forward_loss_and_sample_on_cpu(self):
+        model = VAE(hiddens=[2, 4], latent_dim=3).eval()
+        x = torch.rand(1, 3, 64, 64)
+
+        with torch.no_grad():
+            output, mean, logvar = model(x)
+            loss = vae_loss(x, output, mean, logvar)
+            sample = model.sample()
+
+        self.assertEqual(output.shape, x.shape)
+        self.assertEqual(sample.shape, x.shape)
+        self.assertTrue(torch.isfinite(loss))
 
 
 class StyleTransferTest(unittest.TestCase):

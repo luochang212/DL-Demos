@@ -17,6 +17,7 @@ from dldemos.ddpm.network import (
     unet_1_cfg,
     unet_res_cfg,
 )
+from dldemos.utils.device import resolve_device
 
 batch_size = 512
 n_epochs = 100
@@ -87,7 +88,7 @@ if __name__ == '__main__':
 
     n_steps = 1000
     config_id = 4
-    device = 'cuda'
+    device = resolve_device()
     model_path = 'dldemos/ddpm/model_unet_res.pth'
 
     config = configs[config_id]
@@ -96,5 +97,5 @@ if __name__ == '__main__':
 
     train(ddpm, net, device=device, ckpt_path=model_path)
 
-    net.load_state_dict(torch.load(model_path))
+    net.load_state_dict(torch.load(model_path, map_location=device))
     sample_imgs(ddpm, net, 'work_dirs/diffusion.jpg', device=device)

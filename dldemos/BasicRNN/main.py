@@ -1,3 +1,5 @@
+import argparse
+import os
 from typing import Sequence, Tuple
 
 import torch
@@ -6,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from dldemos.BasicRNN.constant import EMBEDDING_LENGTH, LETTER_MAP
 from dldemos.BasicRNN.models import RNN1, RNN2
 from dldemos.BasicRNN.read_imdb import read_imdb_vocab, read_imdb_words
+from dldemos.utils.device import resolve_device
 
 
 def words_to_label_array(words: Tuple[str, Sequence[str]], max_length):
@@ -126,8 +129,7 @@ test_words = [
 ]
 
 
-def train_rnn1():
-    device = 'cuda:0'
+def train_rnn1(device, checkpoint='dldemos/BasicRNN/rnn1.pth'):
     dataloader, max_length = get_dataloader_and_max_length(19)
 
     model = RNN1().to(device)
@@ -152,16 +154,15 @@ def train_rnn1():
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
-            loss_sum += loss
+            loss_sum += loss.item() * n
 
         print(f'Epoch {epoch}. loss: {loss_sum / dataset_len}')
 
-    torch.save(model.state_dict(), 'dldemos/BasicRNN/rnn1.pth')
+    torch.save(model.state_dict(), checkpoint)
     return model
 
 
-def train_rnn2():
-    device = 'cuda:0'
+def train_rnn2(device, checkpoint='dldemos/BasicRNN/rnn2.pth'):
     dataloader, max_length = get_dataloader_and_max_length(19, is_onehot=False)
 
     model = RNN2().to(device)
@@ -185,21 +186,21 @@ def train_rnn2():
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
-            loss_sum += loss
+            loss_sum += loss.item() * n
 
         print(f'Epoch {epoch}. loss: {loss_sum / dataset_len}')
 
-    torch.save(model.state_dict(), 'dldemos/BasicRNN/rnn2.pth')
+    torch.save(model.state_dict(), checkpoint)
     return model
 
 
-def test_language_model(model, is_onehot=True, device='cuda:0'):
+def test_language_model(model, is_onehot=True):
     _, max_length = get_dataloader_and_max_length(19)
     if is_onehot:
         test_word = words_to_onehot(test_words, max_length)
     else:
         test_word = words_to_label_array(test_words, max_length)
-    test_word = test_word.to(device)
+    test_word = test_word.to(next(model.parameters()).device)
     probs = model.language_model(test_word)
     for word, prob in zip(test_words, probs):
         print(f'{word}: {prob}')
@@ -213,35 +214,36 @@ def sample(model):
     print(*words)
 
 
-def rnn1():
-    # rnn1 = train_rnn1()
-
-    # Or load the models
-    state_dict = torch.load('dldemos/BasicRNN/rnn1_vocab.pth', map_location='cuda')
-    rnn1 = RNN1().to('cuda')
-    rnn1.load_state_dict(state_dict)
-
-    rnn1.eval()
-    test_language_model(rnn1)
-    sample(rnn1)
-
-
-def rnn2():
-    rnn2 = train_rnn2()
-
-    # Or load the models
-    # state_dict = torch.load('dldemos/BasicRNN/rnn2.pth', map_location='cuda')
-    # rnn2 = RNN2().to('cuda')
-    # rnn2.load_state_dict(state_dict)
-
-    rnn2.eval()
-    test_language_model(rnn2, False)
-    sample(rnn2)
+def load_model(model_name, checkpoint, device):
+    if not os.path.exists(checkpoint):
+        raise FileNotFoundError(f'Checkpoint not found: {checkpoint}')
+    model = RNN1() if model_name == 'rnn1' else RNN2()
+    model.load_state_dict(torch.load(checkpoint, map_location=device))
+    return model.to(device).eval()
 
 
 def main():
-    rnn1()
-    # rnn2()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', choices=['rnn1', 'rnn2'], required=True)
+    parser.add_argument(
+        '--mode', choices=['train', 'evaluate', 'sample'], required=True
+    )
+    parser.add_argument('--device', default='auto')
+    parser.add_argument('--checkpoint')
+    args = parser.parse_args()
+
+    device = resolve_device(args.device)
+    checkpoint = args.checkpoint or f'dldemos/BasicRNN/{args.model}.pth'
+    if args.mode == 'train':
+        train = train_rnn1 if args.model == 'rnn1' else train_rnn2
+        train(device, checkpoint)
+        return
+
+    model = load_model(args.model, checkpoint, device)
+    if args.mode == 'evaluate':
+        test_language_model(model, args.model == 'rnn1')
+    else:
+        sample(model)
 
 
 if __name__ == '__main__':

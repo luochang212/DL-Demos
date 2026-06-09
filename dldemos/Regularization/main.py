@@ -29,6 +29,7 @@ class BaseRegressionModel(metaclass=abc.ABCMeta):
         pass
 
     def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
+        Y_hat = np.clip(Y_hat, 1e-12, 1 - 1e-12)
         return np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
 
     def evaluate(self, X: np.ndarray, Y: np.ndarray, return_loss=False):
@@ -133,6 +134,7 @@ class DeepNetwork(BaseRegressionModel):
                 self.b[i] -= learning_rate * self.db_cache[i]
 
     def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
+        Y_hat = np.clip(Y_hat, 1e-12, 1 - 1e-12)
         if self.weight_decay:
             LAMBDA = 4
             tot = np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))

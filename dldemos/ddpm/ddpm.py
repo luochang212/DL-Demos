@@ -1,5 +1,7 @@
 import torch
 
+from dldemos.utils.device import resolve_device
+
 
 class DDPM:
     def __init__(
@@ -79,7 +81,7 @@ def visualize_forward():
     from dldemos.ddpm.dataset import get_dataloader
 
     n_steps = 100
-    device = 'cuda'
+    device = resolve_device()
     dataloader = get_dataloader(5)
     x, _ = next(iter(dataloader))
     x = x.to(device)

@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from dldemos.BasicCNN.dataset import get_cat_set
+from dldemos.utils.device import resolve_device
 
 
 def init_model(device='cpu'):
@@ -109,7 +110,7 @@ def main():
     print(train_X.shape)  # (m, 3, 224, 224)
     print(train_Y.shape)  # (m, 1)
 
-    device = 'cuda:0'
+    device = resolve_device()
     num_epoch = 20
     batch_size = 16
     model = init_model(device)

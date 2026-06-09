@@ -11,6 +11,7 @@ from dldemos.ddim.dataset import get_dataloader
 from dldemos.ddim.ddim import DDIM
 from dldemos.ddim.ddpm import DDPM
 from dldemos.ddim.network import UNet
+from dldemos.utils.device import resolve_device
 
 
 def train(
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     config_id = 0
     cfg = configs[config_id]
     n_steps = 1000
-    device = 'cuda'
+    device = resolve_device()
     model_path = cfg['model_path']
     img_shape = cfg['img_shape']
     to_bgr = False if cfg['dataset_type'] == 'MNIST' else True
@@ -147,7 +148,7 @@ if __name__ == '__main__':
         ckpt_path=model_path,
     )
 
-    net.load_state_dict(torch.load(model_path))
+    net.load_state_dict(torch.load(model_path, map_location=device))
     ddim = DDIM(device, n_steps)
     sample_imgs(
         ddpm,

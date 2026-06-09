@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from dldemos.utils.device import resolve_device
 from dldemos.VQVAE.configs import get_cfg
 from dldemos.VQVAE.dataset import get_dataloader
 from dldemos.VQVAE.model import VQVAE
@@ -166,7 +167,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     cfg = get_cfg(args.c)
 
-    device = f'cuda:{args.d}'
+    requested_device = f'cuda:{args.d}' if torch.cuda.is_available() else 'cpu'
+    device = resolve_device(requested_device)
 
     img_shape = cfg['img_shape']
 
@@ -193,7 +195,7 @@ if __name__ == '__main__':
     )
 
     # 2. Test VQVAE by visualizaing reconstruction result
-    vqvae.load_state_dict(torch.load(cfg['vqvae_path']))
+    vqvae.load_state_dict(torch.load(cfg['vqvae_path'], map_location=device))
     dataloader = get_dataloader(
         cfg['dataset_type'], 16, img_shape=(img_shape[1], img_shape[2])
     )
@@ -201,7 +203,7 @@ if __name__ == '__main__':
     reconstruct(vqvae, img, device, cfg['dataset_type'])
 
     # 3. Train Generative model (Gated PixelCNN in our project)
-    vqvae.load_state_dict(torch.load(cfg['vqvae_path']))
+    vqvae.load_state_dict(torch.load(cfg['vqvae_path'], map_location=device))
 
     train_generative_model(
         vqvae,
@@ -215,8 +217,8 @@ if __name__ == '__main__':
     )
 
     # 4. Sample VQVAE
-    vqvae.load_state_dict(torch.load(cfg['vqvae_path']))
-    gen_model.load_state_dict(torch.load(cfg['gen_model_path']))
+    vqvae.load_state_dict(torch.load(cfg['vqvae_path'], map_location=device))
+    gen_model.load_state_dict(torch.load(cfg['gen_model_path'], map_location=device))
     sample_imgs(
         vqvae,
         gen_model,

@@ -89,10 +89,9 @@ class Momentum(BaseOptimizer):
         super().__init__(param_dict, learning_rate)
         self.beta = beta
         self.grad_dict = deepcopy(self.param_dict)
-        if from_scratch:
-            self.velocity_dict = deepcopy(self.param_dict)
-            for k in self.velocity_dict:
-                self.velocity_dict[k] = 0
+        self.velocity_dict = deepcopy(self.param_dict)
+        for k in self.velocity_dict:
+            self.velocity_dict[k] = 0
 
     def save(self) -> Dict:
         state_dict = super().save()
@@ -131,10 +130,9 @@ class RMSProp(BaseOptimizer):
         self.eps = eps
         self.grad_dict = deepcopy(self.param_dict)
         self.correct_param = correct_param
-        if from_scratch:
-            self.s_dict = deepcopy(self.param_dict)
-            for k in self.s_dict:
-                self.s_dict[k] = 0
+        self.s_dict = deepcopy(self.param_dict)
+        for k in self.s_dict:
+            self.s_dict[k] = 0
 
     def save(self) -> Dict:
         state_dict = super().save()
@@ -182,12 +180,11 @@ class Adam(BaseOptimizer):
         self.eps = eps
         self.grad_dict = deepcopy(self.param_dict)
         self.correct_param = correct_param
-        if from_scratch:
-            self.v_dict = deepcopy(self.param_dict)
-            self.s_dict = deepcopy(self.param_dict)
-            for k in self.v_dict:
-                self.v_dict[k] = 0
-                self.s_dict[k] = 0
+        self.v_dict = deepcopy(self.param_dict)
+        self.s_dict = deepcopy(self.param_dict)
+        for k in self.v_dict:
+            self.v_dict[k] = 0
+            self.s_dict[k] = 0
 
     def save(self) -> Dict:
         state_dict = super().save()

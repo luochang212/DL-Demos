@@ -118,6 +118,10 @@ class AttentionModel(nn.Module):
         return y
 
 
+def sequence_accuracy(prediction, target):
+    return torch.all(prediction == target, dim=-1).float().mean()
+
+
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_path = 'dldemos/attention/train.txt'
@@ -161,7 +165,9 @@ def main():
     torch.save(model.state_dict(), 'dldemos/attention/model.pth')
 
     # test
-    model.load_state_dict(torch.load('dldemos/attention/model.pth'))
+    model.load_state_dict(
+        torch.load('dldemos/attention/model.pth', map_location=device)
+    )
 
     accuracy = 0
     dataset_len = len(test_dataloader.dataset)
@@ -173,8 +179,7 @@ def main():
         with torch.no_grad():
             hat_y = model(x, lengths)
         prediction = torch.argmax(hat_y, 2)
-        score = torch.where(torch.sum(prediction - y, -1) == 0, 1, 0)
-        accuracy += torch.sum(score)
+        accuracy += sequence_accuracy(prediction, y) * prediction.shape[0]
 
     print(f'Accuracy: {accuracy / dataset_len}')
 

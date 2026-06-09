@@ -1,9 +1,12 @@
+import argparse
+import os
 from time import time
 
 import torch
 import torch.nn.functional as F
 from torchvision.transforms import ToPILImage
 
+from dldemos.utils.device import resolve_device
 from dldemos.VAE.load_celebA import get_dataloader
 from dldemos.VAE.model import VAE
 
@@ -22,7 +25,7 @@ def loss_fn(y, y_hat, mean, logvar):
     return loss
 
 
-def train(device, dataloader, model):
+def train(device, dataloader, model, checkpoint='dldemos/VAE/model.pth'):
     optimizer = torch.optim.Adam(model.parameters(), lr)
     dataset_len = len(dataloader.dataset)
 
@@ -37,13 +40,13 @@ def train(device, dataloader, model):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            loss_sum += loss
+            loss_sum += loss.item() * x.shape[0]
         loss_sum /= dataset_len
         training_time = time() - begin_time
         minute = int(training_time // 60)
         second = int(training_time % 60)
         print(f'epoch {i}: loss {loss_sum} {minute}:{second}')
-        torch.save(model.state_dict(), 'dldemos/VAE/model.pth')
+        torch.save(model.state_dict(), checkpoint)
 
 
 def reconstruct(device, dataloader, model):
@@ -66,19 +69,33 @@ def generate(device, model):
     img.save('work_dirs/tmp.jpg')
 
 
-def main():
-    device = 'cuda:0'
-    dataloader = get_dataloader()
-
+def load_model(checkpoint, device):
     model = VAE().to(device)
+    if not os.path.exists(checkpoint):
+        raise FileNotFoundError(f'Checkpoint not found: {checkpoint}')
+    model.load_state_dict(torch.load(checkpoint, map_location=device))
+    return model
 
-    # If you obtain the ckpt, load it
-    model.load_state_dict(torch.load('dldemos/VAE/model.pth', 'cuda:0'))
 
-    # Choose the function
-    train(device, dataloader, model)
-    reconstruct(device, dataloader, model)
-    generate(device, model)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--mode', choices=['train', 'reconstruct', 'generate'], required=True
+    )
+    parser.add_argument('--device', default='auto')
+    parser.add_argument('--checkpoint', default='dldemos/VAE/model.pth')
+    args = parser.parse_args()
+
+    device = resolve_device(args.device)
+    os.makedirs('work_dirs', exist_ok=True)
+
+    if args.mode == 'train':
+        model = VAE().to(device)
+        train(device, get_dataloader(), model, args.checkpoint)
+    elif args.mode == 'reconstruct':
+        reconstruct(device, get_dataloader(), load_model(args.checkpoint, device))
+    else:
+        generate(device, load_model(args.checkpoint, device))
 
 
 if __name__ == '__main__':

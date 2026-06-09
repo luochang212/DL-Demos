@@ -16,8 +16,6 @@ maxlen = 50
 
 source_train = 'dldemos/Transformer/data/cn.txt'
 target_train = 'dldemos/Transformer/data/en.txt'
-source_test = 'dldemos/Transformer/data/cn.test.txt'
-target_test = 'dldemos/Transformer/data/en.test.txt'
 
 
 def load_vocab(language):
@@ -46,6 +44,14 @@ def load_en_vocab():
     return word2idx, idx2word
 
 
+def encode_source(words, en2idx):
+    return [
+        en2idx['<S>'],
+        *(en2idx.get(word, en2idx['<UNK>']) for word in words),
+        en2idx['</S>'],
+    ]
+
+
 def create_data(english_sents, chinese_sents):
     cn2idx, _ = load_cn_vocab()
     en2idx, _ = load_en_vocab()
@@ -53,9 +59,7 @@ def create_data(english_sents, chinese_sents):
     # Index
     x_list, y_list, Sources, Targets = [], [], [], []
     for source_sent, target_sent in zip(english_sents, chinese_sents):
-        x = [
-            en2idx.get(word, 1) for word in ('<S> ' + source_sent + ' </S>').split()
-        ]  # 1: OOV, </S>: End of Text
+        x = encode_source(source_sent.split(), en2idx)
         y = [cn2idx.get(word, 1) for word in ('<S> ' + target_sent + ' </S>').split()]
         if max(len(x), len(y)) <= maxlen:
             x_list.append(np.array(x))
@@ -73,20 +77,15 @@ def create_data(english_sents, chinese_sents):
     return X, Y, Sources, Targets
 
 
-def load_data(data_type):
-    if data_type == 'train':
-        source, target = source_train, target_train
-    elif data_type == 'test':
-        source, target = source_test, target_test
-    assert data_type in ['train', 'test']
+def load_data():
     cn_sents = [
         regex.sub(r"[^\s\p{L}']", '', line)
-        for line in codecs.open(source, 'r', 'utf-8').read().split('\n')
+        for line in codecs.open(source_train, 'r', 'utf-8').read().split('\n')
         if line and line[0] != '<'
     ]
     en_sents = [
         regex.sub(r"[^\s\p{L}']", '', line)
-        for line in codecs.open(target, 'r', 'utf-8').read().split('\n')
+        for line in codecs.open(target_train, 'r', 'utf-8').read().split('\n')
         if line and line[0] != '<'
     ]
 
@@ -95,12 +94,7 @@ def load_data(data_type):
 
 
 def load_train_data():
-    X, Y, _, _ = load_data('train')
-    return X, Y
-
-
-def load_test_data():
-    X, Y, _, _ = load_data('test')
+    X, Y, _, _ = load_data()
     return X, Y
 
 

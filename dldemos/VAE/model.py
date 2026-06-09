@@ -86,8 +86,10 @@ class VAE(nn.Module):
 
         return decoded, mean, logvar
 
-    def sample(self, device='cuda'):
-        z = torch.randn(1, self.latent_dim).to(device)
+    def sample(self, device=None):
+        if device is None:
+            device = next(self.parameters()).device
+        z = torch.randn(1, self.latent_dim, device=device)
         x = self.decoder_projection(z)
         x = torch.reshape(x, (-1, *self.decoder_input_chw))
         decoded = self.decoder(x)

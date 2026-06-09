@@ -1,6 +1,7 @@
 import torch
 
 from dldemos.Transformer.data_load import (
+    encode_source,
     idx_to_sentence,
     load_cn_vocab,
     load_en_vocab,
@@ -56,10 +57,10 @@ def main():
     model.eval()
 
     model_path = 'dldemos/Transformer/model.pth'
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=device))
 
     my_input = ['we', 'should', 'protect', 'environment']
-    x_batch = torch.LongTensor([[en2idx[x] for x in my_input]]).to(device)
+    x_batch = torch.LongTensor([encode_source(my_input, en2idx)]).to(device)
 
     input_sentence = idx_to_sentence(x_batch[0], idx2en, True)
     print(input_sentence)

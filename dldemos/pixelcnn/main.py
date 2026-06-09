@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 from dldemos.pixelcnn.dataset import get_dataloader, get_img_shape
 from dldemos.pixelcnn.model import GatedPixelCNN, PixelCNN
+from dldemos.utils.device import resolve_device
 
 batch_size = 128
 # You can set color_level to any value between 2 and 256
@@ -46,7 +47,7 @@ def train(model, device, model_path):
 def sample(model, device, model_path, output_path, n_sample=81):
 
     model.eval()
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model = model.to(device)
     C, H, W = get_img_shape()  # (1, 28, 28)
     x = torch.zeros((n_sample, C, H, W)).to(device)
@@ -78,7 +79,7 @@ if __name__ == '__main__':
     os.makedirs('work_dirs', exist_ok=True)
     model_id = 1
     model = models[model_id]
-    device = 'cuda'
+    device = resolve_device()
     model_path = f'dldemos/pixelcnn/model_{model_id}_{color_level}.pth'
     train(model, device, model_path)
     sample(

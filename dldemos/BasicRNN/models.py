@@ -63,7 +63,9 @@ class RNN1(nn.Module):
         return output
 
     @torch.no_grad()
-    def sample_word(self, device='cuda:0'):
+    def sample_word(self, device=None):
+        if device is None:
+            device = next(self.parameters()).device
         batch = 1
         output = ''
 
@@ -130,7 +132,9 @@ class RNN2(torch.nn.Module):
         return output
 
     @torch.no_grad()
-    def sample_word(self, device='cuda:0'):
+    def sample_word(self, device=None):
+        if device is None:
+            device = next(self.parameters()).device
         batch = 1
         output = ''
 
