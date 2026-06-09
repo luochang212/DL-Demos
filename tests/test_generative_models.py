@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from dldemos.Regularization.main import DeepNetwork
+from dldemos.BasicCNN import dataset as cnn_dataset
 from dldemos.ddim.ddim import DDIM
 from dldemos.pixelcnn.model import GatedPixelCNN, PixelCNN
 
@@ -76,6 +77,24 @@ class RegularizationTest(unittest.TestCase):
         model.backward(np.zeros((1, 1)))
 
         self.assertEqual(model.dW_cache[0][1, 0], 0)
+
+
+class BasicCNNTest(unittest.TestCase):
+
+    def test_nchw_conversion_preserves_channels(self):
+        image = np.arange(12).reshape(1, 2, 2, 3)
+        with patch.object(cnn_dataset,
+                          'load_set',
+                          side_effect=[image, image.copy()]):
+            train_x, _, test_x, _ = cnn_dataset.get_cat_set('unused',
+                                                             img_shape=(2, 2),
+                                                             train_size=0,
+                                                             test_size=0,
+                                                             format='nchw')
+
+        expected = np.transpose(image, (0, 3, 1, 2))
+        np.testing.assert_array_equal(train_x, expected)
+        np.testing.assert_array_equal(test_x, expected)
 
 
 if __name__ == '__main__':

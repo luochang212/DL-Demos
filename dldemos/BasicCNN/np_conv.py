@@ -73,7 +73,7 @@ def conv2d(input: np.ndarray,
                                         c_lower:c_upper]
                 kernel_slice = weight_new[i_c]
                 output[i_h, i_w, i_c] = np.sum(input_slice * kernel_slice)
-                if bias:
+                if bias is not None:
                     output[i_h, i_w, i_c] += bias[i_c]
     return output
 
@@ -84,7 +84,7 @@ def conv2d(input: np.ndarray,
 @pytest.mark.parametrize('padding', [0, 1])
 @pytest.mark.parametrize('dilation', [1, 2])
 @pytest.mark.parametrize('groups', ['1', 'all'])
-@pytest.mark.parametrize('bias', [False])
+@pytest.mark.parametrize('bias', [False, True])
 def test_conv(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str,
               dilation: int, groups: str, bias: bool):
     if groups == '1':

@@ -50,8 +50,8 @@ def get_cat_set(
         return train_X, np.expand_dims(train_Y,
                                        1), test_X, np.expand_dims(test_Y, 1)
     elif format == 'nchw':
-        train_X = np.reshape(train_X, (-1, 3, *img_shape))
-        test_X = np.reshape(test_X, (-1, 3, *img_shape))
+        train_X = np.transpose(train_X, (0, 3, 1, 2))
+        test_X = np.transpose(test_X, (0, 3, 1, 2))
         return train_X, np.expand_dims(train_Y,
                                        1), test_X, np.expand_dims(test_Y, 1)
     else:

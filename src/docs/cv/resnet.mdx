@@ -2,7 +2,7 @@
 id: resnet
 title: ResNet — 残差网络
 sidebar_label: 2. ResNet — 残差网络
-description: 理解残差连接为什么能让网络变深，掌握 ResNet18 和 ResNet50 的网络结构，并逐行解析 TensorFlow 实现。
+description: 理解残差连接为什么能让网络变深，掌握 ResNet18 和 ResNet50 的核心结构，并逐行解析教学用 TensorFlow 简化实现。
 keywords: [ResNet, 残差连接, skip connection, 深层网络, 梯度消失, TensorFlow]
 ---
 
@@ -15,10 +15,14 @@ import TabItem from '@theme/TabItem';
 - 理解**退化问题**：为什么网络更深反而表现更差
 - 掌握**残差连接**（skip connection）的数学形式和直觉
 - 区分 **Identity Block** 和 **Convolution Block**
-- 读懂 [`dldemos/ResNet/tf_main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ResNet/tf_main.py) 的 ResNet18/50 实现
+- 读懂 [`dldemos/ResNet/tf_main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ResNet/tf_main.py) 的 ResNet18/50 风格简化实现
 :::
 
 > 💡 本章代码使用 TensorFlow/Keras 实现，与本项目其他教程的 PyTorch 风格不同。
+
+:::warning 教学简化实现
+项目源码保留了 ResNet 的残差块与分组结构，但不是论文中的标准 ResNet18/50：stem 缺少 BN/ReLU，ResNet50 第一组会降采样，分类头使用固定平均池化。下方系列对比表描述的是标准 ResNet。
+:::
 
 ---
 
@@ -68,7 +72,7 @@ $$
 \frac{\partial \mathcal{L}}{\partial x} = \frac{\partial \mathcal{L}}{\partial y} \cdot \left(\frac{\partial \mathcal{F}}{\partial x} + 1\right)
 $$
 
-多出的 $+1$ 意味着即使 $\frac{\partial \mathcal{F}}{\partial x}$ 很小，梯度也不会消失——至少有 1 的「保底」梯度直接传过残差块。
+多出的恒等路径让梯度可以绕过残差分支直接传播，通常能缓解深层网络的梯度消失和优化困难。
 
 **优化角度**：残差学习让损失曲面更平滑。实验表明残差网络的损失曲面比普通网络有更少的局部最小值和更温和的梯度。
 
@@ -132,7 +136,7 @@ def convolution_block_2(x, f, filters, s: int, use_shortcut=True):
 
 关键：shortcut 分支用 **1×1 卷积** 将 $x$ 的通道数和空间尺寸调整到与主路径一致。
 
-### 3.3 ResNet18 完整结构
+### 3.3 ResNet18 风格简化结构
 
 ```python title="dldemos/ResNet/tf_main.py" showLineNumbers
 def init_model(input_shape=(224, 224, 3), model_name='ResNet18', use_shortcut=True):

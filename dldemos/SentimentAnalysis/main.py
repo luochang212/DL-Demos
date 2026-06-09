@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from torchtext.data import get_tokenizer
 from torchtext.vocab import GloVe
@@ -36,9 +36,10 @@ def get_dataloader(dir='data/aclImdb'):
 
     def collate_fn(batch):
         x, y = zip(*batch)
+        lengths = torch.tensor([len(sentence) for sentence in x])
         x_pad = pad_sequence(x, batch_first=True)
         y = torch.Tensor(y)
-        return x_pad, y
+        return x_pad, lengths, y
 
     train_dataloader = DataLoader(IMDBDataset(True, dir),
                                   batch_size=32,
@@ -60,12 +61,15 @@ class RNN(torch.nn.Module):
         self.linear = nn.Linear(hidden_units, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor):
         # x shape: [batch, max_word_length, embedding_length]
         emb = self.drop(x)
-        output, _ = self.rnn(emb)
-        output = output[:, -1]
-        output = self.linear(output)
+        packed = pack_padded_sequence(emb,
+                                      lengths.cpu(),
+                                      batch_first=True,
+                                      enforce_sorted=False)
+        _, hidden = self.rnn(packed)
+        output = self.linear(hidden[-1])
         output = self.sigmoid(output)
 
         return output
@@ -85,11 +89,11 @@ def main():
         loss_sum = 0
         dataset_len = len(train_dataloader.dataset)
 
-        for x, y in train_dataloader:
+        for x, lengths, y in train_dataloader:
             batchsize = y.shape[0]
             x = x.to(device)
             y = y.to(device)
-            hat_y = model(x)
+            hat_y = model(x, lengths)
             hat_y = hat_y.squeeze(-1)
             loss = citerion(hat_y, y)
 
@@ -112,11 +116,11 @@ def main():
     accuracy = 0
     dataset_len = len(test_dataloader.dataset)
     model.eval()
-    for x, y in test_dataloader:
+    for x, lengths, y in test_dataloader:
         x = x.to(device)
         y = y.to(device)
         with torch.no_grad():
-            hat_y = model(x)
+            hat_y = model(x, lengths)
         hat_y.squeeze_(1)
         predictions = torch.where(hat_y > 0.5, 1, 0)
         score = torch.sum(torch.where(predictions == y, 1, 0))
@@ -135,8 +139,9 @@ def main():
         'sell riskier assets.'
 
     x = GLOVE.get_vecs_by_tokens(tokenizer(article)).unsqueeze(0).to(device)
+    lengths = torch.tensor([x.shape[1]])
     with torch.no_grad():
-        hat_y = model(x)
+        hat_y = model(x, lengths)
     hat_y = hat_y.squeeze_().item()
     result = 'positive' if hat_y > 0.5 else 'negative'
     print(result)

@@ -31,7 +31,7 @@ import TabItem from '@theme/TabItem';
 | 连接方式 | 每个神经元连所有输入 | 每个神经元只连局部区域 |
 | 权重数量 | $N_{in} \times N_{out}$ | $F \times F \times C_{in} \times C_{out}$ |
 | 空间信息 | ❌ 丢失 | ✅ 保留 |
-| 平移不变性 | ❌ | ✅ 同一 filter 扫描全图 |
+| 平移等变性 | ❌ | ✅ 输入平移时特征图相应平移 |
 
 ---
 
@@ -170,7 +170,7 @@ def init_model(device='cpu'):
         nn.Linear(2048, 1), nn.Sigmoid()
     ).to(device)
 
-    # He 初始化
+    # Xavier 初始化
     def weights_init(m):
         if isinstance(m, nn.Conv2d):
             torch.nn.init.xavier_normal_(m.weight)
@@ -180,6 +180,8 @@ def init_model(device='cpu'):
     model.apply(weights_init)
     return model
 ```
+
+PyTorch 使用 `(N, C, H, W)` 布局，数据加载器通过 `np.transpose(train_X, (0, 3, 1, 2))` 将 OpenCV 的 `(N, H, W, C)` 图像转换为 NCHW；这里不能使用 `reshape`，否则会打乱通道与空间位置。
 
 设计规律：
 - **卷积核从大到小**（11→5→3→3）：先看大范围低级特征，再看小范围高级特征

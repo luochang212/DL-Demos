@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torchtext.vocab import GloVe
 
 glove = GloVe(name='6B', dim=100)
@@ -24,7 +25,7 @@ def get_counterpart(x1, y1, x2):
     max_id = -1
     for i in range(len(myvocab)):
         vector = glove.get_vecs_by_tokens([myvocab[i]], True)[0]
-        cossim = torch.dot(target, vector)
+        cossim = F.cosine_similarity(target, vector, dim=0)
         if cossim > max_sim and i not in {x1_id, y1_id, x2_id}:
             max_sim = cossim
             max_id = i
