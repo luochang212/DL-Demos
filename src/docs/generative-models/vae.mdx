@@ -2,39 +2,78 @@
 id: vae
 title: VAE — 变分自编码器
 sidebar_label: 1. VAE
-description: 从隐变量模型出发，理解 VAE 的 ELBO 推导与重参数化技巧，并逐行解析 PyTorch 实现。
-keywords: [VAE, 变分自编码器, ELBO, 重参数化, 生成模型, KL散度]
+description: 从自编码器的直觉出发，理解 VAE 为什么要把图像编码成分布，推导 ELBO、KL 散度与重参数化技巧，并对应到 PyTorch 实现。
+keywords: [VAE, 变分自编码器, Autoencoder, ELBO, 重参数化, KL散度, 生成模型]
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import FormulaCode from '@site/src/components/FormulaCode';
 
 # VAE — 变分自编码器
 
 :::tip 本章要点
-- 理解**隐变量模型**：为什么普通自编码器不能生成新图像
-- 推导 **ELBO**（证据下界）：将难以直接计算的似然转化为可优化目标
-- 掌握**重参数化技巧**：让采样操作可微分
-- 读懂 [`dldemos/VAE/model.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/VAE/model.py) 的核心实现
+- 从普通自编码器（AE）出发，理解为什么“会重建”不等于“会生成”
+- 理解 VAE 的核心改造：编码器输出的是一个分布，而不是一个固定向量
+- 推导 VAE 的训练目标：重建误差 + KL 正则项
+- 掌握重参数化技巧：让随机采样也能参与反向传播
+- 跑通 [`dldemos/VAE/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/VAE) 的训练、重建和生成流程
 :::
 
----
+## 1. 从 AE 到 VAE
 
-## 1. 为什么需要 VAE
+图像生成模型不能只有一个固定输出。它需要一个输入，用来决定“这次要生成哪一张图”。通常我们把这个输入记作隐变量 $z$，并希望相近的 $z$ 生成相近的图像。
 
-普通自编码器（AE）将图像 $x$ 压缩到潜在向量 $z$，再解码还原。但隐空间**没有结构**——随机采样一个 $z$ 解码出来往往是噪声，无法生成新图像。
+普通自编码器（Autoencoder, AE）正是从这个想法出发：
 
-**核心问题**：AE 的编码器只学习了「把特定图像映射到特定点」，而不是「把图像映射到一个有规律的分布」。
+```text
+图像 x -> 编码器 Encoder -> 压缩向量 z -> 解码器 Decoder -> 重建图像 x_hat
+```
 
-**VAE 的解法**：让编码器输出一个**概率分布**（而不是一个点），并要求这个分布尽量接近标准正态 $\mathcal{N}(0, I)$。生成时只需从 $\mathcal{N}(0, I)$ 中采样再解码，自然得到有意义的图像。
+训练时，AE 只需要让重建图像 $x_{hat}$ 尽量接近原图 $x$。问题是：这只能保证模型会重建训练样本，不能保证随机采样一个 $z$ 后也能生成合理图像。
 
----
+### AE 的问题：隐空间没有结构
 
-## 2. 数学原理
+如果编码器足够强，AE 可以把每张训练图像记成一个很孤立的点。这样做重建没问题，但隐空间中大部分区域没有被训练过。生成时如果从标准正态分布随机采样一个 $z$，它很可能落在这些“空白区域”，解码结果就会不可控。
 
-### 2.1 生成模型的目标
+VAE 的关键改造是：
 
-假设数据 $x$ 由潜在变量 $z$ 生成：
+```text
+不要把一张图编码成一个点，而是编码成一个正态分布。
+```
+
+编码器不再直接输出 $z$，而是输出均值 $\mu$ 和对数方差 $\log\sigma^2$：
+
+$$
+q_\phi(z \mid x) = \mathcal{N}(\mu_\phi(x), \sigma_\phi^2(x) I)
+$$
+
+训练时从这个分布里采样 $z$ 再解码；同时让这个分布靠近标准正态分布 $\mathcal{N}(0, I)$。这样，生成时直接从 $\mathcal{N}(0, I)$ 采样，解码器也更可能见过类似区域。
+
+## 2. VAE 到底优化什么
+
+VAE 的损失由两部分组成：
+
+| 项 | 作用 | 代码里的实现 |
+| --- | --- | --- |
+| 重建误差 | 让解码图像接近输入图像 | `F.mse_loss(y_hat, y)` |
+| KL 散度 | 让编码分布接近标准正态分布 | `-0.5 * sum(1 + logvar - mean**2 - exp(logvar))` |
+
+直觉上，重建误差负责“画得像”，KL 散度负责“隐空间规整”。如果只有重建误差，模型会退化成普通 AE；如果 KL 权重过大，编码器可能被迫输出过于接近标准正态的分布，导致重建质量下降。
+
+本项目使用的是一个加权目标：
+
+$$
+\mathcal{L}
+= \underbrace{\|x - \hat{x}\|_2^2}_{\text{重建误差}}
++ \lambda \underbrace{D_{\mathrm{KL}}(q_\phi(z \mid x) \| p(z))}_{\text{KL 正则}}
+$$
+
+其中 `kl_weight = 0.00025`，也就是 $\lambda = 0.00025$。
+
+### 2.1 从 ELBO 看 VAE
+
+从概率模型角度看，生成过程是：
 
 $$
 z \sim p(z) = \mathcal{N}(0, I)
@@ -44,193 +83,312 @@ $$
 x \sim p_\theta(x \mid z)
 $$
 
-训练目标是最大化观测数据的对数似然：
+我们希望最大化数据的对数似然：
 
 $$
-\log p_\theta(x) = \log \int p_\theta(x \mid z)\, p(z)\, dz
+\log p_\theta(x) = \log \int p_\theta(x \mid z)p(z)\,dz
 $$
 
-对于使用神经网络参数化的解码器，这个积分通常难以直接计算。
-
-### 2.2 引入变分分布，推导 ELBO
-
-引入辅助分布 $q_\phi(z \mid x)$（编码器）来近似真实后验 $p(z \mid x)$，利用 Jensen 不等式推导下界：
+这个积分通常无法直接算，所以引入编码器分布 $q_\phi(z \mid x)$ 近似真实后验。经过变分推导，可以得到证据下界（ELBO）：
 
 $$
-\log p_\theta(x) \geq \underbrace{\mathbb{E}_{q_\phi(z|x)}\!\left[\log p_\theta(x \mid z)\right]}_{\text{重建项}} - \underbrace{D_{\mathrm{KL}}\!\left(q_\phi(z \mid x) \,\|\, p(z)\right)}_{\text{KL 正则项}}
+\log p_\theta(x) \ge
+\mathbb{E}_{q_\phi(z \mid x)}[\log p_\theta(x \mid z)]
+- D_{\mathrm{KL}}(q_\phi(z \mid x) \| p(z))
 $$
 
-这个下界称为 **ELBO（Evidence Lower BOund）**。重建期望通常通过采样估计，而高斯 KL 项可以解析计算。最大化标准 ELBO 等效于：
-- **重建项**↑：编码后解码的输出应尽量接近原始输入
-- **KL 项**↓：编码器输出的分布应尽量接近先验 $\mathcal{N}(0, I)$
+最大化 ELBO，等价于同时做两件事：
 
-### 2.3 KL 散度的解析形式
+1. 提高重建概率：给定 $z$ 后，解码器应该能还原 $x$。
+2. 降低 KL 散度：编码器输出的分布应尽量接近先验 $p(z)$。
 
-当 $q_\phi(z \mid x) = \mathcal{N}(\mu, \sigma^2 I)$ 时，KL 散度有解析式，不需要蒙特卡洛估计：
+### 2.2 KL 散度的直觉
+
+KL 散度可以理解成“用一个分布去近似另一个分布时，多付出的编码成本”。在 VAE 里，我们用编码器给出的 $q_\phi(z \mid x)$ 去靠近标准正态先验 $p(z)$。当两个分布一致时，KL 散度为 0；差异越大，KL 项越大。
+
+对于对角高斯分布：
 
 $$
-D_{\mathrm{KL}}\!\left(\mathcal{N}(\mu, \sigma^2) \,\|\, \mathcal{N}(0,I)\right) = -\frac{1}{2} \sum_{j=1}^{d} \left(1 + \log \sigma_j^2 - \mu_j^2 - \sigma_j^2\right)
+q_\phi(z \mid x)=\mathcal{N}(\mu,\sigma^2 I), \quad p(z)=\mathcal{N}(0,I)
 $$
 
-### 2.4 重参数化技巧
+KL 项有解析形式：
 
-从 $q_\phi(z \mid x) = \mathcal{N}(\mu, \sigma^2)$ 采样 $z$ 的操作**不可微**，梯度无法回传到编码器。
+$$
+D_{\mathrm{KL}}(q_\phi(z \mid x) \| p(z))
+= -\frac{1}{2}\sum_{j=1}^{d}
+\left(1 + \log\sigma_j^2 - \mu_j^2 - \sigma_j^2\right)
+$$
 
-重参数化将随机性「外移」：
+这正对应项目里的代码：
+
+```python title="dldemos/VAE/main.py"
+kl_loss = torch.mean(
+    -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0
+)
+```
+
+## 3. 重参数化技巧
+
+问题来了：从正态分布中采样是随机操作，梯度不能直接穿过“采样”本身传回编码器。
+
+VAE 的做法是把随机性挪到一个独立噪声 $\varepsilon$ 上：
 
 $$
 z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
 $$
 
-$\varepsilon$ 是与参数无关的随机噪声，梯度现在可以通过 $\mu$ 和 $\sigma$ 正常反传。
+这样，$\varepsilon$ 与模型参数无关，梯度可以通过 $\mu$ 和 $\sigma$ 正常反传。
 
----
+<FormulaCode
+  formulaPrefix="z ="
+  formulaParts={[
+    { label: "均值", tex: "\\mu" },
+    { label: "标准差", tex: "+ \\sigma \\odot" },
+    { label: "随机噪声", tex: "\\varepsilon" },
+  ]}
+  code={`mean = self.mean_linear(encoded)
+logvar = self.var_linear(encoded)
+eps = torch.randn_like(logvar)
+std = torch.exp(logvar / 2)
+z = eps * std + mean`}
+  language="python"
+  title="dldemos/VAE/model.py — 重参数化"
+  mappings={[
+    { partIndex: 0, lines: [0, 4] },
+    { partIndex: 1, lines: [1, 3, 4] },
+    { partIndex: 2, lines: [2, 4] },
+  ]}
+/>
 
-## 3. 模型架构
+:::info 为什么输出 `logvar`
+模型输出的是 `logvar`，也就是 $\log\sigma^2$，而不是直接输出 $\sigma^2$。这样可以避免方差为负数，也避免在损失函数里对接近 0 的方差再取对数导致数值不稳定。
+:::
 
-本项目的 VAE 针对 **64×64 CelebA 人脸图像**设计：
+## 4. 模型结构
 
-```
-输入 (3, 64, 64)
-      │
-      ▼  Conv2d × 5，每层 stride=2，通道数 [16, 32, 64, 128, 256]
-      │
-特征图 (256, 2, 2) ── flatten ──► Linear ─┬─► μ     (128维)
-                                           └─► log σ² (128维)
-                                                │
-                                         重参数化 z = μ + σ⊙ε
-                                                │
-                                           Linear + reshape
-                                                │
-      ▼  ConvTranspose2d × 5，逐步上采样回 64×64
-      │
-输出 (3, 64, 64)
-```
+本项目的 VAE 针对 **64×64 CelebA 人脸图像**设计。
 
-两个关键设计：
-1. **双头输出**：编码器用两个独立的 Linear 层分别输出 $\mu$ 和 $\log\sigma^2$（而不是 $\sigma^2$，数值更稳定）
-2. **KL 权重**：本项目将 KL 项乘以很小的权重（0.00025），优化的是加权 VAE 目标，而非标准 ELBO
-
----
-
-## 4. 代码解析
-
-### 4.1 编码器：双头输出 μ 和 log σ²
-
-```python title="dldemos/VAE/model.py" showLineNumbers
-class VAE(nn.Module):
-
-    def __init__(self, hiddens=[16, 32, 64, 128, 256], latent_dim=128) -> None:
-        super().__init__()
-        # highlight-start
-        # 编码器：5 层 Conv2d，每层 stride=2，空间分辨率减半
-        prev_channels = 3
-        modules = []
-        img_length = 64
-        for cur_channels in hiddens:
-            modules.append(
-                nn.Sequential(
-                    nn.Conv2d(prev_channels, cur_channels,
-                              kernel_size=3, stride=2, padding=1),
-                    nn.BatchNorm2d(cur_channels),
-                    nn.ReLU()))
-            prev_channels = cur_channels
-            img_length //= 2
-        self.encoder = nn.Sequential(*modules)
-        # highlight-end
-        self.flatten_dim = prev_channels * img_length * img_length
-        # key-start
-        # 两个独立 Linear 头：分别预测均值 μ 和对数方差 log σ²
-        # 用 log σ² 而非 σ²：避免 σ² 出现负数，数值更稳定
-        self.mean_linear = nn.Linear(self.flatten_dim, latent_dim)
-        self.var_linear  = nn.Linear(self.flatten_dim, latent_dim)
-        # key-end
-        self.latent_dim = latent_dim
+```text
+输入图像 (3, 64, 64)
+  -> Conv2d stride=2, channels 16   -> (16, 32, 32)
+  -> Conv2d stride=2, channels 32   -> (32, 16, 16)
+  -> Conv2d stride=2, channels 64   -> (64, 8, 8)
+  -> Conv2d stride=2, channels 128  -> (128, 4, 4)
+  -> Conv2d stride=2, channels 256  -> (256, 2, 2)
+  -> flatten
+  -> Linear -> mean    (128维)
+  -> Linear -> logvar  (128维)
+  -> 重参数化采样 z
+  -> Linear + reshape -> (256, 2, 2)
+  -> ConvTranspose2d 逐步上采样
+  -> 输出图像 (3, 64, 64)
 ```
 
-### 4.2 重参数化采样（forward 核心）
-
-```python title="dldemos/VAE/model.py" showLineNumbers
-    def forward(self, x):
-        # 编码
-        encoded = self.encoder(x)
-        encoded = torch.flatten(encoded, 1)
-        mean   = self.mean_linear(encoded)
-        logvar = self.var_linear(encoded)
-        # key-start
-        # 重参数化：z = ε * σ + μ，ε ~ N(0, I)
-        # ε 与参数无关，梯度可以通过 mean 和 std 反传
-        eps = torch.randn_like(logvar)
-        std = torch.exp(logvar / 2)   # log σ² / 2 = log σ，exp 得 σ
-        z   = eps * std + mean
-        # key-end
-        # 解码
-        x = self.decoder_projection(z)
-        x = torch.reshape(x, (-1, *self.decoder_input_chw))
-        decoded = self.decoder(x)
-        return decoded, mean, logvar
-```
-
-### 4.3 生成采样（推断时用，不需要编码器）
-
-```python title="dldemos/VAE/model.py" showLineNumbers
-    def sample(self, device=None):
-        if device is None:
-            device = next(self.parameters()).device
-        # highlight-next-line
-        z = torch.randn(1, self.latent_dim, device=device)  # 直接从先验 N(0,I) 采样
-        x = self.decoder_projection(z)
-        x = torch.reshape(x, (-1, *self.decoder_input_chw))
-        decoded = self.decoder(x)
-        return decoded
-```
-
----
-
-## 5. 训练细节
+编码器用卷积逐步压缩空间尺寸、增加通道数；解码器做相反操作，用反卷积把隐变量还原成图像。
 
 <Tabs>
-  <TabItem value="loss" label="损失函数" default>
+  <TabItem value="encoder" label="编码器" default>
 
-```python title="dldemos/VAE/main.py"
-def loss_fn(y, y_hat, mean, logvar):
-    # 重建损失：MSE（像素级 L2）
-    recons_loss = F.mse_loss(y_hat, y)
-    # KL 散度解析式（对 latent_dim 求和，再对 batch 取均值）
-    kl_loss = torch.mean(
-        -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0)
-    # kl_weight=0.00025：KL 项权重很小，防止"后验崩溃"
-    loss = recons_loss + kl_loss * kl_weight
-    return loss
+```python title="dldemos/VAE/model.py"
+prev_channels = 3
+modules = []
+img_length = 64
+for cur_channels in hiddens:
+    modules.append(
+        nn.Sequential(
+            nn.Conv2d(prev_channels, cur_channels, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(cur_channels),
+            nn.ReLU(),
+        )
+    )
+    prev_channels = cur_channels
+    img_length //= 2
+self.encoder = nn.Sequential(*modules)
+self.mean_linear = nn.Linear(prev_channels * img_length * img_length, latent_dim)
+self.var_linear = nn.Linear(prev_channels * img_length * img_length, latent_dim)
 ```
 
   </TabItem>
-  <TabItem value="hyperparams" label="超参数">
+  <TabItem value="decoder" label="解码器">
 
-| 超参数 | 值 | 说明 |
-|--------|-----|------|
-| `latent_dim` | 128 | 隐空间维度 |
-| `hiddens` | `[16, 32, 64, 128, 256]` | 编解码器各层通道数 |
-| `lr` | 0.005 | Adam 学习率 |
-| `kl_weight` | 0.00025 | KL 散度权重 |
-| `n_epochs` | 10 | 训练轮数 |
-| 数据集 | CelebA 64×64 | 需自行下载 |
+```python title="dldemos/VAE/model.py"
+self.decoder_projection = nn.Linear(
+    latent_dim, prev_channels * img_length * img_length
+)
+self.decoder_input_chw = (prev_channels, img_length, img_length)
+
+for i in range(len(hiddens) - 1, 0, -1):
+    modules.append(
+        nn.Sequential(
+            nn.ConvTranspose2d(
+                hiddens[i],
+                hiddens[i - 1],
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                output_padding=1,
+            ),
+            nn.BatchNorm2d(hiddens[i - 1]),
+            nn.ReLU(),
+        )
+    )
+```
+
+  </TabItem>
+  <TabItem value="sample" label="生成采样">
+
+```python title="dldemos/VAE/model.py"
+def sample(self, device=None):
+    if device is None:
+        device = next(self.parameters()).device
+    z = torch.randn(1, self.latent_dim, device=device)
+    x = self.decoder_projection(z)
+    x = torch.reshape(x, (-1, *self.decoder_input_chw))
+    decoded = self.decoder(x)
+    return decoded
+```
+
+生成时不需要编码器，直接从标准正态分布采样 $z$，再交给解码器。
 
   </TabItem>
 </Tabs>
 
-训练、重建和生成通过显式 CLI 模式选择。默认自动选择 CUDA 或 CPU，重建和生成要求 checkpoint 已存在：
+## 5. 训练与运行
 
-```bash
-uv run python dldemos/VAE/main.py --mode train
-uv run python dldemos/VAE/main.py --mode reconstruct
-uv run python dldemos/VAE/main.py --mode generate
+项目入口是 [`dldemos/VAE/main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/VAE/main.py)，支持三种模式：
+
+| 模式 | 命令 | 依赖 |
+| --- | --- | --- |
+| 训练 | `--mode train` | CelebA 数据集 |
+| 重建 | `--mode reconstruct` | CelebA 数据集 + checkpoint |
+| 生成 | `--mode generate` | checkpoint |
+
+### 5.1 数据准备
+
+默认数据目录是：
+
+```text
+data/celebA/img_align_celeba
 ```
 
----
+目录内应直接放置 CelebA 的对齐裁剪图片，例如：
 
-## 6. 延伸阅读
+```text
+data/
+  celebA/
+    img_align_celeba/
+      000001.jpg
+      000002.jpg
+      ...
+```
 
-- 📄 [Auto-Encoding Variational Bayes（Kingma & Welling，2013）](https://arxiv.org/abs/1312.6114)
-- 🔗 [本章源码：`dldemos/VAE/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/VAE)
-- ➡️ **下一章**：[DDPM — 去噪扩散概率模型](./ddpm)
+数据加载代码会做三步预处理：
+
+```python title="dldemos/VAE/load_celebA.py"
+transforms.CenterCrop(168)
+transforms.Resize((64, 64))
+transforms.ToTensor()
+```
+
+CelebA 的对齐图片是长方形，先中心裁剪成正方形，再缩放到 64×64。
+
+### 5.2 Windows / PowerShell 运行
+
+如果 PowerShell 里中文显示成乱码，通常是终端代码页问题，不是 `.mdx` 文件损坏。可以先切到 UTF-8：
+
+```powershell
+chcp 65001
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+```
+
+推荐使用 `uv` 运行项目命令：
+
+```powershell
+uv run python dldemos/VAE/main.py --mode train --device cuda:0
+uv run python dldemos/VAE/main.py --mode reconstruct --device cuda:0
+uv run python dldemos/VAE/main.py --mode generate --device cuda:0
+```
+
+如果当前环境已经安装好 PyTorch 和项目依赖，也可以直接用：
+
+```powershell
+python dldemos/VAE/main.py --mode train --device cuda:0
+```
+
+训练会保存 checkpoint：
+
+```text
+dldemos/VAE/model.pth
+```
+
+重建和生成结果默认保存到：
+
+```text
+work_dirs/tmp.jpg
+```
+
+### 5.3 CUDA 检查
+
+在 Windows 上先确认 PyTorch 能看到 GPU：
+
+```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+如果输出 `True` 和显卡名称，就可以用 `--device cuda:0`。
+
+## 6. 代码实战：一次训练迭代
+
+下面这段就是 VAE 训练的核心闭环：
+
+```python title="dldemos/VAE/main.py"
+for x in dataloader:
+    x = x.to(device)
+    y_hat, mean, logvar = model(x)
+    loss = loss_fn(x, y_hat, mean, logvar)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+```
+
+每一步发生的事情是：
+
+1. `model(x)`：编码器输出 `mean` 和 `logvar`，采样得到 `z`，解码器输出 `y_hat`。
+2. `loss_fn(...)`：计算重建误差和 KL 正则。
+3. `loss.backward()`：通过重参数化路径把梯度传回编码器和解码器。
+4. `optimizer.step()`：更新模型参数。
+
+损失函数对应的代码：
+
+```python title="dldemos/VAE/main.py"
+def loss_fn(y, y_hat, mean, logvar):
+    recons_loss = F.mse_loss(y_hat, y)
+    kl_loss = torch.mean(
+        -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar), 1), 0
+    )
+    loss = recons_loss + kl_loss * kl_weight
+    return loss
+```
+
+:::warning 实验提示
+VAE 生成效果通常不如现代扩散模型锐利。它的价值不只在“生成图片质量”，更在于理解隐变量建模、变分推断、KL 正则和重参数化。这些概念会在后续 DDPM、DDIM、VQVAE 和潜扩散模型里反复出现。
+:::
+
+## 7. 与后续章节的关系
+
+VAE 是后续生成模型章节的地基：
+
+- **DDPM / DDIM**：可以看成更具体的变分生成模型。编码过程不再由神经网络学习，而是固定为逐步加噪；解码器则学习逐步去噪。
+- **VQVAE**：把连续隐空间换成离散 codebook，让图像生成变成更小、更结构化的离散 token 生成问题。
+- **潜扩散模型**：先用 VAE 或类似自编码器把图像压缩到潜空间，再在潜空间里训练扩散模型，从而降低计算成本。
+
+## 参考资料
+
+- Kingma, D. P., & Welling, M. (2013). [Auto-Encoding Variational Bayes](https://arxiv.org/abs/1312.6114).
+- 周弈帆（2022-12-19）。[抛开数学，轻松学懂 VAE（附 PyTorch 实现）](https://zhouyifan.net/2022/12/19/20221016-VAE/)。
+- 周弈帆（2022-10-13）。[从零理解熵、交叉熵、KL散度](https://zhouyifan.net/2022/10/13/20221012-entropy/)。
+- 周弈帆（2023-07-07）。[扩散模型（Diffusion Model）详解：直观理解、数学原理、PyTorch 实现](https://zhouyifan.net/2023/07/07/20230330-diffusion-model/)。
+- 周弈帆（2023-06-06）。[轻松理解 VQ-VAE：首个提出 codebook 机制的生成模型](https://zhouyifan.net/2023/06/06/20230527-VQVAE/)。
+- 本项目源码：[dldemos/VAE/](https://github.com/luochang212/DL-Demos/tree/master/dldemos/VAE)。
