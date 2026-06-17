@@ -5,9 +5,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from chapters.generative_models.ddim.ddim import DDIM
+from chapters.generative_models.pixelcnn.model import GatedPixelCNN, PixelCNN
 from dldemos.BasicCNN import dataset as cnn_dataset
-from dldemos.ddim.ddim import DDIM
-from dldemos.pixelcnn.model import GatedPixelCNN, PixelCNN
 from dldemos.Regularization.main import DeepNetwork
 
 

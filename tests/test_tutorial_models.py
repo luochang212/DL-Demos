@@ -7,6 +7,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from chapters.generative_models.vae.code.main import load_model as load_vae_model
+from chapters.generative_models.vae.code.main import loss_fn as vae_loss
+from chapters.generative_models.vae.code.model import VAE
 from dldemos.AdvancedOptimizer.model import DeepNetwork as OptimizerNetwork
 from dldemos.AdvancedOptimizer.optimizer import Adam, Momentum, RMSProp
 from dldemos.attention.main import AttentionModel, sequence_accuracy
@@ -25,9 +28,6 @@ from dldemos.StyleTransfer.style_transfer import (
 )
 from dldemos.Transformer.data_load import create_data, encode_source, get_batch_indices
 from dldemos.Transformer.translate import greedy_decode
-from dldemos.VAE.main import load_model as load_vae_model
-from dldemos.VAE.main import loss_fn as vae_loss
-from dldemos.VAE.model import VAE
 
 
 class BasicNetworkTest(unittest.TestCase):

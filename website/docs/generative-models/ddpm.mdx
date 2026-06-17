@@ -16,7 +16,7 @@ import FormulaCode from '@site/src/components/FormulaCode';
 - 理解**前向过程**：如何用固定方差逐步给图像加噪
 - 推导**训练目标**：如何从变分下界得到常用的噪声预测目标
 - 掌握**逆向采样**：从纯噪声逐步去噪生成图像
-- 读懂 [`dldemos/ddpm/ddpm.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddpm/ddpm.py) 和 [`dldemos/ddpm/network.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddpm/network.py)
+- 读懂 [`chapters/generative_models/ddpm/ddpm.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/ddpm.py) 和 [`chapters/generative_models/ddpm/network.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/network.py)
 :::
 
 ---
@@ -128,7 +128,7 @@ $$
 
 ### 4.1 前向扩散系数预计算
 
-```python title="dldemos/ddpm/ddpm.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/ddpm.py" showLineNumbers
 class DDPM():
 
     def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
@@ -176,7 +176,7 @@ if eps is None:
 res = eps * torch.sqrt(1 - alpha_bar) + torch.sqrt(alpha_bar) * x
 return res`}
   language="python"
-  title="dldemos/ddpm/ddpm.py — sample_forward"
+  title="chapters/generative_models/ddpm/ddpm.py — sample_forward"
   mappings={[
     { partIndex: 0, lines: [3] },
     { partIndex: 2, lines: [0] },
@@ -186,7 +186,7 @@ return res`}
 
 ### 4.3 逆向单步去噪
 
-```python title="dldemos/ddpm/ddpm.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/ddpm.py" showLineNumbers
     def sample_backward_step(self, x_t, t, net, simple_var=True, clip_x0=True):
         n = x_t.shape[0]
         t_tensor = torch.tensor([t] * n,
@@ -224,7 +224,7 @@ return res`}
 
 ### 4.4 UNet 时间步嵌入
 
-```python title="dldemos/ddpm/network.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/network.py" showLineNumbers
 class PositionalEncoding(nn.Module):
 
     def __init__(self, max_seq_len, d_model):
@@ -287,5 +287,5 @@ for x_0 in dataloader:
 
 - 📄 [Denoising Diffusion Probabilistic Models（Ho et al., 2020）](https://arxiv.org/abs/2006.11239)
 - 📄 [Understanding Diffusion Models: A Unified Perspective（Luo, 2022）](https://arxiv.org/abs/2208.11970)
-- 🔗 [本章源码：`dldemos/ddpm/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/ddpm)
+- 🔗 [本章源码：`chapters/generative_models/ddpm/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/ddpm)
 - ➡️ **下一章**：[DDIM — 去噪扩散隐式模型](./ddim)

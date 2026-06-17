@@ -1,0 +1,5 @@
+name: pixelcnn_smoke
+description: Minimal masked-convolution and sampling path smoke run.
+device: cpu
+color_level: 2
+output: work_dirs/pixelcnn/smoke.jpg

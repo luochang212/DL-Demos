@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 - 掌握**码本（Codebook）**：用有限个向量近似编码器输出
 - 理解**直通梯度估计**：绕过不可微的量化操作
 - 掌握**三段损失函数**：重建损失 + 嵌入损失 + 承诺损失
-- 读懂 [`dldemos/VQVAE/model.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/VQVAE/model.py)
+- 读懂 [`chapters/generative_models/vqvae/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/model.py)
 :::
 
 :::info 前置知识
@@ -79,7 +79,7 @@ $$
 
 ### 3.1 编码器 + 码本 + 解码器结构
 
-```python title="dldemos/VQVAE/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
 class VQVAE(nn.Module):
 
     def __init__(self, input_dim, dim, n_embedding):
@@ -106,7 +106,7 @@ class VQVAE(nn.Module):
 
 ### 3.2 量化过程（forward 核心）
 
-```python title="dldemos/VQVAE/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
     def forward(self, x):
         ze = self.encoder(x)
         embedding = self.vq_embedding.weight.data
@@ -138,7 +138,7 @@ class VQVAE(nn.Module):
 
 ### 3.3 推断：编码与解码分离
 
-```python title="dldemos/VQVAE/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
     @torch.no_grad()
     def encode(self, x):
         ze = self.encoder(x)
@@ -162,7 +162,7 @@ class VQVAE(nn.Module):
 <Tabs>
   <TabItem value="loss" label="三段损失" default>
 
-```python title="dldemos/VQVAE/main.py"
+```python title="chapters/generative_models/vqvae/main.py"
 x_hat, ze, zq = model(x)
 l_reconstruct  = mse_loss(x, x_hat)            # 重建损失
 l_embedding    = mse_loss(ze.detach(), zq)      # 嵌入损失：码本靠近编码器
@@ -219,5 +219,5 @@ VQVAE 的生成流程分为两个阶段：
 ## 5. 延伸阅读
 
 - 📄 [Neural Discrete Representation Learning（van den Oord et al., 2017）](https://arxiv.org/abs/1711.00937)
-- 🔗 [本章源码：`dldemos/VQVAE/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/VQVAE)
+- 🔗 [本章源码：`chapters/generative_models/vqvae/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/vqvae)
 - ⬅️ **前置章节**：[PixelCNN — 自回归像素生成](./pixelcnn)

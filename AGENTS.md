@@ -1,8 +1,31 @@
 # AGENTS.md
 
 This repository is a tutorial-first deep learning project. The web tutorial,
-runnable code, experiments, results, and future Lean4 verification must stay
-aligned by chapter.
+runnable code, experiments, and results must stay aligned by chapter.
+
+## Project Origin
+
+- This repository is maintained at `https://github.com/luochang212/DL-Demos`.
+- It was forked from `https://github.com/SingleZombie/DL-Demos`.
+- The original repository provides the inherited demo code foundation.
+- This fork turns the inherited demos into a chapter-driven web tutorial with
+  clearer derivations, runnable experiments, and visual results.
+- When changing inherited code, preserve attribution and avoid implying the
+  original author wrote new tutorial text or refactored chapter structure.
+
+## Reference Policy
+
+- Zhou Yifan's blog at `https://zhouyifan.net/archives/` is an approved
+  reference source for improving the generative model tutorials.
+- Relevant examples include VAE, KL divergence, diffusion models, DDIM, and
+  VQ-VAE articles.
+- If tutorial text, explanation structure, intuition, or terminology is informed
+  by a Zhou Yifan blog article, cite the exact article in the chapter's
+  reference section.
+- Do not copy long passages. Use the blog as a reference, then write original
+  tutorial text tailored to this repository.
+- Keep references specific. Prefer article-level links over only linking the
+  archive page.
 
 ## Repository Rules
 
@@ -35,7 +58,6 @@ chapters/generative_models/<chapter>/
   experiments/
   results/
   assets/
-  lean/
   tests/
 ```
 

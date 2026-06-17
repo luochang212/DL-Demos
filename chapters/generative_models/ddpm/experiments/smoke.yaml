@@ -1,0 +1,6 @@
+name: ddpm_smoke
+description: Minimal DDPM forward and reverse sampling smoke run.
+device: cpu
+n_steps: 4
+image_shape: [1, 1, 8, 8]
+output: work_dirs/ddpm/smoke.jpg

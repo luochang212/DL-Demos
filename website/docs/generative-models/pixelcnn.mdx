@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**自回归分解**：把图像生成拆解为像素级的条件概率链
 - 掌握**掩码卷积**（A 型/B 型）：如何让卷积只「看到」已生成的像素
 - 理解**门控激活**：Gated PixelCNN 如何解决盲点问题
-- 读懂 [`dldemos/pixelcnn/model.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/pixelcnn/model.py) 的实现
+- 读懂 [`chapters/generative_models/pixelcnn/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/model.py) 的实现
 :::
 
 ---
@@ -83,7 +83,7 @@ Gated PixelCNN 用**双分支结构**解决：
 
 ### 3.1 掩码卷积
 
-```python title="dldemos/pixelcnn/model.py" showLineNumbers
+```python title="chapters/generative_models/pixelcnn/model.py" showLineNumbers
 class MaskConv2d(nn.Module):
 
     def __init__(self, conv_type, *args, **kwags):
@@ -112,7 +112,7 @@ class MaskConv2d(nn.Module):
 
 ### 3.2 门控块（GatedBlock）
 
-```python title="dldemos/pixelcnn/model.py" showLineNumbers
+```python title="chapters/generative_models/pixelcnn/model.py" showLineNumbers
 class GatedBlock(nn.Module):
 
     def __init__(self, conv_type, in_channels, p, bn=False):
@@ -190,5 +190,5 @@ loss = F.cross_entropy(output, target)
 
 - 📄 [PixelCNN++（Salimans et al., 2017）](https://arxiv.org/abs/1701.00105)
 - 📄 [Gated PixelCNN（van den Oord et al., 2016）](https://arxiv.org/abs/1606.05328)
-- 🔗 [本章源码：`dldemos/pixelcnn/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/pixelcnn)
+- 🔗 [本章源码：`chapters/generative_models/pixelcnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/pixelcnn)
 - ➡️ **下一章**：[VQVAE — 向量量化变分自编码器](./vqvae)（其中 PixelCNN 作为先验模型，原理见本章）

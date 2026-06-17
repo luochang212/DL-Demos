@@ -1,0 +1,6 @@
+name: ddim_smoke
+description: Minimal DDIM eta-controlled reverse sampling smoke run.
+device: cpu
+n_steps: 4
+image_shape: [1, 1, 8, 8]
+output: work_dirs/ddim/smoke.jpg

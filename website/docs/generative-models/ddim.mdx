@@ -12,7 +12,7 @@ keywords: [DDIM, 扩散模型, 加速采样, 隐式模型, ODE, 生成模型]
 - 理解 DDIM 与 DDPM 的核心差异：**非马尔可夫逆向过程**
 - 掌握 **子序列采样**：用 20 步跳步采样达到 1000 步的效果
 - 理解 **eta 参数**：$\eta=0$ 确定性采样；使用完整相邻时间步时，$\eta=1$ 对应 DDPM
-- 读懂 [`dldemos/ddim/ddim.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/ddim/ddim.py) 的 57 行实现
+- 读懂 [`chapters/generative_models/ddim/ddim.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/ddim.py) 的 57 行实现
 :::
 
 :::info 前置要求
@@ -66,7 +66,7 @@ DDIM 直接继承 DDPM 类，只重写了 `sample_backward` 方法——全部�
 
 ### 3.1 继承与子序列构造
 
-```python title="dldemos/ddim/ddim.py" showLineNumbers
+```python title="chapters/generative_models/ddim/ddim.py" showLineNumbers
 class DDIM(DDPM):
 
     def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
@@ -87,7 +87,7 @@ class DDIM(DDPM):
 
 ### 3.2 三项更新公式
 
-```python title="dldemos/ddim/ddim.py" showLineNumbers
+```python title="chapters/generative_models/ddim/ddim.py" showLineNumbers
         for i in tqdm(range(1, ddim_step + 1),
                       f'DDIM sampling with eta {eta}'):
             cur_t = ts[i - 1] - 1
@@ -138,6 +138,6 @@ class DDIM(DDPM):
 ## 5. 延伸阅读
 
 - 📄 [Denoising Diffusion Implicit Models（Song et al., 2021）](https://arxiv.org/abs/2010.02502)
-- 🔗 [本章源码：`dldemos/ddim/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/ddim)
+- 🔗 [本章源码：`chapters/generative_models/ddim/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/ddim)
 - ⬅️ **前置章节**：[DDPM — 去噪扩散概率模型](./ddpm)
 - ➡️ **下一章**：[PixelCNN — 自回归像素生成](./pixelcnn)
