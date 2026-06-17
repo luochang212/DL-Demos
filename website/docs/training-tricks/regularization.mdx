@@ -1,87 +1,242 @@
-﻿---
+---
 id: regularization
-title: 正则化：防止过拟合的两种武器
+title: 正则化 — 防止过拟合的两种武器
 sidebar_label: 2. 正则化
-description: 理解 Weight Decay 和 Dropout 的数学原理与 NumPy 实现。
+description: 理解过拟合的成因，掌握 Weight Decay（L2 正则化）和 Dropout 的数学原理与 NumPy 实现。
 keywords: [正则化, Weight Decay, Dropout, L2, 过拟合, 深度学习, NumPy]
 ---
 
-# 正则化：防止过拟合的两种武器
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-本章对应源码：
-[`chapters/training_tricks/regularization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/regularization/main.py)
+# 正则化 — 防止过拟合的两种武器
 
-## 过拟合
+:::tip 本章要点
+- 理解**过拟合**：为什么网络越大越容易「记住」训练数据
+- 掌握 **Weight Decay**（L2 正则化）：在损失函数中惩罚大权重
+- 掌握 **Dropout**：训练时随机丢弃神经元，提高泛化能力
+- 读懂 [`chapters/training_tricks/regularization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/regularization/main.py) 的纯 NumPy 实现
+:::
 
-当模型容量远大于数据规模时，网络可能记住训练样本中的噪声，而不是学到可泛化的规律。训练集损失会很低，但测试集表现变差。
+> 💡 本章代码使用纯 NumPy 手写，与上一章共享网络框架，重点在正则化相关的改动。
 
-正则化的目标是约束模型复杂度，让决策边界更平滑。
+---
 
-## Weight Decay
+## 1. 什么是过拟合
 
-Weight Decay 在原始损失后加入权重惩罚：
+当网络容量（参数数量）远大于训练数据量时，网络可以「记住」每个训练样本，包括噪声。此时：
+
+- **训练集表现好**：Loss 很低，准确率很高
+- **测试集表现差**：泛化能力弱，新数据预测不准
+
+二维点分类实验中，过拟合表现为**决策边界过度扭曲**，试图精确包围每个点，而不是学到一个平滑的分类面。
+
+正则化的目标：**约束模型复杂度**，让模型学到更简单、更平滑的决策边界。
+
+---
+
+## 2. 数学原理
+
+### 2.1 Weight Decay（L2 正则化）
+
+在标准损失函数后添加权重惩罚项：
 
 $$
-L_{\mathrm{reg}}
-= L_{\mathrm{original}}
-+ \frac{\lambda}{2m}\sum_l \lVert W^{[l]}\rVert_F^2
+L_{\text{reg}} = L_{\text{original}} + \frac{\lambda}{2m} \sum_{l} \|W^{[l]}\|_F^2
 $$
 
-对应梯度为：
+其中 $\lambda$ 是正则化强度，$m$ 是样本数，$\|W\|_F^2$ 是 Frobenius 范数的平方（即所有权重平方和）。
+
+对 $W^{[l]}$ 的梯度变为：
 
 $$
-\frac{\partial L_{\mathrm{reg}}}{\partial W^{[l]}}
-= \frac{\partial L_{\mathrm{original}}}{\partial W^{[l]}}
-+ \frac{\lambda}{m}W^{[l]}
+\frac{\partial L_{\text{reg}}}{\partial W^{[l]}} = \frac{\partial L_{\text{original}}}{\partial W^{[l]}} + \frac{\lambda}{m} W^{[l]}
 $$
 
-所以更新可以写成：
+梯度更新时：
 
 $$
-W^{[l]}\leftarrow
-\left(1-\frac{\eta\lambda}{m}\right)W^{[l]}
--\eta\frac{\partial L_{\mathrm{original}}}{\partial W^{[l]}}
+W^{[l]} \leftarrow W^{[l]} - \eta \left(\frac{\partial L_{\text{original}}}{\partial W^{[l]}} + \frac{\lambda}{m} W^{[l]}\right) = \left(1 - \frac{\eta\lambda}{m}\right) W^{[l]} - \eta \frac{\partial L_{\text{original}}}{\partial W^{[l]}}
 $$
 
-代码中只衰减权重，不衰减偏置：
+**直观理解**：每次更新时，权重都会被**稍微缩小**（乘以 $1 - \frac{\eta\lambda}{m}$），防止权重增长过大。这也是「Weight Decay」（权重衰减）名称的由来。
 
-```python title="chapters/training_tricks/regularization/main.py"
-if self.weight_decay:
-    LAMBDA = 4
-    self.W[i] = (1 - learning_rate * LAMBDA / self.m) * self.W[i]
-    self.W[i] -= learning_rate * self.dW_cache[i]
-    self.b[i] -= learning_rate * self.db_cache[i]
+注意：**偏置 $b$ 通常不参与正则化**，因为偏置参数量通常远少于权重，而且不会直接放大输入特征。
+
+### 2.2 Dropout
+
+Dropout 在训练时以概率 $p$ 随机将某些神经元的输出**置零**：
+
+$$
+\tilde{a}^{[l]}_j = \begin{cases} 0 & \text{以概率 } p \\ \frac{a^{[l]}_j}{1-p} & \text{以概率 } 1-p \end{cases}
+$$
+
+除以 $1-p$ 是 **Inverted Dropout** 的关键——保证该层输出的**期望值不变**，这样测试时不需要调整。
+
+**为什么 Dropout 有效**：
+
+1. **打破共适应**：每个神经元不能依赖特定的其他神经元，被迫学到更鲁棒的特征
+2. **近似模型平均**：每次训练相当于采样一个子网络，推断时使用完整网络近似集成这些子网络
+3. **类似 L2 正则的效果**：鼓励权重分布更均匀，避免单个权重过大
+
+---
+
+## 3. 代码解析
+
+与上一章初始化教程共享 `BaseRegressionModel` 基类，网络结构更宽（`[2, 80, 50, 30, 1]`）以突出过拟合问题。重点看正则化相关的改动。
+
+### 3.1 网络初始化：添加正则化选项
+
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+class DeepNetwork(BaseRegressionModel):
+
+    def __init__(self,
+                 neuron_cnt: List[int],
+                 activation_func: List[str],
+                 regularization: str = 'none'):
+        # ...
+        # highlight-start
+        if regularization == 'weight decay':
+            self.weight_decay = True
+        else:
+            self.weight_decay = False
+
+        if regularization == 'dropout':
+            self.dropout = True
+        else:
+            self.dropout = False
+        # highlight-end
 ```
 
-## Dropout
+### 3.2 前向传播：Dropout 实现
 
-Dropout 在训练时随机丢弃部分隐藏单元。代码使用 inverted dropout：训练时除以 `keep_prob`，保证激活期望不变。
-
-$$
-\tilde a_j^{[l]}=
-\begin{cases}
-0, & \text{drop}\\
-\frac{a_j^{[l]}}{p_{\mathrm{keep}}}, & \text{keep}
-\end{cases}
-$$
-
-```python title="chapters/training_tricks/regularization/main.py"
-if train_mode and self.dropout and i < self.num_layer - 1:
-    keep_prob = 0.5
-    d = np.random.rand(*A.shape) < keep_prob
-    A = A * d / keep_prob
-    self.dropout_mask_cache[i] = d
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+    def forward(self, X, train_mode=True):
+        A = X
+        self.A_cache[0] = A
+        for i in range(self.num_layer):
+            Z = np.dot(self.W[i], A) + self.b[i]
+            if i == self.num_layer - 1:
+                A = sigmoid(Z)
+            else:
+                A = get_activation_func(self.activation_func[i])(Z)
+            # key-start
+            # Inverted Dropout：仅在训练时、隐藏层生效
+            if train_mode and self.dropout and i < self.num_layer - 1:
+                keep_prob = 0.5
+                d = np.random.rand(*A.shape) < keep_prob  # 随机 mask
+                A = A * d / keep_prob                       # 缩放保持期望不变
+                self.dropout_mask_cache[i] = d               # 反向传播复用同一 mask
+            # key-end
+            if train_mode:
+                self.Z_cache[i] = Z
+                self.A_cache[i + 1] = A
+        return A
 ```
 
-反向传播时必须复用前向传播保存的同一个 mask。
+两个关键细节：
+1. **`train_mode` 检查**：测试时不做 Dropout，直接使用全部神经元
+2. **`/ keep_prob` 缩放**：保证该层输出的期望值在训练和测试时一致
+3. **缓存 mask**：反向传播必须复用前向传播的同一份 mask
 
-## 实验入口
+### 3.3 反向传播：复用 Dropout mask
 
-```powershell
-uv run python -m chapters.training_tricks.regularization.main
-uv run pytest chapters/training_tricks/regularization/tests -q
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+    def backward(self, Y):
+        # ...
+        for i in range(self.num_layer - 1, -1, -1):
+            if i == self.num_layer - 1:
+                dZ = self.A_cache[-1] - Y
+            else:
+                # key-start
+                # 被前向传播丢弃的神经元不能继续传播梯度
+                if self.dropout:
+                    keep_prob = 0.5
+                    dA = dA * self.dropout_mask_cache[i] / keep_prob
+                # key-end
+                dZ = dA * get_activation_de_func(self.activation_func[i])(
+                    self.Z_cache[i])
 ```
 
-## 小结
+### 3.4 梯度更新：Weight Decay 实现
 
-Weight Decay 通过限制权重规模降低模型复杂度；Dropout 通过随机子网络训练减少神经元之间的共适应。二者都服务于同一个目标：提升泛化能力。
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+    def gradient_descent(self, learning_rate):
+        for i in range(self.num_layer):
+            # key-start
+            if self.weight_decay:
+                LAMBDA = 4
+                # Weight Decay：W 乘以衰减因子 (1 - lr*λ/m)
+                self.W[i] = (1 - learning_rate * LAMBDA / self.m
+                             ) * self.W[i] - learning_rate * self.dW_cache[i]
+                self.b[i] -= learning_rate * self.db_cache[i]  # b 不正则化
+            else:
+                self.W[i] -= learning_rate * self.dW_cache[i]
+                self.b[i] -= learning_rate * self.db_cache[i]
+            # key-end
+```
+
+### 3.5 损失函数：Weight Decay 的惩罚项
+
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+    def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
+        # key-start
+        if self.weight_decay:
+            LAMBDA = 4
+            tot = np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
+            for i in range(self.num_layer):
+                tot += np.sum(self.W[i] * self.W[i]) * LAMBDA / 2 / self.m
+            return tot
+        # key-end
+        else:
+            return np.mean(-(Y * np.log(Y_hat) + (1 - Y) * np.log(1 - Y_hat)))
+```
+
+### 3.6 主函数：三种设置对比
+
+```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+def main():
+    train_X, train_Y = generate_points(400)
+    plot_X = generate_plot_set()
+
+    n_x = train_X.shape[0]
+    neuron_list = [n_x, 80, 50, 30, 1]
+    activation_list = ['relu', 'relu', 'relu']
+
+    # highlight-start
+    # 宽网络（80-50-30）：容易过拟合，便于观察正则化效果
+    model1 = DeepNetwork(neuron_list, activation_list)              # 无正则化
+    model2 = DeepNetwork(neuron_list, activation_list, 'weight decay')  # L2 正则化
+    model3 = DeepNetwork(neuron_list, activation_list, 'dropout')       # Dropout
+    # highlight-end
+
+    train(model1, train_X, train_Y, 15000, 0.01, 1000)
+    train(model2, train_X, train_Y, 15000, 0.01, 1000)
+    train(model3, train_X, train_Y, 15000, 0.01, 1000)
+
+    visualize(train_X, train_Y, model1.forward(plot_X, False))
+    visualize(train_X, train_Y, model2.forward(plot_X, False))
+    visualize(train_X, train_Y, model3.forward(plot_X, False))
+```
+
+---
+
+## 4. 实验结果
+
+同样的宽网络（`[2, 80, 50, 30, 1]`，ReLU），训练 15000 步：
+
+| 正则化方式 | 决策边界 | 特点 |
+|-----------|---------|------|
+| **无正则化** | 边界扭曲，出现不规则凸起 | 过拟合训练数据 |
+| **Weight Decay（λ=4）** | 边界更平滑 | 权重被约束，不能太复杂 |
+| **Dropout（p=0.5）** | 边界通常更平滑 | 减少神经元之间的共适应 |
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Dropout: A Simple Way to Prevent Neural Networks from Overfitting（Srivastava et al.，2014）](https://jmlr.org/papers/v15/srivastava14a.html)
+- 📄 [Decoupled Weight Decay Regularization（Loshchilov & Hutter，2019）](https://arxiv.org/abs/1711.05101) — AdamW 中解耦的 Weight Decay
+- 🔗 [本章源码：`chapters/training_tricks/regularization/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/training_tricks/regularization)
+- ⬅️ **上一章**：[参数初始化](./initialization)
+- ➡️ **下一章**：[优化器 — 从 SGD 到 Adam](./optimizer)

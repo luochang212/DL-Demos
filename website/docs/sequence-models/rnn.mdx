@@ -1,42 +1,42 @@
-﻿---
+---
 id: rnn
-title: RNN 鈥?寰幆绁炵粡缃戠粶
-sidebar_label: 1. RNN 鈥?寰幆绁炵粡缃戠粶
-description: 鐞嗚В RNN 鐨勫惊鐜粨鏋勫拰娌挎椂闂存灞曞紑鐨勮绠楁柟寮忥紝鎺屾彙瀛楃绾ц瑷€妯″瀷鐨勮缁冧笌閲囨牱锛屽苟閫愯瑙ｆ瀽 PyTorch 瀹炵幇銆?
-keywords: [RNN, GRU, 寰幆绁炵粡缃戠粶, 璇█妯″瀷, 瀛楃绾? 搴忓垪寤烘ā, PyTorch]
+title: RNN — 循环神经网络
+sidebar_label: 1. RNN — 循环神经网络
+description: 理解 RNN 的循环结构和沿时间步展开的计算方式，掌握字符级语言模型的训练与采样，并逐行解析 PyTorch 实现。
+keywords: [RNN, GRU, 循环神经网络, 语言模型, 字符级, 序列建模, PyTorch]
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# RNN 鈥?寰幆绁炵粡缃戠粶
+# RNN — 循环神经网络
 
-:::tip 鏈珷瑕佺偣
-- 鐞嗚В **RNN 鐨勫惊鐜粨鏋?*锛氶殣钘忕姸鎬佸浣曞湪鏃堕棿姝ヤ箣闂翠紶閫?
-- 鎺屾彙 **瀛楃绾ц瑷€妯″瀷**锛氶€愬瓧绗﹂娴嬩笅涓€涓瓧绗?
-- 瀵规瘮**鎵嬪啓 RNN** 涓?**nn.GRU** 鐨勪袱绉嶅疄鐜?
-- 璇绘噦 [`chapters/sequence_models/basic_rnn/models.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/basic_rnn/models.py) 鐨勪袱绉?RNN 瀹炵幇
+:::tip 本章要点
+- 理解 **RNN 的循环结构**：隐藏状态如何在时间步之间传递
+- 掌握 **字符级语言模型**：逐字符预测下一个字符
+- 对比**手写 RNN** 与 **nn.GRU** 的两种实现
+- 读懂 [`chapters/sequence_models/basic_rnn/models.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/basic_rnn/models.py) 的两种 RNN 实现
 :::
 
 ---
 
-## 1. 涓轰粈涔堥渶瑕?RNN
+## 1. 为什么需要 RNN
 
-鍏ㄨ繛鎺ョ綉缁滃拰 CNN 鍋囪杈撳叆涔嬮棿鐩镐簰鐙珛銆備絾寰堝鏁版嵁澶╃劧鏄?*搴忓垪**锛?
+全连接网络和 CNN 假设输入之间相互独立。但很多数据天然是**序列**：
 
-- 鏂囨湰锛氥€屾垜浠婂ぉ銆嶁啋 涓嬩竴涓瓧鏄€屽幓銆嶆瘮銆屼簡銆嶆洿鍚堢悊
-- 鏃堕棿搴忓垪锛氳偂绁ㄤ环鏍笺€佸ぉ姘斿彉鍖?
-- 璇煶锛氬墠鍚庡抚寮虹浉鍏?
+- 文本：「我今天」→ 下一个字是「去」比「了」更合理
+- 时间序列：股票价格、天气变化
+- 语音：前后帧强相关
 
-RNN 閫氳繃**闅愯棌鐘舵€?*锛坔idden state锛夊湪鏃堕棿姝ヤ箣闂翠紶閫掍俊鎭紝璁╃綉缁滃叿鏈夈€岃蹇嗐€嶃€?
+RNN 通过**隐藏状态**（hidden state）在时间步之间传递信息，让网络具有「记忆」。
 
 ---
 
-## 2. 鏁板鍘熺悊
+## 2. 数学原理
 
-### 2.1 鍩烘湰缁撴瀯
+### 2.1 基本结构
 
-RNN 鍦ㄦ瘡涓椂闂存 $t$ 鐨勮绠楋細
+RNN 在每个时间步 $t$ 的计算：
 
 $$
 a^{(t)} = g(W_a [a^{(t-1)}, x^{(t)}] + b_a)
@@ -46,33 +46,33 @@ $$
 \hat{y}^{(t)} = \sigma(W_y a^{(t)} + b_y)
 $$
 
-鍏朵腑 $a^{(t)}$ 鏄殣钘忕姸鎬侊紝$[\cdot, \cdot]$ 琛ㄧず鎷兼帴锛?g$ 閫氬父鏄?$\tanh$銆?
+其中 $a^{(t)}$ 是隐藏状态，$[\cdot, \cdot]$ 表示拼接，$g$ 通常是 $\tanh$。
 
 ```
-鏃堕棿姝ュ睍寮€锛?
+时间步展开：
 
-x(1) 鈹€鈹€鈫?[RNN] 鈹€鈹€鈫?x(2) 鈹€鈹€鈫?[RNN] 鈹€鈹€鈫?x(3) 鈹€鈹€鈫?...
-            鈹?                  鈹?                  鈹?
-            a(1) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫?  a(2) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫?  a(3)
-            鈹?                  鈹?                  鈹?
-           欧(1)               欧(2)               欧(3)
+x(1) ──→ [RNN] ──→ x(2) ──→ [RNN] ──→ x(3) ──→ ...
+            │                   │                   │
+            a(1) ──────────→   a(2) ──────────→   a(3)
+            │                   │                   │
+           ŷ(1)               ŷ(2)               ŷ(3)
 ```
 
-姣忎釜鏃堕棿姝ュ叡浜悓涓€缁勬潈閲?$W_a, W_y$銆?
+每个时间步共享同一组权重 $W_a, W_y$。
 
-### 2.2 瀛楃绾ц瑷€妯″瀷
+### 2.2 字符级语言模型
 
-灏嗗崟璇嶇殑姣忎釜瀛楃鐢?one-hot 缂栫爜杈撳叆 RNN锛?
+将单词的每个字符用 one-hot 编码输入 RNN：
 
-- **杈撳叆**锛氬綋鍓嶅瓧绗︾殑 embedding锛堟垨 one-hot锛?
-- **鐩爣**锛氶娴嬩笅涓€涓瓧绗︾殑姒傜巼鍒嗗竷
-- **璁粌**锛氭渶灏忓寲浜ゅ弶鐔?$\sum_t -\log P(c^{(t+1)} \mid c^{(1)}, ..., c^{(t)})$
+- **输入**：当前字符的 embedding（或 one-hot）
+- **目标**：预测下一个字符的概率分布
+- **训练**：最小化交叉熵 $\sum_t -\log P(c^{(t+1)} \mid c^{(1)}, ..., c^{(t)})$
 
-璁粌瀹屾垚鍚庯紝RNN 鍙互鎸夐娴嬫鐜囧垎甯冮殢鏈洪噰鏍蜂笅涓€涓瓧绗︼紝寰幆鐢熸垚鏂扮殑銆屽崟璇嶃€嶃€?
+训练完成后，RNN 可以按预测概率分布随机采样下一个字符，循环生成新的「单词」。
 
-### 2.3 姊害瑁佸壀
+### 2.3 梯度裁剪
 
-RNN 鐨勬搴﹂€氳繃鏃堕棿姝ュ弽鍚戜紶鎾紙BPTT锛夛紝缁忚繃澶氫釜鏃堕棿姝ュ悗瀹规槗姊害鐖嗙偢銆傚父鐢ㄧ殑瑙ｅ喅鏂规鏄?*姊害瑁佸壀**锛?
+RNN 的梯度通过时间步反向传播（BPTT），经过多个时间步后容易梯度爆炸。常用的解决方案是**梯度裁剪**：
 
 $$
 \text{if } \|\nabla\| > \theta: \quad \nabla \leftarrow \frac{\theta}{\|\nabla\|} \nabla
@@ -80,15 +80,15 @@ $$
 
 ---
 
-## 3. 浠ｇ爜瑙ｆ瀽
+## 3. 代码解析
 
-鏈」鐩疄鐜颁簡涓ょ RNN锛?
-- **RNN1**锛氭墜鍔ㄥ惊鐜紝one-hot 杈撳叆锛屽睍绀?RNN 鐨勫簳灞傝绠?
-- **RNN2**锛氫娇鐢?`nn.GRU` + `nn.Embedding`锛屾洿宸ョ▼鍖栫殑鍐欐硶
+本项目实现了两种 RNN：
+- **RNN1**：手动循环，one-hot 输入，展示 RNN 的底层计算
+- **RNN2**：使用 `nn.GRU` + `nn.Embedding`，更工程化的写法
 
-涓よ€呴兘鍦?IMDB 璇嶆眹琛ㄤ笂璁粌瀛楃绾ц瑷€妯″瀷銆?
+两者都在 IMDB 词汇表上训练字符级语言模型。
 
-### 3.1 RNN1锛氭墜鍔ㄥ惊鐜疄鐜?
+### 3.1 RNN1：手动循环实现
 
 ```python title="chapters/sequence_models/basic_rnn/models.py" showLineNumbers
 class RNN1(nn.Module):
@@ -97,7 +97,7 @@ class RNN1(nn.Module):
         super().__init__()
         self.hidden_units = hidden_units
         # key-start
-        # 涓€涓?Linear 鍚屾椂澶勭悊 [a(t-1), x(t)] 鐨勬嫾鎺?
+        # 一个 Linear 同时处理 [a(t-1), x(t)] 的拼接
         self.linear_a = nn.Linear(hidden_units + EMBEDDING_LENGTH, hidden_units)
         self.linear_y = nn.Linear(hidden_units, EMBEDDING_LENGTH)
         self.tanh = nn.Tanh()
@@ -112,42 +112,42 @@ class RNN1(nn.Module):
         x = torch.zeros(batch, EMBEDDING_LENGTH, device=word.device)
         # key-start
         for i in range(Tx):
-            # 鏍稿績寰幆锛歛(t) = tanh(W 路 [a(t-1), x(t)] + b)
+            # 核心循环：a(t) = tanh(W · [a(t-1), x(t)] + b)
             next_a = self.tanh(self.linear_a(torch.cat((a, x), 1)))
-            hat_y = self.linear_y(next_a)   # 棰勬祴涓嬩竴涓瓧绗?
+            hat_y = self.linear_y(next_a)   # 预测下一个字符
             output[i] = hat_y
-            x = word[i]                     # 涓嬩竴涓椂闂存鐨勮緭鍏?
-            a = next_a                       # 浼犻€掗殣钘忕姸鎬?
+            x = word[i]                     # 下一个时间步的输入
+            a = next_a                       # 传递隐藏状态
         # key-end
         return torch.transpose(output, 0, 1)
 ```
 
-### 3.2 璇█妯″瀷锛氳绠楀簭鍒楁鐜?
+### 3.2 语言模型：计算序列概率
 
 ```python title="chapters/sequence_models/basic_rnn/models.py" showLineNumbers
     @torch.no_grad()
     def language_model(self, word):
         batch, Tx = word.shape[0:2]
         word = torch.transpose(word, 0, 1)
-        word_label = torch.argmax(word, 2)  # one-hot 鈫?index
+        word_label = torch.argmax(word, 2)  # one-hot → index
 
         # key-start
-        # P(word) = 鈭?P(c(t+1) | c(1), ..., c(t))
+        # P(word) = ∏ P(c(t+1) | c(1), ..., c(t))
         output = torch.ones(batch, device=word.device)
         a = torch.zeros(batch, self.hidden_units, device=word.device)
         x = torch.zeros(batch, EMBEDDING_LENGTH, device=word.device)
         for i in range(Tx):
             next_a = self.tanh(self.linear_a(torch.cat((a, x), 1)))
             hat_y = F.softmax(self.linear_y(next_a), 1)
-            probs = hat_y[torch.arange(batch), word_label[i]]  # 鍙栫洰鏍囧瓧绗︾殑姒傜巼
-            output *= probs                                      # 绱箻
+            probs = hat_y[torch.arange(batch), word_label[i]]  # 取目标字符的概率
+            output *= probs                                      # 累乘
             x = word[i]
             a = next_a
         # key-end
         return output
 ```
 
-### 3.3 閲囨牱锛氱敓鎴愭柊鍗曡瘝
+### 3.3 采样：生成新单词
 
 ```python title="chapters/sequence_models/basic_rnn/models.py" showLineNumbers
     @torch.no_grad()
@@ -161,13 +161,13 @@ class RNN1(nn.Module):
         for i in range(10):
             next_a = self.tanh(self.linear_a(torch.cat((a, x), 1)))
             hat_y = F.softmax(self.linear_y(next_a), 1)
-            # 鎸夋鐜囧垎甯冮殢鏈洪噰鏍蜂竴涓瓧绗?
+            # 按概率分布随机采样一个字符
             np_prob = hat_y[0].detach().cpu().numpy()
             letter = np.random.choice(LETTER_LIST, p=np_prob)
             output += letter
-            if letter == ' ':  # 绌烘牸 = EOS
+            if letter == ' ':  # 空格 = EOS
                 break
-            # 閲囨牱鐨勫瓧绗︿綔涓轰笅涓€涓椂闂存鐨勮緭鍏?
+            # 采样的字符作为下一个时间步的输入
             x = torch.zeros(1, EMBEDDING_LENGTH, device=device)
             x[0][LETTER_MAP[letter]] = 1
             a = next_a
@@ -175,7 +175,7 @@ class RNN1(nn.Module):
         return output
 ```
 
-### 3.4 RNN2锛欸RU + Embedding 瀹炵幇
+### 3.4 RNN2：GRU + Embedding 实现
 
 ```python title="chapters/sequence_models/basic_rnn/models.py" showLineNumbers
 class RNN2(nn.Module):
@@ -192,7 +192,7 @@ class RNN2(nn.Module):
     def forward(self, word):
         batch, Tx = word.shape[0:2]
         first_letter = word.new_zeros(batch, 1)
-        x = torch.cat((first_letter, word[:, 0:-1]), 1)  # 寤惰繜涓€姝ワ細鐢ㄥ墠涓€涓瓧绗﹂娴嬪綋鍓?
+        x = torch.cat((first_letter, word[:, 0:-1]), 1)  # 延迟一步：用前一个字符预测当前
         hidden = torch.zeros(1, batch, self.hidden_units, device=word.device)
         emb = self.drop(self.encoder(x))
         output, hidden = self.rnn(emb, hidden)
@@ -200,9 +200,9 @@ class RNN2(nn.Module):
         return y.reshape(batch, Tx, -1)
 ```
 
-**GRU**锛圙ated Recurrent Unit锛夋槸 RNN 鐨勬敼杩涚増鏈紝閫氳繃**鏇存柊闂?*鍜?*閲嶇疆闂?*鎺у埗淇℃伅娴佸姩锛岀紦瑙ｆ搴︽秷澶遍棶棰樸€?
+**GRU**（Gated Recurrent Unit）是 RNN 的改进版本，通过**更新门**和**重置门**控制信息流动，缓解梯度消失问题。
 
-### 3.5 璁粌锛氭搴﹁鍓?
+### 3.5 训练：梯度裁剪
 
 ```python title="chapters/sequence_models/basic_rnn/main.py" showLineNumbers
 for epoch in range(5):
@@ -214,12 +214,12 @@ for epoch in range(5):
         optimizer.zero_grad()
         loss.backward()
         # key-start
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 姊害瑁佸壀
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 梯度裁剪
         # key-end
         optimizer.step()
 ```
 
-璁粌銆佽瘎浼板拰閲囨牱閫氳繃鏄惧紡 CLI 妯″紡閫夋嫨锛岄粯璁よ嚜鍔ㄤ娇鐢ㄥ彲鐢ㄧ殑 CUDA 鎴?CPU锛?
+训练、评估和采样通过显式 CLI 模式选择，默认自动使用可用的 CUDA 或 CPU：
 
 ```bash
 uv run python chapters/sequence_models/basic_rnn/main.py --model rnn1 --mode train
@@ -229,21 +229,21 @@ uv run python chapters/sequence_models/basic_rnn/main.py --model rnn1 --mode sam
 
 ---
 
-## 4. RNN1 vs RNN2 瀵规瘮
+## 4. RNN1 vs RNN2 对比
 
-| 鐗规€?| RNN1 | RNN2 |
+| 特性 | RNN1 | RNN2 |
 |------|------|------|
-| 寰幆鍗曞厓 | 鎵嬪姩瀹炵幇锛?\tanh$ + Linear锛?| `nn.GRU` |
-| 杈撳叆缂栫爜 | One-hot | `nn.Embedding` |
-| 闅愯棌鍗曞厓鏁?| 32 | 64 |
-| Dropout | 鉂?| 鉁?|
-| 璁粌閫熷害 | 杈冩參锛堟墜鍔ㄥ惊鐜級 | 杈冨揩锛圙RU 浼樺寲锛?|
+| 循环单元 | 手动实现（$\tanh$ + Linear） | `nn.GRU` |
+| 输入编码 | One-hot | `nn.Embedding` |
+| 隐藏单元数 | 32 | 64 |
+| Dropout | ❌ | ✅ |
+| 训练速度 | 较慢（手动循环） | 较快（GRU 优化） |
 
 ---
 
-## 5. 寤朵几闃呰
+## 5. 延伸阅读
 
-- 馃搫 [Learning Representations by Back-propagating Errors锛圧umelhart et al.锛?986锛塢(https://www.nature.com/articles/323533a0)
-- 馃搫 [Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling锛圕hung et al.锛?014锛塢(https://arxiv.org/abs/1412.3555) 鈥?GRU
-- 馃敆 [鏈珷婧愮爜锛歚chapters/sequence_models/basic_rnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/basic_rnn)
-- 鉃★笍 **涓嬩竴绔?*锛歔鎯呮劅鍒嗘瀽 鈥?RNN 瀹炴垬](./sentiment-analysis)
+- 📄 [Learning Representations by Back-propagating Errors（Rumelhart et al.，1986）](https://www.nature.com/articles/323533a0)
+- 📄 [Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling（Chung et al.，2014）](https://arxiv.org/abs/1412.3555) — GRU
+- 🔗 [本章源码：`chapters/sequence_models/basic_rnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/basic_rnn)
+- ➡️ **下一章**：[情感分析 — RNN 实战](./sentiment-analysis)

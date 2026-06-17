@@ -1,63 +1,63 @@
-﻿---
+---
 id: basic-cnn
-title: CNN 鍩虹 鈥?浠庡嵎绉繍绠楀埌鍥惧儚鍒嗙被
-sidebar_label: 1. CNN 鍩虹
-description: 鐞嗚В鍗风Н杩愮畻鐨勬暟瀛﹀師鐞嗭紝鐢?NumPy 浠庨浂瀹炵幇 2D 鍗风Н鐨勫墠鍚戝拰鍙嶅悜浼犳挱锛屽苟鐢?PyTorch 瀹屾垚鐚嫍鍒嗙被銆?
-keywords: [CNN, 鍗风Н绁炵粡缃戠粶, 鍗风Н, 姹犲寲, NumPy, PyTorch, 鍥惧儚鍒嗙被]
+title: CNN 基础 — 从卷积运算到图像分类
+sidebar_label: 1. CNN 基础
+description: 理解卷积运算的数学原理，用 NumPy 从零实现 2D 卷积的前向和反向传播，并用 PyTorch 完成猫狗分类。
+keywords: [CNN, 卷积神经网络, 卷积, 池化, NumPy, PyTorch, 图像分类]
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# CNN 鍩虹 鈥?浠庡嵎绉繍绠楀埌鍥惧儚鍒嗙被
+# CNN 基础 — 从卷积运算到图像分类
 
-:::tip 鏈珷瑕佺偣
-- 鐞嗚В**鍗风Н杩愮畻**锛氭粦鍔ㄧ獥鍙ｃ€佸～鍏呫€佹骞呯殑鏁板瀹氫箟
-- 鐢?NumPy 鎵嬪啓 **2D 鍗风Н鐨勫墠鍚戜紶鎾?*鍜?*鍙嶅悜浼犳挱**
-- 鐞嗚В **姹犲寲灞?*鍜?**BatchNorm** 鐨勪綔鐢?
-- 璇绘噦 [`chapters/cv/basic_cnn/pt_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/basic_cnn/pt_main.py) 鐨?PyTorch 鐚嫍鍒嗙被瀹炵幇
+:::tip 本章要点
+- 理解**卷积运算**：滑动窗口、填充、步幅的数学定义
+- 用 NumPy 手写 **2D 卷积的前向传播**和**反向传播**
+- 理解 **池化层**和 **BatchNorm** 的作用
+- 读懂 [`chapters/cv/basic_cnn/pt_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/basic_cnn/pt_main.py) 的 PyTorch 猫狗分类实现
 :::
 
 ---
 
-## 1. 涓轰粈涔堢敤鍗风Н
+## 1. 为什么用卷积
 
-鍏ㄨ繛鎺ュ眰澶勭悊鍥惧儚鏃讹紝鎶婂浘鍍忓睍骞虫垚涓€缁村悜閲忥紝涓㈠け浜?*绌洪棿缁撴瀯**淇℃伅銆備竴涓?224脳224脳3 鐨勫浘鐗囧睍骞冲悗鏈?150,528 涓緭鍏ワ紝绗竴灞傚鏋滄湁 1024 涓缁忓厓锛屽氨鏈?1.5 浜夸釜鍙傛暟鈥斺€斿弬鏁扮垎鐐搞€?
+全连接层处理图像时，把图像展平成一维向量，丢失了**空间结构**信息。一个 224×224×3 的图片展平后有 150,528 个输入，第一层如果有 1024 个神经元，就有 1.5 亿个参数——参数爆炸。
 
-鍗风Н灞傜敤**灞€閮ㄨ繛鎺?+ 鏉冮噸鍏变韩**瑙ｅ喅杩欎袱涓棶棰橈細
+卷积层用**局部连接 + 权重共享**解决这两个问题：
 
-| 鐗规€?| 鍏ㄨ繛鎺ュ眰 | 鍗风Н灞?|
+| 特性 | 全连接层 | 卷积层 |
 |------|---------|--------|
-| 杩炴帴鏂瑰紡 | 姣忎釜绁炵粡鍏冭繛鎵€鏈夎緭鍏?| 姣忎釜绁炵粡鍏冨彧杩炲眬閮ㄥ尯鍩?|
-| 鏉冮噸鏁伴噺 | $N_{in} \times N_{out}$ | $F \times F \times C_{in} \times C_{out}$ |
-| 绌洪棿淇℃伅 | 鉂?涓㈠け | 鉁?淇濈暀 |
-| 骞崇Щ绛夊彉鎬?| 鉂?| 鉁?杈撳叆骞崇Щ鏃剁壒寰佸浘鐩稿簲骞崇Щ |
+| 连接方式 | 每个神经元连所有输入 | 每个神经元只连局部区域 |
+| 权重数量 | $N_{in} \times N_{out}$ | $F \times F \times C_{in} \times C_{out}$ |
+| 空间信息 | ❌ 丢失 | ✅ 保留 |
+| 平移等变性 | ❌ | ✅ 输入平移时特征图相应平移 |
 
 ---
 
-## 2. 鏁板鍘熺悊
+## 2. 数学原理
 
-### 2.1 2D 鍗风Н杩愮畻
+### 2.1 2D 卷积运算
 
-缁欏畾杈撳叆 $A \in \mathbb{R}^{H \times W \times C_{in}}$ 鍜屽嵎绉牳 $W \in \mathbb{R}^{F \times F \times C_{in} \times C_{out}}$锛岃緭鍑虹壒寰佸浘鐨勬瘡涓厓绱狅細
+给定输入 $A \in \mathbb{R}^{H \times W \times C_{in}}$ 和卷积核 $W \in \mathbb{R}^{F \times F \times C_{in} \times C_{out}}$，输出特征图的每个元素：
 
 $$
 Z[h, w, c_o] = \sum_{c_k} \sum_{i} \sum_{j} A[h \cdot s + i, w \cdot s + j, c_k] \cdot W[i, j, c_k, c_o] + b[c_o]
 $$
 
-鍏朵腑 $s$ 鏄骞咃紙stride锛夛紝$F$ 鏄嵎绉牳澶у皬銆?
+其中 $s$ 是步幅（stride），$F$ 是卷积核大小。
 
-### 2.2 杈撳嚭灏哄璁＄畻
+### 2.2 输出尺寸计算
 
-濉厖 $p$銆佹骞?$s$銆佸嵎绉牳 $F$ 鏃讹紝杈撳嚭绌洪棿灏哄锛?
+填充 $p$、步幅 $s$、卷积核 $F$ 时，输出空间尺寸：
 
 $$
 H_{out} = \left\lfloor \frac{H + 2p - F}{s} \right\rfloor + 1
 $$
 
-### 2.3 鍗风Н鐨勫弽鍚戜紶鎾?
+### 2.3 卷积的反向传播
 
-鍓嶅悜浼犳挱涓紝杈撳嚭鍏冪礌 $Z[h,w,c_o]$ 渚濊禆浜庤緭鍏ョ殑灞€閮ㄥ垏鐗?$A_{slice}$ 鍜屽搴旂殑鍗风Н鏍?$W[c_o]$銆傚弽鍚戜紶鎾椂锛?
+前向传播中，输出元素 $Z[h,w,c_o]$ 依赖于输入的局部切片 $A_{slice}$ 和对应的卷积核 $W[c_o]$。反向传播时：
 
 $$
 \frac{\partial L}{\partial W[c_o]} += A_{slice} \cdot \frac{\partial L}{\partial Z[h,w,c_o]}
@@ -71,18 +71,18 @@ $$
 \frac{\partial L}{\partial b[c_o]} += \frac{\partial L}{\partial Z[h,w,c_o]}
 $$
 
-鐩磋鐞嗚В锛氭搴︽部鐫€鍓嶅悜浼犳挱涓€屼箻娉曘€嶇殑璺緞鍥炰紶鈥斺€旇緭鍏ユ搴︽槸鍗风Н鏍哥殑杞疆鍗风Н锛屾潈閲嶆搴︽槸杈撳叆鍜岃緭鍑烘搴︾殑澶栫Н銆?
+直观理解：梯度沿着前向传播中「乘法」的路径回传——输入梯度是卷积核的转置卷积，权重梯度是输入和输出梯度的外积。
 
 ---
 
-## 3. 浠ｇ爜瑙ｆ瀽
+## 3. 代码解析
 
-鏈」鐩寘鍚笁涓眰娆＄殑瀹炵幇锛?
-- **NumPy 鍓嶅悜浼犳挱**锛歚np_conv.py`锛屾敮鎸?stride/padding/dilation/groups
-- **NumPy 鍓嶅悜 + 鍙嶅悜**锛歚np_conv_backward.py`锛岀敤姊害浼犳挱楠岃瘉
-- **PyTorch 瀹炵幇**锛歚pt_main.py`锛岀尗鐙楀垎绫诲疄鎴?
+本项目包含三个层次的实现：
+- **NumPy 前向传播**：`np_conv.py`，支持 stride/padding/dilation/groups
+- **NumPy 前向 + 反向**：`np_conv_backward.py`，用梯度传播验证
+- **PyTorch 实现**：`pt_main.py`，猫狗分类实战
 
-### 3.1 NumPy 鍗风Н鍓嶅悜浼犳挱
+### 3.1 NumPy 卷积前向传播
 
 ```python title="chapters/cv/basic_cnn/np_conv.py" showLineNumbers
 def conv2d(input: np.ndarray, weight: np.ndarray,
@@ -92,7 +92,7 @@ def conv2d(input: np.ndarray, weight: np.ndarray,
     c_o, f, f_2, c_k = weight.shape
 
     # key-start
-    # dilation锛氬湪鍗风Н鏍稿厓绱犱箣闂存彃鍏?(dilation-1) 涓浂
+    # dilation：在卷积核元素之间插入 (dilation-1) 个零
     f_new = f + (f - 1) * (dilation - 1)
     weight_new = np.zeros((c_o, f_new, f_new, c_k))
     for i_c_o in range(c_o):
@@ -114,7 +114,7 @@ def conv2d(input: np.ndarray, weight: np.ndarray,
         for i_w in range(w_o):
             for i_c in range(c_o):
                 # highlight-start
-                # 鎻愬彇杈撳叆鍒囩墖锛屼笌瀵瑰簲鍗风Н鏍搁€愬厓绱犵浉涔樻眰鍜?
+                # 提取输入切片，与对应卷积核逐元素相乘求和
                 i_g = i_c // c_o_per_group
                 input_slice = input_pad[
                     i_h*stride : i_h*stride+f_new,
@@ -127,7 +127,7 @@ def conv2d(input: np.ndarray, weight: np.ndarray,
     return output
 ```
 
-### 3.2 NumPy 鍗风Н鍙嶅悜浼犳挱
+### 3.2 NumPy 卷积反向传播
 
 ```python title="chapters/cv/basic_cnn/np_conv_backward.py" showLineNumbers
 def conv2d_backward(dZ, cache, stride, padding):
@@ -143,24 +143,24 @@ def conv2d_backward(dZ, cache, stride, padding):
                     i_h*stride : i_h*stride+f,
                     i_w*stride : i_w*stride+f, :]
                 # key-start
-                dW[i_c] += input_slice * dZ[i_h, i_w, i_c]            # 鏉冮噸姊害
+                dW[i_c] += input_slice * dZ[i_h, i_w, i_c]            # 权重梯度
                 dA_prev_pad[i_h*stride:i_h*stride+f,
-                            i_w*stride:i_w*stride+f, :] += W[i_c] * dZ[i_h, i_w, i_c]  # 杈撳叆姊害
+                            i_w*stride:i_w*stride+f, :] += W[i_c] * dZ[i_h, i_w, i_c]  # 输入梯度
                 # key-end
     return dW, db, dA_prev
 ```
 
-### 3.3 PyTorch 鐚嫍鍒嗙被缃戠粶
+### 3.3 PyTorch 猫狗分类网络
 
 ```python title="chapters/cv/basic_cnn/pt_main.py" showLineNumbers
 def init_model(device='cpu'):
     model = nn.Sequential(
         # highlight-start
-        # 绗竴缁勶細澶у嵎绉牳鎻愬彇浣庣骇鐗瑰緛锛堣竟缂樸€佺汗鐞嗭級
+        # 第一组：大卷积核提取低级特征（边缘、纹理）
         nn.Conv2d(3, 16, 11, 3), nn.BatchNorm2d(16), nn.ReLU(True), nn.MaxPool2d(2, 2),
-        # 绗簩缁勶細涓瓑鍗风Н鏍告彁鍙栦腑绾х壒寰侊紙褰㈢姸銆侀儴浠讹級
+        # 第二组：中等卷积核提取中级特征（形状、部件）
         nn.Conv2d(16, 32, 5),    nn.BatchNorm2d(32), nn.ReLU(True), nn.MaxPool2d(2, 2),
-        # 绗笁缁勶細灏忓嵎绉牳鎻愬彇楂樼骇鐗瑰緛锛堟暣浣撶粨鏋勶級
+        # 第三组：小卷积核提取高级特征（整体结构）
         nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(True),
         nn.Conv2d(64, 64, 3),            nn.BatchNorm2d(64), nn.ReLU(True),
         nn.MaxPool2d(2, 2),
@@ -170,7 +170,7 @@ def init_model(device='cpu'):
         nn.Linear(2048, 1), nn.Sigmoid()
     ).to(device)
 
-    # Xavier 鍒濆鍖?
+    # Xavier 初始化
     def weights_init(m):
         if isinstance(m, nn.Conv2d):
             torch.nn.init.xavier_normal_(m.weight)
@@ -181,41 +181,41 @@ def init_model(device='cpu'):
     return model
 ```
 
-PyTorch 浣跨敤 `(N, C, H, W)` 甯冨眬锛屾暟鎹姞杞藉櫒閫氳繃 `np.transpose(train_X, (0, 3, 1, 2))` 灏?OpenCV 鐨?`(N, H, W, C)` 鍥惧儚杞崲涓?NCHW锛涜繖閲屼笉鑳戒娇鐢?`reshape`锛屽惁鍒欎細鎵撲贡閫氶亾涓庣┖闂翠綅缃€?
+PyTorch 使用 `(N, C, H, W)` 布局，数据加载器通过 `np.transpose(train_X, (0, 3, 1, 2))` 将 OpenCV 的 `(N, H, W, C)` 图像转换为 NCHW；这里不能使用 `reshape`，否则会打乱通道与空间位置。
 
-璁捐瑙勫緥锛?
-- **鍗风Н鏍镐粠澶у埌灏?*锛?1鈫?鈫?鈫?锛夛細鍏堢湅澶ц寖鍥翠綆绾х壒寰侊紝鍐嶇湅灏忚寖鍥撮珮绾х壒寰?
-- **閫氶亾鏁伴€愭笎澧炲姞**锛?鈫?6鈫?2鈫?4锛夛細浣庣骇鐗瑰緛灏戯紝楂樼骇鐗瑰緛澶?
-- **BatchNorm + ReLU** 璺熷湪姣忎釜 Conv 鍚庨潰锛岀ǔ瀹氳缁?
-- **MaxPool** 鍦ㄦ瘡缁勫嵎绉悗涓嬮噰鏍凤紝鍑忓皯璁＄畻閲?
+设计规律：
+- **卷积核从大到小**（11→5→3→3）：先看大范围低级特征，再看小范围高级特征
+- **通道数逐渐增加**（3→16→32→64）：低级特征少，高级特征多
+- **BatchNorm + ReLU** 跟在每个 Conv 后面，稳定训练
+- **MaxPool** 在每组卷积后下采样，减少计算量
 
 ---
 
-## 4. 璁粌缁嗚妭
+## 4. 训练细节
 
 <Tabs>
   <TabItem value="hyperparams" label="超参数" default>
 
-| 瓒呭弬鏁?| 鍊?| 璇存槑 |
+| 超参数 | 值 | 说明 |
 |--------|-----|------|
-| 杈撳叆灏哄 | 224脳224脳3 | 鏍囧噯 ImageNet 灏哄 |
+| 输入尺寸 | 224×224×3 | 标准 ImageNet 尺寸 |
 | batch_size | 16 | |
-| lr | 5e-4 | Adam 瀛︿範鐜?|
+| lr | 5e-4 | Adam 学习率 |
 | num_epoch | 20 | |
-| 鏁版嵁闆?| 鐚嫍鍒嗙被 | 闇€鑷涓嬭浇 |
+| 数据集 | 猫狗分类 | 需自行下载 |
 
   </TabItem>
-  <TabItem value="layers" label="缃戠粶缁撴瀯">
+  <TabItem value="layers" label="网络结构">
 
 ```
-杈撳叆 (3, 224, 224)
-  鈫?Conv(3鈫?6, 11脳11, s=3) 鈫?BN 鈫?ReLU 鈫?MaxPool(2)
-  鈫?Conv(16鈫?2, 5脳5) 鈫?BN 鈫?ReLU 鈫?MaxPool(2)
-  鈫?Conv(32鈫?4, 3脳3, p=1) 鈫?BN 鈫?ReLU
-  鈫?Conv(64鈫?4, 3脳3) 鈫?BN 鈫?ReLU 鈫?MaxPool(2)
-  鈫?Flatten(3136) 鈫?Linear(2048) 鈫?ReLU
-  鈫?Linear(1) 鈫?Sigmoid
-杈撳嚭: 鐚?鐙楁鐜?
+输入 (3, 224, 224)
+  → Conv(3→16, 11×11, s=3) → BN → ReLU → MaxPool(2)
+  → Conv(16→32, 5×5) → BN → ReLU → MaxPool(2)
+  → Conv(32→64, 3×3, p=1) → BN → ReLU
+  → Conv(64→64, 3×3) → BN → ReLU → MaxPool(2)
+  → Flatten(3136) → Linear(2048) → ReLU
+  → Linear(1) → Sigmoid
+输出: 猫/狗概率
 ```
 
   </TabItem>
@@ -223,8 +223,8 @@ PyTorch 浣跨敤 `(N, C, H, W)` 甯冨眬锛屾暟鎹姞杞藉櫒閫氳繃 `
 
 ---
 
-## 5. 寤朵几闃呰
+## 5. 延伸阅读
 
-- 馃搫 [CS231n: Convolutional Neural Networks for Visual Recognition](https://cs231n.github.io/)
-- 馃敆 [鏈珷婧愮爜锛歚chapters/cv/basic_cnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/cv/basic_cnn)
-- 鉃★笍 **涓嬩竴绔?*锛歔ResNet 鈥?娈嬪樊缃戠粶](./resnet)
+- 📄 [CS231n: Convolutional Neural Networks for Visual Recognition](https://cs231n.github.io/)
+- 🔗 [本章源码：`chapters/cv/basic_cnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/cv/basic_cnn)
+- ➡️ **下一章**：[ResNet — 残差网络](./resnet)

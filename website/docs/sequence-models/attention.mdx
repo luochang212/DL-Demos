@@ -1,30 +1,30 @@
-﻿---
+---
 id: attention
-title: Attention 鈥?璁╄В鐮佸櫒閫夋嫨淇℃伅
+title: Attention — 让解码器选择信息
 sidebar_label: 3. Attention
-description: 鐢ㄦ棩鏈熸牸寮忚浆鎹㈢悊瑙?Encoder銆丏ecoder銆佸榻愬垎鏁板拰涓婁笅鏂囧悜閲忋€?
+description: 用日期格式转换理解 Encoder、Decoder、对齐分数和上下文向量。
 ---
 
-# Attention 鈥?璁╄В鐮佸櫒閫夋嫨淇℃伅
+# Attention — 让解码器选择信息
 
-鍥哄畾闀垮害鍚戦噺瑕佹眰 Encoder 鎶婃墍鏈夎緭鍏ヤ俊鎭帇缂╁埌涓€涓姸鎬併€侫ttention 鍏佽 Decoder 鍦ㄦ瘡涓緭鍑烘楠ら噸鏂伴€夋嫨杈撳叆搴忓垪涓殑鐩稿叧浣嶇疆銆?
+固定长度向量要求 Encoder 把所有输入信息压缩到一个状态。Attention 允许 Decoder 在每个输出步骤重新选择输入序列中的相关位置。
 
-## 1. 璁＄畻杩囩▼
+## 1. 计算过程
 
-缂栫爜鍣ㄨ緭鍑烘瘡涓緭鍏ヤ綅缃殑琛ㄧず $a_i$銆傜 $t$ 涓В鐮佹楠ゆ牴鎹笂涓€鐘舵€佽绠楀榻愬垎鏁帮細
+编码器输出每个输入位置的表示 $a_i$。第 $t$ 个解码步骤根据上一状态计算对齐分数：
 
 $$e_{t,i}=f(s_{t-1},a_i),\qquad
 \alpha_{t,i}=\mathrm{softmax}(e_{t,i})$$
 
-涓婁笅鏂囧悜閲忔槸缂栫爜鍣ㄧ姸鎬佺殑鍔犳潈鍜岋細
+上下文向量是编码器状态的加权和：
 
 $$c_t=\sum_i\alpha_{t,i}a_i$$
 
-Decoder 浣跨敤 $c_t$ 涓庝笂涓€杈撳嚭鐢熸垚褰撳墠瀛楃銆?
+Decoder 使用 $c_t$ 与上一输出生成当前字符。
 
 ## 2. Padding Mask
 
-鍚屼竴 batch 涓殑鏃ユ湡瀛楃涓查暱搴︿笉鍚屻€傛簮鐮佸厛鐢?`pack_padded_sequence` 璁╁弻鍚?LSTM 璺宠繃 padding锛屽啀鎶?padding 浣嶇疆鐨勫榻愬垎鏁拌涓鸿礋鏃犵┓锛岀‘淇?Softmax 涓嶄細涓哄叾鍒嗛厤姒傜巼銆?
+同一 batch 中的日期字符串长度不同。源码先用 `pack_padded_sequence` 让双向 LSTM 跳过 padding，再把 padding 位置的对齐分数设为负无穷，确保 Softmax 不会为其分配概率。
 
 ```python
 packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True,
@@ -35,16 +35,16 @@ a, _ = pad_packed_sequence(packed_a, batch_first=True,
 scores = scores.masked_fill(padding_mask, float('-inf'))
 ```
 
-## 3. 瑙ｇ爜寰幆
+## 3. 解码循环
 
-姣忎竴姝ラ噸澶嶄笂涓€ Decoder 鐘舵€侊紝涓庡叏閮?Encoder 鐘舵€佹嫾鎺ヨ绠楀榻愬垎鏁般€傚緱鍒颁笂涓嬫枃鍚戦噺鍚庯紝Decoder 浜х敓涓嬩竴瀛楃鐨?logits锛屽苟鎶婂畠浣滀负涓嬩竴姝ヨ緭鍏ャ€?
+每一步重复上一 Decoder 状态，与全部 Encoder 状态拼接计算对齐分数。得到上下文向量后，Decoder 产生下一字符的 logits，并把它作为下一步输入。
 
-## 4. 杩愯
+## 4. 运行
 
 ```bash
 uv run python chapters/sequence_models/attention/main.py
 ```
 
-棣栨杩愯浼氱敓鎴愯缁冧笌娴嬭瘯鏃ユ湡鏁版嵁銆傝剼鏈嚜鍔ㄩ€夋嫨 CUDA 鎴?CPU锛屽苟杈撳嚭瀹屾暣鏃ユ湡瀛楃涓插尮閰嶅噯纭巼銆?
+首次运行会生成训练与测试日期数据。脚本自动选择 CUDA 或 CPU，并输出完整日期字符串匹配准确率。
 
-璇ュ疄鐜扮敤浜庤В閲?Attention锛孌ecoder 涓嶄娇鐢?teacher forcing锛屼篃娌℃湁 beam search锛屽洜姝や笉浠ｈ〃鐢熶骇绾у簭鍒楄浆鎹㈢郴缁熴€?
+该实现用于解释 Attention，Decoder 不使用 teacher forcing，也没有 beam search，因此不代表生产级序列转换系统。

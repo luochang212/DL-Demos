@@ -1,40 +1,40 @@
-﻿---
+---
 id: style-transfer
-title: Style Transfer 鈥?浼樺寲涓€寮犲浘鍍?
+title: Style Transfer — 优化一张图像
 sidebar_label: 3. Style Transfer
-description: 浣跨敤 VGG 鐗瑰緛銆佸唴瀹规崯澶卞拰 Gram Matrix 瀹屾垚绁炵粡椋庢牸杩佺Щ銆?
+description: 使用 VGG 特征、内容损失和 Gram Matrix 完成神经风格迁移。
 ---
 
-# Style Transfer 鈥?浼樺寲涓€寮犲浘鍍?
+# Style Transfer — 优化一张图像
 
-绁炵粡椋庢牸杩佺Щ涓嶈缁冩柊鐨勭敓鎴愮綉缁滐紝鑰屾槸鍐荤粨棰勮缁?VGG锛岀洿鎺ユ妸杈撳嚭鍥惧儚鍍忕礌浣滀负寰呬紭鍖栧弬鏁般€?
+神经风格迁移不训练新的生成网络，而是冻结预训练 VGG，直接把输出图像像素作为待优化参数。
 
-## 1. 鍐呭涓庨鏍?
+## 1. 内容与风格
 
-鍐呭鎹熷け姣旇緝杈撳嚭鍥惧儚涓庡唴瀹瑰浘鍍忕殑楂樺眰鐗瑰緛锛?
+内容损失比较输出图像与内容图像的高层特征：
 
 $$L_{content}=\|F_l(x)-F_l(c)\|_2^2$$
 
-椋庢牸浣跨敤 Gram Matrix 鎻忚堪閫氶亾涔嬮棿鐨勭浉鍏虫€э細
+风格使用 Gram Matrix 描述通道之间的相关性：
 
 $$G(F)=FF^T,\qquad L_{style}=\sum_l\|G(F_l(x))-G(F_l(s))\|_2^2$$
 
-鎬绘崯澶辨槸涓よ€呯殑鍔犳潈鍜屻€俈GG 鍙傛暟琚喕缁擄紝姊害鍙洿鏂拌緭鍏ュ浘鍍忋€?
+总损失是两者的加权和。VGG 参数被冻结，梯度只更新输入图像。
 
-## 2. 浠ｇ爜瑙ｆ瀽
+## 2. 代码解析
 
 ```python
 features = x.reshape(n * c, h * w)
 gram_matrix = torch.mm(features, features.T) / (n * c * h * w)
 ```
 
-Gram Matrix 鎶涘純鐗瑰緛鍑虹幇鐨勫叿浣撲綅缃紝鍙繚鐣欓€氶亾鍏卞悓鍑虹幇鐨勭粺璁″叧绯伙紝鍥犳閫傚悎琛ㄨ揪绾圭悊鍜岀瑪瑙︺€?
+Gram Matrix 抛弃特征出现的具体位置，只保留通道共同出现的统计关系，因此适合表达纹理和笔触。
 
-浼樺寲闃舵浣跨敤 LBFGS銆傛瘡娆?closure 鍏堟妸鍥惧儚瑁佸壀鍒板悎娉曞儚绱犺寖鍥达紝鍐嶈绠楀唴瀹规崯澶变笌椋庢牸鎹熷け锛屾搴﹀彧鍥炰紶鍒?`input_img`銆?
+优化阶段使用 LBFGS。每次 closure 先把图像裁剪到合法像素范围，再计算内容损失与风格损失，梯度只回传到 `input_img`。
 
-## 3. 鍙皟鐢ㄥ叆鍙?
+## 3. 可调用入口
 
-`run_style_transfer(content_path, style_path, output_path, num_steps, device)` 鏄棤瀵煎叆鍓綔鐢ㄧ殑鍏叡鍏ュ彛銆傚鍏ユā鍧椾笉浼氫笅杞芥潈閲嶆垨寮€濮嬭缁冦€?
+`run_style_transfer(content_path, style_path, output_path, num_steps, device)` 是无导入副作用的公共入口。导入模块不会下载权重或开始训练。
 
 ```bash
 uv run python chapters/cv/style_transfer/style_transfer.py \
@@ -44,4 +44,4 @@ uv run python chapters/cv/style_transfer/style_transfer.py \
   --steps 300
 ```
 
-棣栨杩愯浼氫笅杞?torchvision 鐨?VGG19 榛樿鏉冮噸銆傝鏂规硶浼樺寲閫熷害鎱紝閫傚悎鐞嗚В鐗瑰緛鎹熷け锛屼笉閫傚悎瀹炴椂椋庢牸杩佺Щ銆?
+首次运行会下载 torchvision 的 VGG19 默认权重。该方法优化速度慢，适合理解特征损失，不适合实时风格迁移。

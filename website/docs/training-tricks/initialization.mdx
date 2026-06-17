@@ -1,84 +1,237 @@
-﻿---
+---
 id: initialization
-title: 参数初始化：从零开始的训练起点
+title: 参数初始化 — 从零开始的训练起点
 sidebar_label: 1. 参数初始化
-description: 理解全零初始化、随机初始化和 He 初始化对深层网络训练的影响。
-keywords: [初始化, He 初始化, Xavier 初始化, 深度学习, NumPy]
+description: 理解为什么参数初始化至关重要，对比全零初始化、随机初始化和 He 初始化的效果差异，并逐行解析纯 NumPy 实现。
+keywords: [初始化, He初始化, Xavier初始化, 深度学习, NumPy]
 ---
 
-# 参数初始化：从零开始的训练起点
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-本章对应源码：
-[`chapters/training_tricks/initialization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/initialization/main.py)
+# 参数初始化 — 从零开始的训练起点
 
-## 核心问题
+:::tip 本章要点
+- 理解**对称性问题**：为什么全零初始化会让网络退化
+- 分析**方差传递**：信号在网络前向传播时的方差变化
+- 掌握 **He 初始化**：为什么 `√(2/n)` 是 ReLU 网络的最佳选择
+- 读懂 [`chapters/training_tricks/initialization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/initialization/main.py) 的纯 NumPy 实现
+:::
 
-深层网络的第一步是设定初始权重。这个选择会直接影响信号和梯度能否稳定传播。
+> 💡 本章代码使用纯 NumPy 手写前向传播和反向传播，不依赖 PyTorch，帮助理解底层原理。
 
-- 全零初始化会让同一层神经元保持完全对称，网络退化成重复的单个神经元。
-- 随机初始化可以打破对称性，但方差过大会导致激活和梯度震荡。
-- He 初始化根据输入维度缩放权重，适合 ReLU 网络。
+---
 
-## 为什么不能全零初始化
+## 1. 为什么初始化很重要
 
-假设两层网络的权重和偏置都初始化为 0：
+训练深度网络的第一步是设定初始权重。看似简单的一步，却直接决定了训练能否成功：
+
+- **全零初始化**：所有神经元学到完全相同的特征，对称性无法打破，网络退化为单神经元
+- **随机初始化（方差过大）**：信号在前向传播中指数放大 → 梯度爆炸
+- **随机初始化（方差过小）**：信号在前向传播中指数衰减 → 梯度消失
+
+**目标**：找到一种初始化方式，让信号在网络每一层传递时**方差保持稳定**。
+
+---
+
+## 2. 数学原理
+
+### 2.1 全零初始化的对称性问题
+
+假设网络有两层，权重 $W^{[1]}$ 和 $W^{[2]}$ 全部初始化为 0。前向传播：
 
 $$
-z^{[1]} = W^{[1]}x + b^{[1]} = 0,\qquad a^{[1]} = g(0)
+z^{[1]} = W^{[1]} x + b^{[1]} = 0, \quad a^{[1]} = g(0)
 $$
 
-同一层中所有神经元看到的输入、输出和梯度都相同。梯度更新后这些参数仍然相同，因此宽网络不会学到多样化特征。
+由于 $W^{[1]}$ 的每一行相同，所有神经元的输出也相同。反向传播时，每一层的梯度也完全相同，所以梯度更新后参数依然完全相同——**网络在宽度上等效于只有一个神经元**。
 
-## 方差传播
+### 2.2 随机初始化的方差问题
+
+打破对称性的方法是随机初始化。但随机初始化的**方差**需要精心设计。
 
 考虑第 $l$ 层的一个神经元：
 
 $$
-z^{[l]}=\sum_{j=1}^{n_{l-1}} W_j^{[l]}a_j^{[l-1]}
+z^{[l]} = \sum_{j=1}^{n_{l-1}} W^{[l]}_j \cdot a^{[l-1]}_j
 $$
 
-若 $W_j^{[l]}$ 与 $a_j^{[l-1]}$ 独立且均值为 0，则：
+假设 $W^{[l]}_j$ 和 $a^{[l-1]}_j$ 独立且均值为 0，则 $z^{[l]}$ 的方差为：
 
 $$
-\operatorname{Var}(z^{[l]})
-= n_{l-1}\operatorname{Var}(W^{[l]})\operatorname{Var}(a^{[l-1]})
+\text{Var}(z^{[l]}) = n_{l-1} \cdot \text{Var}(W^{[l]}) \cdot \text{Var}(a^{[l-1]})
 $$
 
-为了让每层输出方差稳定，Xavier 初始化令：
+为了让每一层的输出方差稳定（$\text{Var}(z^{[l]}) \approx \text{Var}(a^{[l-1]})$），需要：
 
 $$
-\operatorname{Var}(W^{[l]})=\frac{1}{n_{l-1}}
+\text{Var}(W^{[l]}) = \frac{1}{n_{l-1}}
 $$
 
-ReLU 会将大约一半的负值置零，因此 He 初始化使用更大的方差：
+这就是 **Xavier 初始化**的条件。
+
+### 2.3 He 初始化
+
+当激活函数使用 **ReLU** 时，输入有一半被置零，方差减半。因此需要补偿这个因子 2：
 
 $$
-\operatorname{Var}(W^{[l]})=\frac{2}{n_{l-1}}
+\text{Var}(W^{[l]}) = \frac{2}{n_{l-1}}
 $$
 
-代码中的实现是：
+实际实现中，从正态分布采样并缩放：
 
-```python title="chapters/training_tricks/initialization/main.py"
-if initialization == 'zeros':
-    self.W.append(np.zeros((neuron_cnt[i + 1], neuron_cnt[i])))
-elif initialization == 'random':
-    self.W.append(np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 5)
-elif initialization == 'he':
-    self.W.append(
-        np.random.randn(neuron_cnt[i + 1], neuron_cnt[i])
-        * np.sqrt(2 / neuron_cnt[i])
-    )
+$$
+W^{[l]} \sim \mathcal{N}\left(0, \frac{2}{n_{l-1}}\right) \quad \Longleftrightarrow \quad W^{[l]} = \text{randn} \times \sqrt{\frac{2}{n_{l-1}}}
+$$
+
+| 初始化方式 | 方差 | 适用场景 |
+|-----------|------|---------|
+| 全零 | 0 | ❌ 不适用 |
+| 随机（×5） | $25$ | ❌ 方差过大 |
+| Xavier | $1/n$ | Sigmoid / Tanh |
+| He | $2/n$ | ✅ ReLU |
+
+---
+
+## 3. 代码解析
+
+本项目用纯 NumPy 实现了一个多层全连接网络，对二维点做二分类，对比三种初始化的效果。
+
+### 3.1 网络结构
+
+```
+输入 (2维) → Dense(10, ReLU) → Dense(5, ReLU) → Dense(1, Sigmoid) → 输出
 ```
 
-## 实验入口
+### 3.2 三种初始化的实现
 
-本章用同一组二维点分类数据，对比三种初始化：
+```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+class DeepNetwork(BaseRegressionModel):
 
-```powershell
-uv run python -m chapters.training_tricks.initialization.main
-uv run pytest chapters/training_tricks/initialization/tests -q
+    def __init__(self,
+                 neuron_cnt: List[int],
+                 activation_func: List[str],
+                 initialization='zeros'):
+        # ...
+        for i in range(self.num_layer):
+            # highlight-start
+            if initialization == 'zeros':
+                # 全零初始化：对称性无法打破
+                self.W.append(np.zeros((neuron_cnt[i + 1], neuron_cnt[i])))
+            elif initialization == 'random':
+                # 随机初始化：方差过大（×5），容易梯度爆炸
+                self.W.append(
+                    np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 5)
+            elif initialization == 'he':
+                # He 初始化：方差 = 2/n，配合 ReLU 效果最好
+                self.W.append(
+                    np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) *
+                    np.sqrt(2 / neuron_cnt[i]))
+            # highlight-end
+            self.b.append(np.zeros((neuron_cnt[i + 1], 1)))
 ```
 
-## 小结
+三种初始化的关键差异只在 `np.random.randn` 后的**缩放因子**。
 
-初始化的目标不是让参数“随机”这么简单，而是让每一层的信号规模可控。对 ReLU 网络，He 初始化通常是更稳的默认选择。
+### 3.3 前向传播
+
+```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+    def forward(self, X, train_mode=True):
+        A = X
+        self.A_cache[0] = A
+        for i in range(self.num_layer):
+            Z = np.dot(self.W[i], A) + self.b[i]
+            if i == self.num_layer - 1:
+                A = sigmoid(Z)           # 最后一层用 Sigmoid
+            else:
+                A = get_activation_func(self.activation_func[i])(Z)  # 隐藏层用 ReLU
+            if train_mode:
+                self.Z_cache[i] = Z
+                self.A_cache[i + 1] = A
+        return A
+```
+
+### 3.4 反向传播
+
+```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+    def backward(self, Y):
+        dA = 0
+        # key-start
+        # 从最后一层反向逐层计算梯度
+        for i in range(self.num_layer - 1, -1, -1):
+            if i == self.num_layer - 1:
+                # 输出层：Sigmoid + BCE 的简化梯度
+                dZ = self.A_cache[-1] - Y
+            else:
+                # 隐藏层：链式法则 dZ = dA ⊙ g'(Z)
+                dZ = dA * get_activation_de_func(self.activation_func[i])(
+                    self.Z_cache[i])
+            dW = np.dot(dZ, self.A_cache[i].T) / self.m
+            db = np.mean(dZ, axis=1, keepdims=True)
+            dA = np.dot(self.W[i].T, dZ)
+            # key-end
+            self.dW_cache[i] = dW
+            self.db_cache[i] = db
+```
+
+### 3.5 梯度下降
+
+```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+    def gradient_descent(self, learning_rate):
+        for i in range(self.num_layer):
+            self.W[i] -= learning_rate * self.dW_cache[i]
+            self.b[i] -= learning_rate * self.db_cache[i]
+```
+
+### 3.6 主函数：三种初始化对比
+
+```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+def main():
+    train_X, train_Y = generate_points(400)
+    plot_X = generate_plot_set()
+
+    n_x = train_X.shape[0]
+    neuron_list = [n_x, 10, 5, 1]
+    activation_list = ['relu', 'relu']
+
+    # highlight-start
+    # 同样的网络结构，仅初始化不同
+    model1 = DeepNetwork(neuron_list, activation_list, 'zeros')
+    model2 = DeepNetwork(neuron_list, activation_list, 'random')
+    model3 = DeepNetwork(neuron_list, activation_list, 'he')
+    # highlight-end
+
+    train(model1, train_X, train_Y, 20000, 0.01, 1000)
+    train(model2, train_X, train_Y, 20000, 0.01, 1000)
+    train(model3, train_X, train_Y, 20000, 0.01, 1000)
+
+    # 可视化三种初始化的决策边界
+    plot_result1 = model1.forward(plot_X, False)
+    plot_result2 = model2.forward(plot_X, False)
+    plot_result3 = model3.forward(plot_X, False)
+
+    visualize(train_X, train_Y, plot_result1)
+    visualize(train_X, train_Y, plot_result2)
+    visualize(train_X, train_Y, plot_result3)
+```
+
+---
+
+## 4. 实验结果
+
+同样的网络（`[2, 10, 5, 1]`，ReLU），同样的数据，训练 20000 步，学习率 0.01：
+
+| 初始化方式 | 训练结果 |
+|-----------|---------|
+| **zeros** | 决策边界几乎不变，Loss 居高不下。所有神经元学到相同特征，等效于单神经元 |
+| **random（×5）** | Loss 震荡剧烈，收敛缓慢。初始方差过大导致梯度不稳定 |
+| **He（√(2/n)）** | 快速收敛，决策边界清晰。方差在各层之间保持稳定 |
+
+---
+
+## 5. 延伸阅读
+
+- 📄 [Understanding the difficulty of training deep feedforward neural networks（Glorot & Bengio，2010）](http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf) — Xavier 初始化
+- 📄 [Delving Deep into Rectifiers（He et al.，2015）](https://arxiv.org/abs/1502.01852) — He 初始化
+- 🔗 [本章源码：`chapters/training_tricks/initialization/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/training_tricks/initialization)
+- ➡️ **下一章**：[正则化 — 防止过拟合的两种武器](./regularization)

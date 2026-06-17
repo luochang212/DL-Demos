@@ -1,88 +1,88 @@
-﻿---
+---
 id: fourier-feature
-title: 鍌呴噷鍙剁壒寰?鈥?绐佺牬 MLP 鐨勯鐜囩摱棰?
-sidebar_label: 1. 鍌呴噷鍙剁壒寰?
-description: 鐞嗚В MLP 鐨勯璋卞亸缃棶棰橈紝鎺屾彙 Fourier Feature 鏄犲皠濡備綍璁╃綉缁滃鍒伴珮棰戠粏鑺傦紝骞堕€愯瑙ｆ瀽 PyTorch 瀹炵幇銆?
-keywords: [Fourier Feature, 棰戣氨鍋忕疆, NeRF, 闅愬紡琛ㄧず, MLP, 娣卞害瀛︿範]
+title: 傅里叶特征 — 突破 MLP 的频率瓶颈
+sidebar_label: 1. 傅里叶特征
+description: 理解 MLP 的频谱偏置问题，掌握 Fourier Feature 映射如何让网络学到高频细节，并逐行解析 PyTorch 实现。
+keywords: [Fourier Feature, 频谱偏置, NeRF, 隐式表示, MLP, 深度学习]
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 鍌呴噷鍙剁壒寰?鈥?绐佺牬 MLP 鐨勯鐜囩摱棰?
+# 傅里叶特征 — 突破 MLP 的频率瓶颈
 
-:::tip 鏈珷瑕佺偣
-- 鐞嗚В**棰戣氨鍋忕疆**锛坰pectral bias锛夛細涓轰粈涔?MLP 鎿呴暱瀛︿綆棰戙€佷笉鎿呴暱瀛﹂珮棰?
-- 鎺屾彙 **Fourier Feature 鏄犲皠**锛氶€氳繃姝ｅ鸡/浣欏鸡鍙樻崲灏嗕綆缁磋緭鍏ユ槧灏勫埌楂樼淮鐗瑰緛绌洪棿
-- 鐞嗚В **NTK 鐞嗚**锛氫负浠€涔?Fourier Feature 鑳芥敼鍙樼綉缁滅殑棰戠巼鍋忓ソ
-- 璇绘噦 [`chapters/engineering/fourier_feature/image_mlp.ipynb`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/fourier_feature/image_mlp.ipynb) 鐨勫疄楠屼唬鐮?
+:::tip 本章要点
+- 理解**频谱偏置**（spectral bias）：为什么 MLP 擅长学低频、不擅长学高频
+- 掌握 **Fourier Feature 映射**：通过正弦/余弦变换将低维输入映射到高维特征空间
+- 理解 **NTK 理论**：为什么 Fourier Feature 能改变网络的频率偏好
+- 读懂 [`chapters/engineering/fourier_feature/image_mlp.ipynb`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/fourier_feature/image_mlp.ipynb) 的实验代码
 :::
 
 ---
 
-## 1. 闂锛氱敤 MLP 鎷熷悎涓€寮犲浘鐗?
+## 1. 问题：用 MLP 拟合一张图片
 
-鑰冭檻涓€涓湅浼肩畝鍗曠殑浠诲姟锛?*鐢ㄤ竴涓?MLP 璁颁綇涓€寮犲浘鐗?*銆?
+考虑一个看似简单的任务：**用一个 MLP 记住一张图片**。
 
-- **杈撳叆**锛氬儚绱犲潗鏍?$(x, y)$锛屽彇鍊艰寖鍥?$[0, 1]$
-- **杈撳嚭**锛氳浣嶇疆鐨?RGB 棰滆壊鍊?
-- **鏂规硶**锛氳 MLP 瀵规瘡涓儚绱犲潗鏍囧洖褰掑叾棰滆壊锛屾渶灏忓寲 L1 鎹熷け
+- **输入**：像素坐标 $(x, y)$，取值范围 $[0, 1]$
+- **输出**：该位置的 RGB 颜色值
+- **方法**：让 MLP 对每个像素坐标回归其颜色，最小化 L1 损失
 
-鐩磋涓婏紝涓€涓冻澶熷鐨?MLP 搴旇鑳芥嫙鍚堜换浣曡繛缁嚱鏁般€備絾瀹為檯瀹為獙鍙戠幇锛?*MLP 鑳藉揩閫熷鍒板浘鐗囩殑浣庨杞粨锛屼絾寰堥毦瀛﹀埌楂橀缁嗚妭锛堢汗鐞嗐€佽竟缂橈級**銆傝繖灏辨槸**棰戣氨鍋忕疆**锛圫pectral Bias锛夈€?
+直觉上，一个足够宽的 MLP 应该能拟合任何连续函数。但实际实验发现：**MLP 能快速学到图片的低频轮廓，但很难学到高频细节（纹理、边缘）**。这就是**频谱偏置**（Spectral Bias）。
 
 ---
 
-## 2. 鏁板鍘熺悊
+## 2. 数学原理
 
-### 2.1 棰戣氨鍋忕疆鐨?NTK 瑙ｉ噴
+### 2.1 频谱偏置的 NTK 解释
 
-Neural Tangent Kernel锛圢TK锛夌悊璁虹粰鍑轰簡棰戣氨鍋忕疆鐨勬暟瀛﹁В閲娿€?
+Neural Tangent Kernel（NTK）理论给出了频谱偏置的数学解释。
 
-鏃犻檺瀹?MLP 鐨勮缁冨姩鎬佸彲浠ョ敤 NTK 鏍稿嚱鏁?$K$ 鎻忚堪锛?
+无限宽 MLP 的训练动态可以用 NTK 核函数 $K$ 描述：
 
 $$
 K(x, x') = \left\langle \nabla_\theta f(x), \nabla_\theta f(x') \right\rangle
 $$
 
-NTK 鐨勭壒寰佸€艰氨鍐冲畾浜嗕笉鍚岄鐜囧垎閲忕殑瀛︿範閫熷害銆傚浜庢爣鍑?MLP锛孨TK 鐨勭壒寰佸€奸殢棰戠巼**鎸囨暟琛板噺**鈥斺€旇繖鎰忓懗鐫€楂橀鍒嗛噺鐨勫涔犻€熷害鏋佹參銆?
+NTK 的特征值谱决定了不同频率分量的学习速度。对于标准 MLP，NTK 的特征值随频率**指数衰减**——这意味着高频分量的学习速度极慢。
 
-**鏈川鍘熷洜**锛氭爣鍑?MLP 瀵逛綆缁磋緭鍏?$(x, y)$ 鐨?NTK 绫讳技浜庝竴涓?*浣庨€氭护娉㈠櫒**銆?
+**本质原因**：标准 MLP 对低维输入 $(x, y)$ 的 NTK 类似于一个**低通滤波器**。
 
-### 2.2 Fourier Feature 鏄犲皠
+### 2.2 Fourier Feature 映射
 
-瑙ｆ硶鏄皢杈撳叆閫氳繃涓€涓?*闅忔満 Fourier 鐗瑰緛鏄犲皠**锛?
+解法是将输入通过一个**随机 Fourier 特征映射**：
 
 $$
 \gamma(\mathbf{v}) = \begin{bmatrix} \cos(2\pi B\mathbf{v}) \\ \sin(2\pi B\mathbf{v}) \end{bmatrix}
 $$
 
-鍏朵腑 $B \in \mathbb{R}^{m \times d}$ 鏄竴涓殢鏈虹煩闃碉紝姣忎釜鍏冪礌浠?$\mathcal{N}(0, \sigma^2)$ 涓噰鏍枫€?\sigma$ 鎺у埗浜嗘槧灏勭殑棰戠巼鑼冨洿銆?
+其中 $B \in \mathbb{R}^{m \times d}$ 是一个随机矩阵，每个元素从 $\mathcal{N}(0, \sigma^2)$ 中采样。$\sigma$ 控制了映射的频率范围。
 
-**鍏抽敭娲炶**锛氱粡杩?Fourier Feature 鏄犲皠鍚庯紝NTK 鐨勬牳鍑芥暟鍙樻垚锛?
+**关键洞见**：经过 Fourier Feature 映射后，NTK 的核函数变成：
 
 $$
 K_\gamma(x, x') = K(\gamma(x), \gamma(x')) = \varphi(B(x - x'))
 $$
 
-NTK 鐨勯鐜囧搷搴旂幇鍦ㄧ敱 $B$ 鐨勫垎甯冨喅瀹氥€傞€氳繃閫夋嫨鍚堥€傜殑 $\sigma$锛屽彲浠ヨ NTK 瀵圭洰鏍囬鐜囪寖鍥寸殑鍝嶅簲澶у箙澧炲己銆?
+NTK 的频率响应现在由 $B$ 的分布决定。通过选择合适的 $\sigma$，可以让 NTK 对目标频率范围的响应大幅增强。
 
-### 2.3 scale 鍙傛暟鐨勫奖鍝?
+### 2.3 scale 参数的影响
 
-$B$ 鐨勬爣鍑嗗樊 $\sigma$ 鍐冲畾浜?Fourier Feature 鐨勩€岄鐜囪寖鍥淬€嶏細
+$B$ 的标准差 $\sigma$ 决定了 Fourier Feature 的「频率范围」：
 
-| $\sigma$ | 鏁堟灉 |
+| $\sigma$ | 效果 |
 |----------|------|
-| 澶皬 | 鏄犲皠棰戠巼鍋忎綆锛屼粛鐒跺涓嶅埌楂橀缁嗚妭 |
-| 鍚堥€?| 鍖归厤鐩爣淇″彿鐨勯鐜囪寖鍥达紝鎷熷悎鏁堟灉鏈€濂?|
-| 澶ぇ | 鏄犲皠棰戠巼杩囬珮锛屽彲鑳藉紩鍏ュ櫔澹?|
+| 太小 | 映射频率偏低，仍然学不到高频细节 |
+| 合适 | 匹配目标信号的频率范围，拟合效果最好 |
+| 太大 | 映射频率过高，可能引入噪声 |
 
 ---
 
-## 3. 浠ｇ爜瑙ｆ瀽
+## 3. 代码解析
 
-瀹為獙鐢?MLP 鎷熷悎涓€寮?256脳256 鍥剧墖锛屽姣旀湁鏃?Fourier Feature 鐨勬晥鏋溿€?
+实验用 MLP 拟合一张 256×256 图片，对比有无 Fourier Feature 的效果。
 
-### 3.1 鍩哄噯 MLP
+### 3.1 基准 MLP
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
 class MLP(nn.Module):
@@ -98,9 +98,9 @@ class MLP(nn.Module):
         return self.mlp(x)
 ```
 
-鐢?`Conv2d(kernel_size=1)` 瀹炵幇 pointwise 鍏ㄨ繛鎺ュ眰锛屾柟渚垮鐞?2D 鐗瑰緛鍥俱€?
+用 `Conv2d(kernel_size=1)` 实现 pointwise 全连接层，方便处理 2D 特征图。
 
-### 3.2 杈撳叆鍧愭爣缃戞牸
+### 3.2 输入坐标网格
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
 H, W = input_image.shape[2:]
@@ -109,16 +109,16 @@ w_coord = torch.linspace(0, 1, W)
 grid = torch.stack(torch.meshgrid([h_coord, w_coord]), -1).permute(2, 0, 1).unsqueeze(0)
 ```
 
-鐢熸垚 `(1, 2, H, W)` 鐨勫潗鏍囩綉鏍硷紝姣忎釜浣嶇疆鐨勫€兼槸璇ュ儚绱犵殑 $(x, y)$ 鍧愭爣锛堝綊涓€鍖栧埌 $[0, 1]$锛夈€?
+生成 `(1, 2, H, W)` 的坐标网格，每个位置的值是该像素的 $(x, y)$ 坐标（归一化到 $[0, 1]$）。
 
-### 3.3 Fourier Feature 妯″潡
+### 3.3 Fourier Feature 模块
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
 class FourierFeature(nn.Module):
     def __init__(self, in_c, out_c, scale):
         super().__init__()
         # key-start
-        # 闅忔満棰戠巼鐭╅樀 B锛歴hape (in_c, out_c//2)锛屽厓绱?~ N(0, scale虏)
+        # 随机频率矩阵 B：shape (in_c, out_c//2)，元素 ~ N(0, scale²)
         fourier_basis = torch.randn(in_c, out_c // 2) * scale
         self.register_buffer('_fourier_basis', fourier_basis)
         # key-end
@@ -126,41 +126,41 @@ class FourierFeature(nn.Module):
     def forward(self, x):
         N, C, H, W = x.shape
         # key-start
-        x = rearrange(x, 'n c h w -> (n h w) c')  # 灞曞钩绌洪棿缁村害
-        x = x @ self._fourier_basis                  # 绾挎€ф姇褰憋細v 鈫?Bv
+        x = rearrange(x, 'n c h w -> (n h w) c')  # 展平空间维度
+        x = x @ self._fourier_basis                  # 线性投影：v → Bv
         x = rearrange(x, '(n h w) c -> n c h w', h=H, w=W)
-        x = 2 * torch.pi * x                         # 涔樹互 2蟺
-        x = torch.cat([torch.sin(x), torch.cos(x)], dim=1)  # [sin, cos] 鎷兼帴
+        x = 2 * torch.pi * x                         # 乘以 2π
+        x = torch.cat([torch.sin(x), torch.cos(x)], dim=1)  # [sin, cos] 拼接
         # key-end
         return x
 ```
 
 流程：$\mathbf{v} \xrightarrow{B\mathbf{v}} \xrightarrow{2\pi} \xrightarrow{[\sin, \cos]} \gamma(\mathbf{v})$
 
-杈撳叆缁村害 2锛岀粡杩?`out_c // 2 = 128` 缁寸殑闅忔満鎶曞奖锛屽啀 sin/cos 鎷兼帴寰楀埌 `out_c = 256` 缁寸壒寰併€?
+输入维度 2，经过 `out_c // 2 = 128` 维的随机投影，再 sin/cos 拼接得到 `out_c = 256` 维特征。
 
-### 3.4 鍩哄噯璁粌锛堟棤 Fourier Feature锛?
+### 3.4 基准训练（无 Fourier Feature）
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
-model = MLP(2).to(device)           # 杈撳叆缁村害 = 2锛坸, y 鍧愭爣锛?
+model = MLP(2).to(device)           # 输入维度 = 2（x, y 坐标）
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 for epoch in range(400):
-    output = model(grid)            # 鐩存帴杈撳叆鍧愭爣
+    output = model(grid)            # 直接输入坐标
     loss = F.l1_loss(output, input_image)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 ```
 
-### 3.5 Fourier Feature 璁粌
+### 3.5 Fourier Feature 训练
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
 feature_length = 256
-model = MLP(feature_length).to(device)      # 杈撳叆缁村害 = 256锛團ourier 鐗瑰緛锛?
+model = MLP(feature_length).to(device)      # 输入维度 = 256（Fourier 特征）
 fourier_feature = FourierFeature(2, feature_length, 10).to(device)  # scale=10
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 for epoch in range(400):
-    x = fourier_feature(grid)               # 鍧愭爣 鈫?Fourier 鐗瑰緛
+    x = fourier_feature(grid)               # 坐标 → Fourier 特征
     output = model(x)
     loss = F.l1_loss(output, input_image)
     optimizer.zero_grad()
@@ -168,48 +168,48 @@ for epoch in range(400):
     optimizer.step()
 ```
 
-鍞竴鐨勫尯鍒細鍧愭爣鍏堢粡杩?`fourier_feature` 鏄犲皠鍐嶉€佸叆 MLP銆?
+唯一的区别：坐标先经过 `fourier_feature` 映射再送入 MLP。
 
-### 3.6 骞崇Щ涓嶅彉鎬у疄楠?
+### 3.6 平移不变性实验
 
-浠ｇ爜涓繕鍋氫簡涓€涓湁瓒ｇ殑瀹為獙鈥斺€斿皢 Fourier Feature 搴旂敤浜庡钩绉诲悗鐨勫潗鏍囷紝楠岃瘉妯″瀷鐨勬硾鍖栬兘鍔涳細
+代码中还做了一个有趣的实验——将 Fourier Feature 应用于平移后的坐标，验证模型的泛化能力：
 
 ```python title="chapters/engineering/fourier_feature/image_mlp.ipynb" showLineNumbers
-# 鍦?Fourier 绌洪棿涓仛浠垮皠鍙樻崲锛堝钩绉?+ 鏃嬭浆锛?
+# 在 Fourier 空间中做仿射变换（平移 + 旋转）
 def aff_transform(model, x, aff):
     # ...
-    phases = model._fourier_basis.T @ aff[:2, 2:]  # 骞崇Щ 鈫?鐩镐綅鍋忕Щ
+    phases = model._fourier_basis.T @ aff[:2, 2:]  # 平移 → 相位偏移
     # ...
 ```
 
-杩欏睍绀轰簡 Fourier Feature 鐨勪竴涓噸瑕佹€ц川锛氬湪棰戠巼绌洪棿涓紝绌洪棿鍩熺殑骞崇Щ瀵瑰簲浜庣浉浣嶇殑鍋忕Щ銆?
+这展示了 Fourier Feature 的一个重要性质：在频率空间中，空间域的平移对应于相位的偏移。
 
 ---
 
-## 4. 瀹為獙瀵规瘮
+## 4. 实验对比
 
-鐢ㄥ悓涓€寮?256脳256 鍥剧墖锛屽悓鏍风殑 MLP 缁撴瀯锛岃缁?400 涓?epoch锛?
+用同一张 256×256 图片，同样的 MLP 结构，训练 400 个 epoch：
 
-| 鏂规硶 | 杈撳叆缁村害 | 楂橀缁嗚妭 | Loss |
+| 方法 | 输入维度 | 高频细节 | Loss |
 |------|---------|---------|------|
-| **鐩存帴杈撳叆鍧愭爣** | 2 | 鉂?妯＄硦锛岀粏鑺備涪澶?| 杈冮珮 |
-| **Fourier Feature锛坰cale=10锛?* | 256 | 鉁?绾圭悊娓呮櫚锛岃竟缂橀攼鍒?| 鏄捐憲闄嶄綆 |
+| **直接输入坐标** | 2 | ❌ 模糊，细节丢失 | 较高 |
+| **Fourier Feature（scale=10）** | 256 | ✅ 纹理清晰，边缘锐利 | 显著降低 |
 
 ---
 
-## 5. 搴旂敤鍦烘櫙
+## 5. 应用场景
 
-Fourier Feature 涓嶄粎鏄竴涓湁瓒ｇ殑瀹為獙锛屽畠鍦ㄥ疄闄呯爺绌朵腑鏈夊箍娉涘簲鐢細
+Fourier Feature 不仅是一个有趣的实验，它在实际研究中有广泛应用：
 
-- **NeRF锛圢eural Radiance Fields锛?*锛氱敤 Fourier Feature 缂栫爜 3D 鍧愭爣锛屽疄鐜伴珮璐ㄩ噺鐨勬柊瑙嗚鍚堟垚
-- **SIREN**锛氱敤姝ｅ鸡婵€娲诲嚱鏁版浛浠?ReLU锛岄殣寮忓疄鐜扮被浼肩殑棰戠巼澧炲己鏁堟灉
-- **闅愬紡绁炵粡琛ㄧず**锛氬皢鍥惧儚銆侀煶棰戙€?D 褰㈢姸绛変俊鍙风敤绁炵粡缃戠粶鍙傛暟鍖?
+- **NeRF（Neural Radiance Fields）**：用 Fourier Feature 编码 3D 坐标，实现高质量的新视角合成
+- **SIREN**：用正弦激活函数替代 ReLU，隐式实现类似的频率增强效果
+- **隐式神经表示**：将图像、音频、3D 形状等信号用神经网络参数化
 
 ---
 
-## 6. 寤朵几闃呰
+## 6. 延伸阅读
 
-- 馃搫 [Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains锛圱ancik et al.锛?020锛塢(https://arxiv.org/abs/2006.10739)
-- 馃搫 [NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis锛圡ildenhall et al.锛?020锛塢(https://arxiv.org/abs/2003.08934)
-- 馃敆 [鏈珷婧愮爜锛歚chapters/engineering/fourier_feature/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/fourier_feature)
-- 鉃★笍 **涓嬩竴绔?*锛歔鍒嗗竷寮忚缁?鈥?PyTorch DDP 瀹炴垬](./distributed)
+- 📄 [Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains（Tancik et al.，2020）](https://arxiv.org/abs/2006.10739)
+- 📄 [NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis（Mildenhall et al.，2020）](https://arxiv.org/abs/2003.08934)
+- 🔗 [本章源码：`chapters/engineering/fourier_feature/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/fourier_feature)
+- ➡️ **下一章**：[分布式训练 — PyTorch DDP 实战](./distributed)

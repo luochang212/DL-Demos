@@ -1,23 +1,23 @@
-﻿---
+---
 id: environment
-title: 鐜銆佽繍琛屼笌楠岃瘉
-sidebar_label: 鐜銆佽繍琛屼笌楠岃瘉
-description: 浣跨敤 uv 绠＄悊 DL-Demos 鐨?Python 3.13 鐜锛屽苟杩愯璐ㄩ噺妫€鏌ヤ笌鏁欑▼绀轰緥銆?
+title: 环境、运行与验证
+sidebar_label: 环境、运行与验证
+description: 使用 uv 管理 DL-Demos 的 Python 3.13 环境，并运行质量检查与教程示例。
 ---
 
-# 鐜銆佽繍琛屼笌楠岃瘉
+# 环境、运行与验证
 
-椤圭洰榛樿鐜鏄?**Python 3.13 + PyTorch**锛屼娇鐢?[uv](https://docs.astral.sh/uv/) 瑙ｆ瀽銆侀攣瀹氬拰杩愯渚濊禆銆?
+项目默认环境是 **Python 3.13 + PyTorch**，使用 [uv](https://docs.astral.sh/uv/) 解析、锁定和运行依赖。
 
-## 1. 鍒涘缓鐜
+## 1. 创建环境
 
 ```bash
 uv sync --group dev
 ```
 
-`uv.lock` 閿佸畾鎵€鏈夌洿鎺ヤ笌闂存帴渚濊禆銆備笉瑕佷娇鐢ㄥ叏灞€ Python 鐩存帴杩愯绀轰緥锛屼篃涓嶈鎵嬪伐缁存姢铏氭嫙鐜銆?
+`uv.lock` 锁定所有直接与间接依赖。不要使用全局 Python 直接运行示例，也不要手工维护虚拟环境。
 
-## 2. 杩愯绀轰緥
+## 2. 运行示例
 
 ```bash
 uv run python -m chapters.fundamentals.shallow_network.points_classification
@@ -25,9 +25,9 @@ uv run python chapters/sequence_models/transformer/train.py
 uv run python chapters/cv/style_transfer/style_transfer.py --steps 50
 ```
 
-閮ㄥ垎璁粌鑴氭湰闇€瑕佹彁鍓嶄笅杞芥暟鎹泦锛屽叿浣撶洰褰曠粨鏋勮瀵瑰簲绔犺妭銆?
+部分训练脚本需要提前下载数据集，具体目录结构见对应章节。
 
-## 3. 楠岃瘉淇敼
+## 3. 验证修改
 
 ```bash
 uv run ruff check .
@@ -36,20 +36,20 @@ uv run pytest
 cd src && npm run build
 ```
 
-瀹夎 Git 鎻愪氦妫€鏌ワ細
+安装 Git 提交检查：
 
 ```bash
 uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
-pre-commit 鍙鏌ワ紝涓嶄細鍦ㄦ彁浜よ繃绋嬩腑闅愬紡鏀瑰啓鏂囦欢銆傞渶瑕佷慨澶嶆牸寮忔椂鏄惧紡杩愯锛?
+pre-commit 只检查，不会在提交过程中隐式改写文件。需要修复格式时显式运行：
 
 ```bash
 uv run ruff check --fix .
 uv run ruff format .
 ```
 
-## 4. Legacy 绀轰緥
+## 4. Legacy 示例
 
-榛樿鐜涓嶅寘鍚?TensorFlow 鍜屽凡鍋滄缁存姢鐨?`torchtext`銆俁esNet 鐨?TensorFlow 瀹炵幇鍜屾儏鎰熷垎鏋愮殑 `torchtext` 瀹炵幇浣滀负 legacy 鏁欏鏉愭枡淇濈暀锛屼絾涓嶅睘浜庨粯璁ょ幆澧冪殑鍙繍琛屾€ф壙璇恒€?
+默认环境不包含 TensorFlow 和已停止维护的 `torchtext`。ResNet 的 TensorFlow 实现和情感分析的 `torchtext` 实现作为 legacy 教学材料保留，但不属于默认环境的可运行性承诺。
