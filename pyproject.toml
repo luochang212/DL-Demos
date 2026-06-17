@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["dldemos*"]
+include = ["chapters*", "dldemos*"]
 
 [tool.ruff]
 target-version = "py313"

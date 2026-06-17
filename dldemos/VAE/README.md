@@ -1,5 +1,8 @@
 # VAE
 
+This directory is a compatibility entrypoint for older commands and imports.
+The tutorial source now lives in `chapters/generative_models/vae/`.
+
 1. Download [CelebA](https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
    Align&Cropped Images.
 
@@ -8,9 +11,9 @@
 3. Choose the operation explicitly:
 
 ```bash
-uv run python dldemos/VAE/main.py --mode train
-uv run python dldemos/VAE/main.py --mode reconstruct
-uv run python dldemos/VAE/main.py --mode generate
+uv run python -m chapters.generative_models.vae.code.main --mode train
+uv run python -m chapters.generative_models.vae.code.main --mode reconstruct
+uv run python -m chapters.generative_models.vae.code.main --mode generate
 ```
 
 The default device is selected automatically. Use `--device cpu` or
