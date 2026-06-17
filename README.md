@@ -38,11 +38,11 @@ uv run pre-commit run --all-files
 - 生成模型：VAE、DDPM、DDIM、PixelCNN、VQVAE
 - 工程实践：Fourier Feature、PyTorch DDP
 
-教程站源码位于 `src/`：
+教程站源码位于 `website/`：
 
 ```bash
-cd src
-npm install
+cd website
+npm ci
 npm run build
 ```
 

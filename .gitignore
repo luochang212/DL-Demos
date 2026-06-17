@@ -137,7 +137,9 @@ dldemos/*/*.txt
 nohup.out
 
 # Docusaurus website
-src/node_modules/
-src/build/
-src/.docusaurus/
-src/package-lock.json
+website/node_modules/
+website/build/
+website/.docusaurus/
+
+# Old ignored website cache location kept for Windows file locks during migration.
+src/
