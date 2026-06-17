@@ -6,12 +6,12 @@ import einops
 import torch
 import torch.nn as nn
 
+from chapters.common.utils.device import resolve_device
 from chapters.generative_models.ddim.configs import configs
 from chapters.generative_models.ddim.dataset import get_dataloader
 from chapters.generative_models.ddim.ddim import DDIM
 from chapters.generative_models.ddim.ddpm import DDPM
 from chapters.generative_models.ddim.network import UNet
-from dldemos.utils.device import resolve_device
 
 
 def ensure_parent_dir(path):

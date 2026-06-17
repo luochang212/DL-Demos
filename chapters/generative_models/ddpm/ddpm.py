@@ -1,6 +1,6 @@
 import torch
 
-from dldemos.utils.device import resolve_device
+from chapters.common.utils.device import resolve_device
 
 
 class DDPM:

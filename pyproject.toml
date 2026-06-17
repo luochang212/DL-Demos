@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dldemos"
+name = "dl-demos"
 version = "0.1.0"
 description = "Educational deep learning implementations and tutorials"
 readme = "README.md"
@@ -33,12 +33,12 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["chapters*", "dldemos*"]
+include = ["chapters*"]
 
 [tool.ruff]
 target-version = "py313"
 line-length = 88
-extend-exclude = ["dldemos/Transformer/outdated"]
+extend-exclude = ["chapters/sequence_models/transformer/outdated"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]

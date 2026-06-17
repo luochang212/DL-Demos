@@ -8,9 +8,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from chapters.common.utils.device import resolve_device
 from chapters.generative_models.pixelcnn.dataset import get_dataloader, get_img_shape
 from chapters.generative_models.pixelcnn.model import GatedPixelCNN, PixelCNN
-from dldemos.utils.device import resolve_device
 
 batch_size = 128
 # You can set color_level to any value between 2 and 256

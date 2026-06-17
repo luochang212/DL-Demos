@@ -1,107 +1,107 @@
----
+﻿---
 id: distributed
-title: 分布式训练 — PyTorch DDP 实战
-sidebar_label: 2. 分布式训练
-description: 理解数据并行训练的原理，掌握 PyTorch DistributedDataParallel（DDP）的完整流程，包括进程初始化、数据分片、梯度同步和权重加载。
-keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel, 多GPU]
+title: 鍒嗗竷寮忚缁?鈥?PyTorch DDP 瀹炴垬
+sidebar_label: 2. 鍒嗗竷寮忚缁?
+description: 鐞嗚В鏁版嵁骞惰璁粌鐨勫師鐞嗭紝鎺屾彙 PyTorch DistributedDataParallel锛圖DP锛夌殑瀹屾暣娴佺▼锛屽寘鎷繘绋嬪垵濮嬪寲銆佹暟鎹垎鐗囥€佹搴﹀悓姝ュ拰鏉冮噸鍔犺浇銆?
+keywords: [鍒嗗竷寮忚缁? DDP, PyTorch, 鏁版嵁骞惰, DistributedDataParallel, 澶欸PU]
 ---
 
-# 分布式训练 — PyTorch DDP 实战
+# 鍒嗗竷寮忚缁?鈥?PyTorch DDP 瀹炴垬
 
-:::tip 本章要点
-- 理解**数据并行** vs **模型并行**：两种分布式训练策略
-- 掌握 **DDP 完整流程**：初始化 → 数据分片 → 模型包装 → 梯度同步 → 清理
-- 理解 **rank / world_size / DistributedSampler** 等核心概念
-- 读懂 [`dldemos/PyTorchDistributed/main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/PyTorchDistributed/main.py) 的最小可运行示例
+:::tip 鏈珷瑕佺偣
+- 鐞嗚В**鏁版嵁骞惰** vs **妯″瀷骞惰**锛氫袱绉嶅垎甯冨紡璁粌绛栫暐
+- 鎺屾彙 **DDP 瀹屾暣娴佺▼**锛氬垵濮嬪寲 鈫?鏁版嵁鍒嗙墖 鈫?妯″瀷鍖呰 鈫?姊害鍚屾 鈫?娓呯悊
+- 鐞嗚В **rank / world_size / DistributedSampler** 绛夋牳蹇冩蹇?
+- 璇绘噦 [`chapters/engineering/pytorch_distributed/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/pytorch_distributed/main.py) 鐨勬渶灏忓彲杩愯绀轰緥
 :::
 
 ---
 
-## 1. 为什么需要分布式训练
+## 1. 涓轰粈涔堥渶瑕佸垎甯冨紡璁粌
 
-当模型太大或数据太多，单张 GPU 放不下或训练太慢时，就需要多 GPU（甚至多机）协同训练。
+褰撴ā鍨嬪お澶ф垨鏁版嵁澶锛屽崟寮?GPU 鏀句笉涓嬫垨璁粌澶參鏃讹紝灏遍渶瑕佸 GPU锛堢敋鑷冲鏈猴級鍗忓悓璁粌銆?
 
-两种主要策略：
+涓ょ涓昏绛栫暐锛?
 
-| 策略 | 思路 | 适用场景 |
+| 绛栫暐 | 鎬濊矾 | 閫傜敤鍦烘櫙 |
 |------|------|---------|
-| **数据并行** | 每张卡持有完整模型副本，但处理不同的数据分片 | 模型能放进单卡，但数据量大 |
-| **模型并行** | 模型被拆分到多张卡上，每张卡只存一部分 | 模型太大，单卡放不下（如大语言模型） |
+| **鏁版嵁骞惰** | 姣忓紶鍗℃寔鏈夊畬鏁存ā鍨嬪壇鏈紝浣嗗鐞嗕笉鍚岀殑鏁版嵁鍒嗙墖 | 妯″瀷鑳芥斁杩涘崟鍗★紝浣嗘暟鎹噺澶?|
+| **妯″瀷骞惰** | 妯″瀷琚媶鍒嗗埌澶氬紶鍗′笂锛屾瘡寮犲崱鍙瓨涓€閮ㄥ垎 | 妯″瀷澶ぇ锛屽崟鍗℃斁涓嶄笅锛堝澶ц瑷€妯″瀷锛?|
 
-本章聚焦 **数据并行**，使用 PyTorch 的 `DistributedDataParallel`（DDP）实现。
+鏈珷鑱氱劍 **鏁版嵁骞惰**锛屼娇鐢?PyTorch 鐨?`DistributedDataParallel`锛圖DP锛夊疄鐜般€?
 
-### 数据并行的核心流程
+### 鏁版嵁骞惰鐨勬牳蹇冩祦绋?
 
 ```
-                    ┌──────────┐
-                    │ 完整数据集 │
-                    └─────┬────┘
-                          │ DistributedSampler 分片
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-          ┌───────┐   ┌───────┐   ┌───────┐
-          │ GPU 0 │   │ GPU 1 │   │ GPU 2 │
-          │模型副本│   │模型副本│   │模型副本│
-          │数据分片│   │数据分片│   │数据分片│
-          └───┬───┘   └───┬───┘   └───┬───┘
-              │ 前向+反向  │ 前向+反向  │ 前向+反向
-              ▼           ▼           ▼
-          ┌───────┐   ┌───────┐   ┌───────┐
-          │梯度 g₀ │   │梯度 g₁ │   │梯度 g₂ │
-          └───┬───┘   └───┬───┘   └───┬───┘
-              │           │           │
-              └───────────┼───────────┘
-                          │ AllReduce 平均
-                          ▼
-                    ḡ = (g₀+g₁+g₂)/3
-                          │
-                    所有 GPU 用 ḡ 更新参数
+                    鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+                    鈹?瀹屾暣鏁版嵁闆?鈹?
+                    鈹斺攢鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹?
+                          鈹?DistributedSampler 鍒嗙墖
+              鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+              鈻?          鈻?          鈻?
+          鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+          鈹?GPU 0 鈹?  鈹?GPU 1 鈹?  鈹?GPU 2 鈹?
+          鈹傛ā鍨嬪壇鏈攤   鈹傛ā鍨嬪壇鏈攤   鈹傛ā鍨嬪壇鏈攤
+          鈹傛暟鎹垎鐗団攤   鈹傛暟鎹垎鐗団攤   鈹傛暟鎹垎鐗団攤
+          鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?  鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?  鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?
+              鈹?鍓嶅悜+鍙嶅悜  鈹?鍓嶅悜+鍙嶅悜  鈹?鍓嶅悜+鍙嶅悜
+              鈻?          鈻?          鈻?
+          鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+          鈹傛搴?g鈧€ 鈹?  鈹傛搴?g鈧?鈹?  鈹傛搴?g鈧?鈹?
+          鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?  鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?  鈹斺攢鈹€鈹€鈹攢鈹€鈹€鈹?
+              鈹?          鈹?          鈹?
+              鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+                          鈹?AllReduce 骞冲潎
+                          鈻?
+                    g虅 = (g鈧€+g鈧?g鈧?/3
+                          鈹?
+                    鎵€鏈?GPU 鐢?g虅 鏇存柊鍙傛暟
 ```
 
-每个 GPU 独立计算自己数据分片的梯度，然后通过 **AllReduce** 通信操作汇总梯度，最后所有 GPU 用相同的平均梯度更新参数——保证模型一致性。
+姣忎釜 GPU 鐙珛璁＄畻鑷繁鏁版嵁鍒嗙墖鐨勬搴︼紝鐒跺悗閫氳繃 **AllReduce** 閫氫俊鎿嶄綔姹囨€绘搴︼紝鏈€鍚庢墍鏈?GPU 鐢ㄧ浉鍚岀殑骞冲潎姊害鏇存柊鍙傛暟鈥斺€斾繚璇佹ā鍨嬩竴鑷存€с€?
 
 ---
 
-## 2. 核心概念
+## 2. 鏍稿績姒傚康
 
-| 概念 | 说明 |
+| 姒傚康 | 璇存槑 |
 |------|------|
-| **rank** | 当前进程的全局编号（0, 1, 2, ...） |
-| **world_size** | 总进程数（通常 = GPU 数量） |
-| **local_rank** | 当前节点内的 GPU 编号 |
-| **DistributedSampler** | 为每个进程分配数据分片；数据量不能整除时默认会补齐少量重复样本 |
-| **AllReduce** | 跨所有进程的规约操作（如求和、求平均） |
-| **barrier** | 同步屏障，所有进程到达后才能继续 |
+| **rank** | 褰撳墠杩涚▼鐨勫叏灞€缂栧彿锛?, 1, 2, ...锛?|
+| **world_size** | 鎬昏繘绋嬫暟锛堥€氬父 = GPU 鏁伴噺锛?|
+| **local_rank** | 褰撳墠鑺傜偣鍐呯殑 GPU 缂栧彿 |
+| **DistributedSampler** | 涓烘瘡涓繘绋嬪垎閰嶆暟鎹垎鐗囷紱鏁版嵁閲忎笉鑳芥暣闄ゆ椂榛樿浼氳ˉ榻愬皯閲忛噸澶嶆牱鏈?|
+| **AllReduce** | 璺ㄦ墍鏈夎繘绋嬬殑瑙勭害鎿嶄綔锛堝姹傚拰銆佹眰骞冲潎锛?|
+| **barrier** | 鍚屾灞忛殰锛屾墍鏈夎繘绋嬪埌杈惧悗鎵嶈兘缁х画 |
 
 ---
 
-## 3. 代码解析
+## 3. 浠ｇ爜瑙ｆ瀽
 
-这是一个最小可运行的 DDP 示例，使用一个简单的线性模型 `Linear(1, 1)` 和 4 条数据，重点展示 DDP 的框架用法。
+杩欐槸涓€涓渶灏忓彲杩愯鐨?DDP 绀轰緥锛屼娇鐢ㄤ竴涓畝鍗曠殑绾挎€фā鍨?`Linear(1, 1)` 鍜?4 鏉℃暟鎹紝閲嶇偣灞曠ず DDP 鐨勬鏋剁敤娉曘€?
 
-### 3.1 初始化与清理
+### 3.1 鍒濆鍖栦笌娓呯悊
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 import torch.distributed as dist
 
 def setup():
     # key-start
-    # 初始化进程组：使用 NCCL 后端（GPU 通信的高性能实现）
+    # 鍒濆鍖栬繘绋嬬粍锛氫娇鐢?NCCL 鍚庣锛圙PU 閫氫俊鐨勯珮鎬ц兘瀹炵幇锛?
     dist.init_process_group('nccl')
     # key-end
 
 def cleanup():
     # key-start
-    # 销毁进程组，释放通信资源
+    # 閿€姣佽繘绋嬬粍锛岄噴鏀鹃€氫俊璧勬簮
     dist.destroy_process_group()
     # key-end
 ```
 
-NCCL（NVIDIA Collective Communications Library）是 GPU 间通信的最高性能后端。其他选项包括 `gloo`（CPU/GPU 通用）和 `mpi`（高性能计算集群）。
+NCCL锛圢VIDIA Collective Communications Library锛夋槸 GPU 闂撮€氫俊鐨勬渶楂樻€ц兘鍚庣銆傚叾浠栭€夐」鍖呮嫭 `gloo`锛圕PU/GPU 閫氱敤锛夊拰 `mpi`锛堥珮鎬ц兘璁＄畻闆嗙兢锛夈€?
 
-### 3.2 数据集与采样器
+### 3.2 鏁版嵁闆嗕笌閲囨牱鍣?
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 class MyDataset(Dataset):
     def __init__(self):
         self.data = torch.tensor([1, 2, 3, 4], dtype=torch.float32)
@@ -113,68 +113,68 @@ class MyDataset(Dataset):
         return self.data[index:index + 1]
 
 # key-start
-sampler = DistributedSampler(dataset)  # 自动分片：4条数据 + 2个GPU → 每GPU 2条
+sampler = DistributedSampler(dataset)  # 鑷姩鍒嗙墖锛?鏉℃暟鎹?+ 2涓狦PU 鈫?姣廏PU 2鏉?
 dataloader = DataLoader(dataset, batch_size=2, sampler=sampler)
 # key-end
 ```
 
-**为什么用 DistributedSampler 而不是普通采样器**：它让每个 GPU 主要处理不同的数据分片。普通 DataLoader 会让每个 GPU 都看到完整数据集。当前示例的 4 条数据可被 2 个进程整除，因此分片不重叠。
+**涓轰粈涔堢敤 DistributedSampler 鑰屼笉鏄櫘閫氶噰鏍峰櫒**锛氬畠璁╂瘡涓?GPU 涓昏澶勭悊涓嶅悓鐨勬暟鎹垎鐗囥€傛櫘閫?DataLoader 浼氳姣忎釜 GPU 閮界湅鍒板畬鏁存暟鎹泦銆傚綋鍓嶇ず渚嬬殑 4 鏉℃暟鎹彲琚?2 涓繘绋嬫暣闄わ紝鍥犳鍒嗙墖涓嶉噸鍙犮€?
 
-### 3.3 模型包装
+### 3.3 妯″瀷鍖呰
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 device_id = rank % torch.cuda.device_count()
 
 model = ToyModel().to(device_id)
 # key-start
-# DDP 包装：自动在反向传播后同步梯度
-# device_ids 指定当前进程使用的 GPU
+# DDP 鍖呰锛氳嚜鍔ㄥ湪鍙嶅悜浼犳挱鍚庡悓姝ユ搴?
+# device_ids 鎸囧畾褰撳墠杩涚▼浣跨敤鐨?GPU
 ddp_model = DistributedDataParallel(model, device_ids=[device_id])
 # key-end
 ```
 
-DDP 在 `forward()` 时自动注册反向传播的钩子，在 `backward()` 后自动触发 AllReduce 梯度同步。
+DDP 鍦?`forward()` 鏃惰嚜鍔ㄦ敞鍐屽弽鍚戜紶鎾殑閽╁瓙锛屽湪 `backward()` 鍚庤嚜鍔ㄨЕ鍙?AllReduce 姊害鍚屾銆?
 
-### 3.4 权重保存与加载（跨设备）
+### 3.4 鏉冮噸淇濆瓨涓庡姞杞斤紙璺ㄨ澶囷級
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 # key-start
 if rank == 0:
-    # 只有 rank 0 保存权重，避免多个进程同时写文件
+    # 鍙湁 rank 0 淇濆瓨鏉冮噸锛岄伩鍏嶅涓繘绋嬪悓鏃跺啓鏂囦欢
     torch.save(ddp_model.state_dict(), ckpt_path)
 
-dist.barrier()  # 等待 rank 0 保存完成
+dist.barrier()  # 绛夊緟 rank 0 淇濆瓨瀹屾垚
 
-# 加载时需要做设备映射：cuda:0 → cuda:device_id
+# 鍔犺浇鏃堕渶瑕佸仛璁惧鏄犲皠锛歝uda:0 鈫?cuda:device_id
 map_location = {'cuda:0': f'cuda:{device_id}'}
 state_dict = torch.load(ckpt_path, map_location=map_location)
 ddp_model.load_state_dict(state_dict)
 # key-end
 ```
 
-`map_location` 是关键——保存的权重张量位于 `cuda:0`，但 rank 1 的模型在 `cuda:1` 上，需要做设备映射。
+`map_location` 鏄叧閿€斺€斾繚瀛樼殑鏉冮噸寮犻噺浣嶄簬 `cuda:0`锛屼絾 rank 1 鐨勬ā鍨嬪湪 `cuda:1` 涓婏紝闇€瑕佸仛璁惧鏄犲皠銆?
 
-### 3.5 训练循环
+### 3.5 璁粌寰幆
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 for epoch in range(2):
     # key-start
-    sampler.set_epoch(epoch)  # 每个 epoch 设置不同的随机种子，保证数据打乱不同
+    sampler.set_epoch(epoch)  # 姣忎釜 epoch 璁剧疆涓嶅悓鐨勯殢鏈虹瀛愶紝淇濊瘉鏁版嵁鎵撲贡涓嶅悓
     # key-end
     for x in dataloader:
         x = x.to(device_id)
         y = ddp_model(x)
         optimizer.zero_grad()
         loss = loss_fn(x, y)
-        loss.backward()     # DDP 自动在此之后同步梯度
+        loss.backward()     # DDP 鑷姩鍦ㄦ涔嬪悗鍚屾姊害
         optimizer.step()
 ```
 
-`sampler.set_epoch(epoch)` 很容易被遗忘——如果不设置，每个 epoch 的数据顺序相同，失去随机打乱的效果。
+`sampler.set_epoch(epoch)` 寰堝鏄撹閬楀繕鈥斺€斿鏋滀笉璁剧疆锛屾瘡涓?epoch 鐨勬暟鎹『搴忕浉鍚岋紝澶卞幓闅忔満鎵撲贡鐨勬晥鏋溿€?
 
-### 3.6 完整主函数
+### 3.6 瀹屾暣涓诲嚱鏁?
 
-```python title="dldemos/PyTorchDistributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
 def main():
     setup()
     rank = dist.get_rank()
@@ -189,7 +189,7 @@ def main():
     loss_fn = nn.MSELoss()
     optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
 
-    # ... 保存/加载权重（见上文） ...
+    # ... 淇濆瓨/鍔犺浇鏉冮噸锛堣涓婃枃锛?...
 
     for epoch in range(2):
         sampler.set_epoch(epoch)
@@ -206,44 +206,44 @@ def main():
 
 ---
 
-## 4. 运行方式
+## 4. 杩愯鏂瑰紡
 
-DDP 脚本不能用 `python main.py` 直接运行，需要用 `torchrun` 启动多进程：
+DDP 鑴氭湰涓嶈兘鐢?`python main.py` 鐩存帴杩愯锛岄渶瑕佺敤 `torchrun` 鍚姩澶氳繘绋嬶細
 
 ```bash
-# 单机 2 GPU
-torchrun --nproc_per_node=2 dldemos/PyTorchDistributed/main.py
+# 鍗曟満 2 GPU
+torchrun --nproc_per_node=2 chapters/engineering/pytorch_distributed/main.py
 
-# 单机 4 GPU
-torchrun --nproc_per_node=4 dldemos/PyTorchDistributed/main.py
+# 鍗曟満 4 GPU
+torchrun --nproc_per_node=4 chapters/engineering/pytorch_distributed/main.py
 
-# 双机，每机 2 GPU：主节点执行
-torchrun --nnodes=2 --node_rank=0 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
+# 鍙屾満锛屾瘡鏈?2 GPU锛氫富鑺傜偣鎵ц
+torchrun --nnodes=2 --node_rank=0 --nproc_per_node=2 --master_addr=涓昏妭鐐笽P --master_port=29500 chapters/engineering/pytorch_distributed/main.py
 
-# 第二个节点执行
-torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 dldemos/PyTorchDistributed/main.py
+# 绗簩涓妭鐐规墽琛?
+torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=涓昏妭鐐笽P --master_port=29500 chapters/engineering/pytorch_distributed/main.py
 ```
 
-`torchrun` 会自动设置 `RANK`、`WORLD_SIZE`、`MASTER_ADDR` 等环境变量，`init_process_group` 会读取这些变量完成初始化。
+`torchrun` 浼氳嚜鍔ㄨ缃?`RANK`銆乣WORLD_SIZE`銆乣MASTER_ADDR` 绛夌幆澧冨彉閲忥紝`init_process_group` 浼氳鍙栬繖浜涘彉閲忓畬鎴愬垵濮嬪寲銆?
 
 ---
 
-## 5. 常见陷阱
+## 5. 甯歌闄烽槺
 
-| 问题 | 说明 | 解决方法 |
+| 闂 | 璇存槑 | 瑙ｅ喅鏂规硶 |
 |------|------|---------|
-| 忘记 `set_epoch` | 每个 epoch 数据顺序相同 | 每轮循环开头调用 `sampler.set_epoch(epoch)` |
-| 所有 rank 都保存模型 | 多进程同时写文件导致冲突 | 只在 `rank == 0` 时保存 |
-| `map_location` 缺失 | 加载的权重在错误的 GPU 上 | 用 `{'cuda:0': f'cuda:{device_id}'}` 映射 |
-| 忘记 `cleanup()` | 进程组未销毁，资源泄漏 | 在 `finally` 或函数末尾调用 `cleanup()` |
-| `batch_size` 含义 | 是每个 GPU 的 batch size | 全局 batch size = batch_size × world_size |
+| 蹇樿 `set_epoch` | 姣忎釜 epoch 鏁版嵁椤哄簭鐩稿悓 | 姣忚疆寰幆寮€澶磋皟鐢?`sampler.set_epoch(epoch)` |
+| 鎵€鏈?rank 閮戒繚瀛樻ā鍨?| 澶氳繘绋嬪悓鏃跺啓鏂囦欢瀵艰嚧鍐茬獊 | 鍙湪 `rank == 0` 鏃朵繚瀛?|
+| `map_location` 缂哄け | 鍔犺浇鐨勬潈閲嶅湪閿欒鐨?GPU 涓?| 鐢?`{'cuda:0': f'cuda:{device_id}'}` 鏄犲皠 |
+| 蹇樿 `cleanup()` | 杩涚▼缁勬湭閿€姣侊紝璧勬簮娉勬紡 | 鍦?`finally` 鎴栧嚱鏁版湯灏捐皟鐢?`cleanup()` |
+| `batch_size` 鍚箟 | 鏄瘡涓?GPU 鐨?batch size | 鍏ㄥ眬 batch size = batch_size 脳 world_size |
 
 ---
 
-## 6. 延伸阅读
+## 6. 寤朵几闃呰
 
-- 📄 [PyTorch Distributed Data Parallel 官方教程](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
-- 📄 [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
-- 📄 [PyTorch Distributed: Experiences on Multi-Node Training（Li et al.，2020）](https://arxiv.org/abs/2006.15704)
-- 🔗 [本章源码：`dldemos/PyTorchDistributed/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/PyTorchDistributed)
-- ⬅️ **上一章**：[傅里叶特征](./fourier-feature)
+- 馃搫 [PyTorch Distributed Data Parallel 瀹樻柟鏁欑▼](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 馃搫 [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 馃搫 [PyTorch Distributed: Experiences on Multi-Node Training锛圠i et al.锛?020锛塢(https://arxiv.org/abs/2006.15704)
+- 馃敆 [鏈珷婧愮爜锛歚chapters/engineering/pytorch_distributed/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/pytorch_distributed)
+- 猬咃笍 **涓婁竴绔?*锛歔鍌呴噷鍙剁壒寰乚(./fourier-feature)

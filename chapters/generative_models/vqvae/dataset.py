@@ -58,7 +58,7 @@ class CelebADataset(Dataset):
 
 
 if TO_LMDB:
-    from dldemos.lmdb_loader import ImageFolderLMDB
+    from chapters.common.lmdb_loader import ImageFolderLMDB
 
     class CelebALMDBDataset(ImageFolderLMDB):
         def __init__(self, path, img_shape=(64, 64)):
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         img = transforms.ToPILImage()(img)
         img.save('work_dirs/vqvae/tmp_celeba.jpg')
         if TO_LMDB:
-            from dldemos.lmdb_loader import folder2lmdb
+            from chapters.common.lmdb_loader import folder2lmdb
 
             folder2lmdb(CELEBA_DIR, CELEBA_LMDB_PATH)
 
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         img = transforms.ToPILImage()(img)
         img.save('work_dirs/vqvae/tmp_celebahq.jpg')
         if TO_LMDB:
-            from dldemos.lmdb_loader import folder2lmdb
+            from chapters.common.lmdb_loader import folder2lmdb
 
             folder2lmdb(CELEBA_HQ_DIR, CELEBA_HQ_LMDB_PATH)
 

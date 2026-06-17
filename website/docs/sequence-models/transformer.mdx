@@ -1,32 +1,32 @@
----
+﻿---
 id: transformer
-title: Transformer — 从注意力到序列转换
+title: Transformer 鈥?浠庢敞鎰忓姏鍒板簭鍒楄浆鎹?
 sidebar_label: 4. Transformer
-description: 从零实现多头注意力、位置编码、Mask 和英译中推理。
+description: 浠庨浂瀹炵幇澶氬ご娉ㄦ剰鍔涖€佷綅缃紪鐮併€丮ask 鍜岃嫳璇戜腑鎺ㄧ悊銆?
 ---
 
-# Transformer — 从注意力到序列转换
+# Transformer 鈥?浠庢敞鎰忓姏鍒板簭鍒楄浆鎹?
 
-Transformer 用 Attention 替代循环结构，使序列位置可以并行计算。项目实现一个英语到中文的 Encoder-Decoder Transformer。
+Transformer 鐢?Attention 鏇夸唬寰幆缁撴瀯锛屼娇搴忓垪浣嶇疆鍙互骞惰璁＄畻銆傞」鐩疄鐜颁竴涓嫳璇埌涓枃鐨?Encoder-Decoder Transformer銆?
 
 ## 1. Scaled Dot-Product Attention
 
 $$\mathrm{Attention}(Q,K,V)=
 \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}+M\right)V$$
 
-$1/\sqrt{d_k}$ 防止点积随维度增大而让 Softmax 饱和。Multi-Head Attention 将特征拆成多个头，分别学习不同关系后再拼接。
+$1/\sqrt{d_k}$ 闃叉鐐圭Н闅忕淮搴﹀澶ц€岃 Softmax 楗卞拰銆侻ulti-Head Attention 灏嗙壒寰佹媶鎴愬涓ご锛屽垎鍒涔犱笉鍚屽叧绯诲悗鍐嶆嫾鎺ャ€?
 
-## 2. 位置与 Mask
+## 2. 浣嶇疆涓?Mask
 
-- 位置编码：为并行输入加入顺序信息。
-- Source padding mask：忽略英文输入中的补齐 token。
-- Target causal mask：禁止 Decoder 查看未来中文 token。
-- Source-target mask：Decoder 交叉注意力忽略英文 padding。
+- 浣嶇疆缂栫爜锛氫负骞惰杈撳叆鍔犲叆椤哄簭淇℃伅銆?
+- Source padding mask锛氬拷鐣ヨ嫳鏂囪緭鍏ヤ腑鐨勮ˉ榻?token銆?
+- Target causal mask锛氱姝?Decoder 鏌ョ湅鏈潵涓枃 token銆?
+- Source-target mask锛欴ecoder 浜ゅ弶娉ㄦ剰鍔涘拷鐣ヨ嫳鏂?padding銆?
 
-## 3. 训练契约
+## 3. 璁粌濂戠害
 
-`load_train_data()` 明确返回 `(english_source, chinese_target)`。训练输入使用中文目标序列去掉最后一个 token，标签使用去掉第一个 token 的序列。
-训练和推理都为英文源序列添加 `<S>`、`</S>`，并将词表外单词映射为 `<UNK>`，避免输入分布不一致。
+`load_train_data()` 鏄庣‘杩斿洖 `(english_source, chinese_target)`銆傝缁冭緭鍏ヤ娇鐢ㄤ腑鏂囩洰鏍囧簭鍒楀幓鎺夋渶鍚庝竴涓?token锛屾爣绛句娇鐢ㄥ幓鎺夌涓€涓?token 鐨勫簭鍒椼€?
+璁粌鍜屾帹鐞嗛兘涓鸿嫳鏂囨簮搴忓垪娣诲姞 `<S>`銆乣</S>`锛屽苟灏嗚瘝琛ㄥ鍗曡瘝鏄犲皠涓?`<UNK>`锛岄伩鍏嶈緭鍏ュ垎甯冧笉涓€鑷淬€?
 
 ```python
 y_input = y_batch[:, :-1]
@@ -34,9 +34,9 @@ y_label = y_batch[:, 1:]
 logits = model(x_batch, y_input)
 ```
 
-## 4. 自回归推理
+## 4. 鑷洖褰掓帹鐞?
 
-解码从中文词表的 `<S>` 开始，每一步选择当前最后位置的预测；生成 `</S>` 后停止，其余位置保持 padding。
+瑙ｇ爜浠庝腑鏂囪瘝琛ㄧ殑 `<S>` 寮€濮嬶紝姣忎竴姝ラ€夋嫨褰撳墠鏈€鍚庝綅缃殑棰勬祴锛涚敓鎴?`</S>` 鍚庡仠姝紝鍏朵綑浣嶇疆淇濇寔 padding銆?
 
 ```python
 y[:, 0] = start_id
@@ -52,9 +52,9 @@ for i in range(1, max_len):
 ```
 
 ```bash
-uv run python dldemos/Transformer/data_load.py
-uv run python dldemos/Transformer/train.py
-uv run python dldemos/Transformer/translate.py
+uv run python chapters/sequence_models/transformer/data_load.py
+uv run python chapters/sequence_models/transformer/train.py
+uv run python chapters/sequence_models/transformer/translate.py
 ```
 
-默认实现使用贪心解码，没有 beam search、学习率 warmup 或 KV cache，重点是展示 Transformer 数据流。
+榛樿瀹炵幇浣跨敤璐績瑙ｇ爜锛屾病鏈?beam search銆佸涔犵巼 warmup 鎴?KV cache锛岄噸鐐规槸灞曠ず Transformer 鏁版嵁娴併€?

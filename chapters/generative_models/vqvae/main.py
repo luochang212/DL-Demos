@@ -9,11 +9,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from chapters.common.utils.device import resolve_device
 from chapters.generative_models.vqvae.configs import get_cfg
 from chapters.generative_models.vqvae.dataset import get_dataloader
 from chapters.generative_models.vqvae.model import VQVAE
 from chapters.generative_models.vqvae.pixelcnn_model import PixelCNNWithEmbedding
-from dldemos.utils.device import resolve_device
 
 USE_LMDB = False
 

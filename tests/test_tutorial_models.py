@@ -7,27 +7,43 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from chapters.generative_models.vae.code.main import load_model as load_vae_model
-from chapters.generative_models.vae.code.main import loss_fn as vae_loss
-from chapters.generative_models.vae.code.model import VAE
-from dldemos.AdvancedOptimizer.model import DeepNetwork as OptimizerNetwork
-from dldemos.AdvancedOptimizer.optimizer import Adam, Momentum, RMSProp
-from dldemos.attention.main import AttentionModel, sequence_accuracy
-from dldemos.BasicRNN.main import load_model as load_rnn_model
-from dldemos.BasicRNN.models import RNN1, RNN2
-from dldemos.Initialization.main import DeepNetwork as InitializationNetwork
-from dldemos.LogisticRegression.main import loss as binary_cross_entropy
-from dldemos.MulticlassClassification.pt_main import MulticlassClassificationNet
-from dldemos.nms.iou import iou
-from dldemos.nms.nms import nms
-from dldemos.Regularization.main import DeepNetwork as RegularizationNetwork
-from dldemos.StyleTransfer.style_transfer import (
+from chapters.cv.nms.iou import iou
+from chapters.cv.nms.nms import nms
+from chapters.cv.style_transfer.style_transfer import (
     get_model_and_losses,
     gram,
     run_style_transfer,
 )
-from dldemos.Transformer.data_load import create_data, encode_source, get_batch_indices
-from dldemos.Transformer.translate import greedy_decode
+from chapters.fundamentals.logistic_regression.main import loss as binary_cross_entropy
+from chapters.fundamentals.multiclass_classification.pt_main import (
+    MulticlassClassificationNet,
+)
+from chapters.generative_models.vae.code.main import load_model as load_vae_model
+from chapters.generative_models.vae.code.main import loss_fn as vae_loss
+from chapters.generative_models.vae.code.model import VAE
+from chapters.sequence_models.attention.main import AttentionModel, sequence_accuracy
+from chapters.sequence_models.basic_rnn.main import load_model as load_rnn_model
+from chapters.sequence_models.basic_rnn.models import RNN1, RNN2
+from chapters.sequence_models.transformer.data_load import (
+    create_data,
+    encode_source,
+    get_batch_indices,
+)
+from chapters.sequence_models.transformer.translate import greedy_decode
+from chapters.training_tricks.advanced_optimizer.model import (
+    DeepNetwork as OptimizerNetwork,
+)
+from chapters.training_tricks.advanced_optimizer.optimizer import (
+    Adam,
+    Momentum,
+    RMSProp,
+)
+from chapters.training_tricks.initialization.main import (
+    DeepNetwork as InitializationNetwork,
+)
+from chapters.training_tricks.regularization.main import (
+    DeepNetwork as RegularizationNetwork,
+)
 
 
 class BasicNetworkTest(unittest.TestCase):
@@ -122,18 +138,18 @@ class EndTokenModel(nn.Module):
 class TransformerTest(unittest.TestCase):
     def test_create_data_uses_english_source_and_chinese_target_vocabularies(self):
         en_vocab = {'<PAD>': 0, '<UNK>': 1, '<S>': 2, '</S>': 3, 'hello': 4}
-        cn_vocab = {'<PAD>': 0, '<UNK>': 1, '<S>': 2, '</S>': 3, '你好': 5}
+        cn_vocab = {'<PAD>': 0, '<UNK>': 1, '<S>': 2, '</S>': 3, '浣犲ソ': 5}
         with (
             patch(
-                'dldemos.Transformer.data_load.load_en_vocab',
+                'chapters.sequence_models.transformer.data_load.load_en_vocab',
                 return_value=(en_vocab, {}),
             ),
             patch(
-                'dldemos.Transformer.data_load.load_cn_vocab',
+                'chapters.sequence_models.transformer.data_load.load_cn_vocab',
                 return_value=(cn_vocab, {}),
             ),
         ):
-            source, target, _, _ = create_data(['hello'], ['你好'])
+            source, target, _, _ = create_data(['hello'], ['浣犲ソ'])
 
         np.testing.assert_array_equal(source[0, :3], [2, 4, 3])
         np.testing.assert_array_equal(target[0, :3], [2, 5, 3])
@@ -251,15 +267,18 @@ class StyleTransferTest(unittest.TestCase):
 
         with (
             patch(
-                'dldemos.StyleTransfer.style_transfer.read_image',
+                'chapters.cv.style_transfer.style_transfer.read_image',
                 side_effect=[content, style],
             ),
             patch(
-                'dldemos.StyleTransfer.style_transfer.get_model_and_losses',
+                'chapters.cv.style_transfer.style_transfer.get_model_and_losses',
                 return_value=losses,
             ),
-            patch('dldemos.StyleTransfer.style_transfer.optim.LBFGS', OneStepOptimizer),
-            patch('dldemos.StyleTransfer.style_transfer.save_image') as save_image,
+            patch(
+                'chapters.cv.style_transfer.style_transfer.optim.LBFGS',
+                OneStepOptimizer,
+            ),
+            patch('chapters.cv.style_transfer.style_transfer.save_image') as save_image,
         ):
             result = run_style_transfer('content', 'style', 'output', num_steps=1)
 

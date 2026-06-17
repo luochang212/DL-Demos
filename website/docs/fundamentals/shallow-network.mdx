@@ -25,7 +25,7 @@ $$dZ^{[2]}=A^{[2]}-Y,\qquad dA^{[1]}=(W^{[2]})^TdZ^{[2]}$$
 
 $$dZ^{[1]}=dA^{[1]}\odot \mathrm{ReLU}'(Z^{[1]})$$
 
-对应代码位于 `dldemos/ShallowNetwork/model.py`。
+对应代码位于 `chapters/fundamentals/shallow_network/model.py`。
 
 ## 3. 代码解析
 
@@ -41,7 +41,7 @@ A2 = sigmoid(Z2)
 ## 4. 实验
 
 ```bash
-uv run python dldemos/ShallowNetwork/points_classification.py
+uv run python -m chapters.fundamentals.shallow_network.points_classification
 ```
 
 脚本对比 Logistic Regression 与不同隐藏单元数量的浅层网络。隐藏单元增加会提高表达能力，也会增加过拟合和优化成本。

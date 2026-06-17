@@ -1,37 +1,37 @@
----
+﻿---
 id: iou-nms
-title: 目标检测基础 — IoU 与 NMS
-sidebar_label: 4. IoU 与 NMS
-description: 理解目标框表示、交并比与非极大值抑制，并逐步解析 NumPy 教学实现。
-keywords: [目标检测, Bounding Box, IoU, NMS, Non-Maximum Suppression]
+title: 鐩爣妫€娴嬪熀纭€ 鈥?IoU 涓?NMS
+sidebar_label: 4. IoU 涓?NMS
+description: 鐞嗚В鐩爣妗嗚〃绀恒€佷氦骞舵瘮涓庨潪鏋佸ぇ鍊兼姂鍒讹紝骞堕€愭瑙ｆ瀽 NumPy 鏁欏瀹炵幇銆?
+keywords: [鐩爣妫€娴? Bounding Box, IoU, NMS, Non-Maximum Suppression]
 ---
 
-# 目标检测基础 — IoU 与 NMS
+# 鐩爣妫€娴嬪熀纭€ 鈥?IoU 涓?NMS
 
-目标检测模型通常会为同一个物体输出多个重叠候选框。IoU 衡量两个框的重叠程度，NMS 根据置信度与 IoU 删除重复预测。
+鐩爣妫€娴嬫ā鍨嬮€氬父浼氫负鍚屼竴涓墿浣撹緭鍑哄涓噸鍙犲€欓€夋銆侷oU 琛￠噺涓や釜妗嗙殑閲嶅彔绋嬪害锛孨MS 鏍规嵁缃俊搴︿笌 IoU 鍒犻櫎閲嶅棰勬祴銆?
 
-## 1. Bounding Box 表示
+## 1. Bounding Box 琛ㄧず
 
-本项目统一使用：
+鏈」鐩粺涓€浣跨敤锛?
 
 $$b=(x_1,y_1,x_2,y_2)$$
 
-其中 $(x_1,y_1)$ 是左上角，$(x_2,y_2)$ 是右下角。宽高与面积为：
+鍏朵腑 $(x_1,y_1)$ 鏄乏涓婅锛?(x_2,y_2)$ 鏄彸涓嬭銆傚楂樹笌闈㈢Н涓猴細
 
 $$w=\max(x_2-x_1,0),\qquad h=\max(y_2-y_1,0),\qquad A=wh$$
 
-使用 `max(..., 0)` 可以让不相交区域的面积保持为零。
+浣跨敤 `max(..., 0)` 鍙互璁╀笉鐩镐氦鍖哄煙鐨勯潰绉繚鎸佷负闆躲€?
 
 ## 2. IoU
 
-交并比（Intersection over Union）定义为：
+浜ゅ苟姣旓紙Intersection over Union锛夊畾涔変负锛?
 
 $$\mathrm{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}
 =\frac{|A\cap B|}{|A|+|B|-|A\cap B|}$$
 
-IoU 越接近 1，两个框越相似；完全不相交时为 0。两个框都没有面积时并集也为零，源码将结果定义为 0，避免除零。
+IoU 瓒婃帴杩?1锛屼袱涓瓒婄浉浼硷紱瀹屽叏涓嶇浉浜ゆ椂涓?0銆備袱涓閮芥病鏈夐潰绉椂骞堕泦涔熶负闆讹紝婧愮爜灏嗙粨鏋滃畾涔変负 0锛岄伩鍏嶉櫎闆躲€?
 
-```python title="dldemos/nms/iou.py"
+```python title="chapters/cv/nms/iou.py"
 def iou(b1, b2):
     intersection = box_intersection(b1, b2)
     inter_area = area(intersection)
@@ -43,12 +43,12 @@ def iou(b1, b2):
 
 ## 3. Non-Maximum Suppression
 
-NMS 对候选框重复执行以下步骤：
+NMS 瀵瑰€欓€夋閲嶅鎵ц浠ヤ笅姝ラ锛?
 
-1. 删除低于 `score_thresh` 的候选框。
-2. 从剩余框中选择置信度最高的框并保留。
-3. 删除与该框 IoU 高于 `iou_thresh` 的其他框。
-4. 直到没有候选框。
+1. 鍒犻櫎浣庝簬 `score_thresh` 鐨勫€欓€夋銆?
+2. 浠庡墿浣欐涓€夋嫨缃俊搴︽渶楂樼殑妗嗗苟淇濈暀銆?
+3. 鍒犻櫎涓庤妗?IoU 楂樹簬 `iou_thresh` 鐨勫叾浠栨銆?
+4. 鐩村埌娌℃湁鍊欓€夋銆?
 
 ```python
 while remaining_boxes:
@@ -60,17 +60,17 @@ while remaining_boxes:
     ]
 ```
 
-较低的 IoU 阈值会更积极地删除重叠框，可能漏掉靠得很近的物体；较高阈值会保留更多重复框。
+杈冧綆鐨?IoU 闃堝€间細鏇寸Н鏋佸湴鍒犻櫎閲嶅彔妗嗭紝鍙兘婕忔帀闈犲緱寰堣繎鐨勭墿浣擄紱杈冮珮闃堝€间細淇濈暀鏇村閲嶅妗嗐€?
 
-## 4. 代码解析
+## 4. 浠ｇ爜瑙ｆ瀽
 
-`dldemos/nms/nms.py` 的每行预测格式为：
+`chapters/cv/nms/nms.py` 鐨勬瘡琛岄娴嬫牸寮忎负锛?
 
 ```text
 [score, x1, y1, x2, y2]
 ```
 
-函数同时返回保留的预测和原始索引：
+鍑芥暟鍚屾椂杩斿洖淇濈暀鐨勯娴嬪拰鍘熷绱㈠紩锛?
 
 ```python
 filtered_predicts, indices = nms(
@@ -80,33 +80,33 @@ filtered_predicts, indices = nms(
 )
 ```
 
-实现使用显式循环，时间复杂度约为 $O(N^2)$。它适合解释算法，不适合替代框架中经过向量化或硬件优化的 NMS。
+瀹炵幇浣跨敤鏄惧紡寰幆锛屾椂闂村鏉傚害绾︿负 $O(N^2)$銆傚畠閫傚悎瑙ｉ噴绠楁硶锛屼笉閫傚悎鏇夸唬妗嗘灦涓粡杩囧悜閲忓寲鎴栫‖浠朵紭鍖栫殑 NMS銆?
 
-## 5. 类别边界
+## 5. 绫诲埆杈圭晫
 
-本项目实现是**类别无关 NMS**：只根据分数和几何重叠做抑制。如果把不同类别的框一起输入，重叠的“人”和“自行车”也可能互相删除。
+鏈」鐩疄鐜版槸**绫诲埆鏃犲叧 NMS**锛氬彧鏍规嵁鍒嗘暟鍜屽嚑浣曢噸鍙犲仛鎶戝埗銆傚鏋滄妸涓嶅悓绫诲埆鐨勬涓€璧疯緭鍏ワ紝閲嶅彔鐨勨€滀汉鈥濆拰鈥滆嚜琛岃溅鈥濅篃鍙兘浜掔浉鍒犻櫎銆?
 
-多类别检测器通常应先按类别分组，再分别执行 NMS；完整检测框架还会处理批次、每类阈值和最大输出数量。这些内容不属于当前教学实现。
+澶氱被鍒娴嬪櫒閫氬父搴斿厛鎸夌被鍒垎缁勶紝鍐嶅垎鍒墽琛?NMS锛涘畬鏁存娴嬫鏋惰繕浼氬鐞嗘壒娆°€佹瘡绫婚槇鍊煎拰鏈€澶ц緭鍑烘暟閲忋€傝繖浜涘唴瀹逛笉灞炰簬褰撳墠鏁欏瀹炵幇銆?
 
-## 6. 运行与验证
+## 6. 杩愯涓庨獙璇?
 
-核心算法不依赖外部图片，可直接运行测试：
+鏍稿績绠楁硶涓嶄緷璧栧閮ㄥ浘鐗囷紝鍙洿鎺ヨ繍琛屾祴璇曪細
 
 ```bash
 uv run pytest tests/test_tutorial_models.py -k DetectionPostprocessing
 ```
 
-测试覆盖相同框、无重叠框、零面积框、低分过滤和高重叠框抑制。
+娴嬭瘯瑕嗙洊鐩稿悓妗嗐€佹棤閲嶅彔妗嗐€侀浂闈㈢Н妗嗐€佷綆鍒嗚繃婊ゅ拰楂橀噸鍙犳鎶戝埗銆?
 
-可视化脚本需要自行准备 `work_dirs/detection_demo.jpg`：
+鍙鍖栬剼鏈渶瑕佽嚜琛屽噯澶?`work_dirs/detection_demo.jpg`锛?
 
 ```bash
-uv run python dldemos/nms/iou.py
-uv run python dldemos/nms/nms.py
+uv run python chapters/cv/nms/iou.py
+uv run python chapters/cv/nms/nms.py
 ```
 
-## 7. 延伸阅读
+## 7. 寤朵几闃呰
 
-- Soft-NMS：不直接删除重叠框，而是降低其分数。
-- DIoU-NMS：在 IoU 之外考虑中心点距离。
-- `torchvision.ops.nms`：生产代码优先使用框架优化实现。
+- Soft-NMS锛氫笉鐩存帴鍒犻櫎閲嶅彔妗嗭紝鑰屾槸闄嶄綆鍏跺垎鏁般€?
+- DIoU-NMS锛氬湪 IoU 涔嬪鑰冭檻涓績鐐硅窛绂汇€?
+- `torchvision.ops.nms`锛氱敓浜т唬鐮佷紭鍏堜娇鐢ㄦ鏋朵紭鍖栧疄鐜般€?

@@ -5,10 +5,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from chapters.cv.basic_cnn import dataset as cnn_dataset
 from chapters.generative_models.ddim.ddim import DDIM
 from chapters.generative_models.pixelcnn.model import GatedPixelCNN, PixelCNN
-from dldemos.BasicCNN import dataset as cnn_dataset
-from dldemos.Regularization.main import DeepNetwork
+from chapters.training_tricks.regularization.main import DeepNetwork
 
 
 class ZeroNoisePredictor(nn.Module):

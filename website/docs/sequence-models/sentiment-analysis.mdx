@@ -1,98 +1,98 @@
----
+﻿---
 id: sentiment-analysis
-title: 情感分析 — RNN 的 NLP 实战
-sidebar_label: 2. 情感分析
-description: 使用 GloVe 词向量和 GRU 构建 IMDB 影评情感分类器，掌握文本数据的预处理、词嵌入和序列分类的完整流程。
-keywords: [情感分析, GloVe, 词向量, GRU, IMDB, NLP, PyTorch]
+title: 鎯呮劅鍒嗘瀽 鈥?RNN 鐨?NLP 瀹炴垬
+sidebar_label: 2. 鎯呮劅鍒嗘瀽
+description: 浣跨敤 GloVe 璇嶅悜閲忓拰 GRU 鏋勫缓 IMDB 褰辫瘎鎯呮劅鍒嗙被鍣紝鎺屾彙鏂囨湰鏁版嵁鐨勯澶勭悊銆佽瘝宓屽叆鍜屽簭鍒楀垎绫荤殑瀹屾暣娴佺▼銆?
+keywords: [鎯呮劅鍒嗘瀽, GloVe, 璇嶅悜閲? GRU, IMDB, NLP, PyTorch]
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-:::caution Legacy 依赖
-本章源码依赖已停止维护的 `torchtext`，不属于项目默认 Python 3.13 环境的可运行性承诺。算法说明与源码仍作为教学材料保留。
+:::caution Legacy 渚濊禆
+鏈珷婧愮爜渚濊禆宸插仠姝㈢淮鎶ょ殑 `torchtext`锛屼笉灞炰簬椤圭洰榛樿 Python 3.13 鐜鐨勫彲杩愯鎬ф壙璇恒€傜畻娉曡鏄庝笌婧愮爜浠嶄綔涓烘暀瀛︽潗鏂欎繚鐣欍€?
 :::
 
-# 情感分析 — RNN 的 NLP 实战
+# 鎯呮劅鍒嗘瀽 鈥?RNN 鐨?NLP 瀹炴垬
 
-:::tip 本章要点
-- 理解 **GloVe 词向量**：如何把词语编码成有意义的实数向量
-- 掌握**文本分类流程**：分词 → 词嵌入 → GRU 编码 → 分类
-- 理解 **变长序列处理**：`pad_sequence` 和 `collate_fn`
-- 读懂 [`dldemos/SentimentAnalysis/main.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/SentimentAnalysis/main.py) 的完整实现
+:::tip 鏈珷瑕佺偣
+- 鐞嗚В **GloVe 璇嶅悜閲?*锛氬浣曟妸璇嶈缂栫爜鎴愭湁鎰忎箟鐨勫疄鏁板悜閲?
+- 鎺屾彙**鏂囨湰鍒嗙被娴佺▼**锛氬垎璇?鈫?璇嶅祵鍏?鈫?GRU 缂栫爜 鈫?鍒嗙被
+- 鐞嗚В **鍙橀暱搴忓垪澶勭悊**锛歚pad_sequence` 鍜?`collate_fn`
+- 璇绘噦 [`chapters/sequence_models/sentiment_analysis/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/sentiment_analysis/main.py) 鐨勫畬鏁村疄鐜?
 :::
 
 ---
 
-## 1. 任务定义
+## 1. 浠诲姟瀹氫箟
 
-**情感分析**（Sentiment Analysis）：给定一段影评文本，判断其情感极性（正面/负面）。
+**鎯呮劅鍒嗘瀽**锛圫entiment Analysis锛夛細缁欏畾涓€娈靛奖璇勬枃鏈紝鍒ゆ柇鍏舵儏鎰熸瀬鎬э紙姝ｉ潰/璐熼潰锛夈€?
 
-数据集：[IMDB Movie Review](https://ai.stanford.edu/~amaas/data/sentiment/)，包含 50,000 条影评，正面和负面各占一半。
+鏁版嵁闆嗭細[IMDB Movie Review](https://ai.stanford.edu/~amaas/data/sentiment/)锛屽寘鍚?50,000 鏉″奖璇勶紝姝ｉ潰鍜岃礋闈㈠悇鍗犱竴鍗娿€?
 
-这是一个典型的**序列分类**任务：
-- 输入：变长文本序列
-- 输出：二分类标签（positive / negative）
+杩欐槸涓€涓吀鍨嬬殑**搴忓垪鍒嗙被**浠诲姟锛?
+- 杈撳叆锛氬彉闀挎枃鏈簭鍒?
+- 杈撳嚭锛氫簩鍒嗙被鏍囩锛坧ositive / negative锛?
 
 ---
 
-## 2. 数学原理
+## 2. 鏁板鍘熺悊
 
-### 2.1 词嵌入
+### 2.1 璇嶅祵鍏?
 
-文本不能直接输入神经网络，需要先把每个词编码成数值向量。最简单的方式是 one-hot，但 one-hot 有两个问题：
-1. **维度极高**（词汇表可能有几万个词）
-2. **无法表达词义关系**（「猫」和「狗」的向量距离和「猫」和「汽车」一样远）
+鏂囨湰涓嶈兘鐩存帴杈撳叆绁炵粡缃戠粶锛岄渶瑕佸厛鎶婃瘡涓瘝缂栫爜鎴愭暟鍊煎悜閲忋€傛渶绠€鍗曠殑鏂瑰紡鏄?one-hot锛屼絾 one-hot 鏈変袱涓棶棰橈細
+1. **缁村害鏋侀珮**锛堣瘝姹囪〃鍙兘鏈夊嚑涓囦釜璇嶏級
+2. **鏃犳硶琛ㄨ揪璇嶄箟鍏崇郴**锛堛€岀尗銆嶅拰銆岀嫍銆嶇殑鍚戦噺璺濈鍜屻€岀尗銆嶅拰銆屾苯杞︺€嶄竴鏍疯繙锛?
 
-**GloVe**（Global Vectors for Word Representation）通过在大规模语料上统计词共现矩阵，将每个词映射到一个低维稠密向量（如 100 维），使得语义相近的词在向量空间中距离相近。
+**GloVe**锛圙lobal Vectors for Word Representation锛夐€氳繃鍦ㄥぇ瑙勬ā璇枡涓婄粺璁¤瘝鍏辩幇鐭╅樀锛屽皢姣忎釜璇嶆槧灏勫埌涓€涓綆缁寸瀵嗗悜閲忥紙濡?100 缁达級锛屼娇寰楄涔夌浉杩戠殑璇嶅湪鍚戦噺绌洪棿涓窛绂荤浉杩戙€?
 
-### 2.2 词向量类比
+### 2.2 璇嶅悜閲忕被姣?
 
-GloVe 词向量有一个著名的性质——**类比推理**：
+GloVe 璇嶅悜閲忔湁涓€涓憲鍚嶇殑鎬ц川鈥斺€?*绫绘瘮鎺ㄧ悊**锛?
 
 $$
 \vec{king} - \vec{man} + \vec{woman} \approx \vec{queen}
 $$
 
-本项目 [`dldemos/SentimentAnalysis/glove.py`](https://github.com/luochang212/DL-Demos/blob/master/dldemos/SentimentAnalysis/glove.py) 中实现了类比推理的验证：
+鏈」鐩?[`chapters/sequence_models/sentiment_analysis/glove.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/sentiment_analysis/glove.py) 涓疄鐜颁簡绫绘瘮鎺ㄧ悊鐨勯獙璇侊細
 
-```python title="dldemos/SentimentAnalysis/glove.py"
+```python title="chapters/sequence_models/sentiment_analysis/glove.py"
 def get_counterpart(x1, y1, x2):
     """Find y2 that makes x1-y1 = x2-y2."""
     target = x2_vec - x1_vec + y1_vec
-    # 在词汇表中按余弦相似度寻找最接近 target 的词向量
+    # 鍦ㄨ瘝姹囪〃涓寜浣欏鸡鐩镐技搴﹀鎵炬渶鎺ヨ繎 target 鐨勮瘝鍚戦噺
     # ...
 
-print(get_counterpart('man', 'woman', 'king'))    # → queen
-print(get_counterpart('more', 'less', 'long'))    # → shorter
-print(get_counterpart('apple', 'red', 'banana'))  # → yellow
+print(get_counterpart('man', 'woman', 'king'))    # 鈫?queen
+print(get_counterpart('more', 'less', 'long'))    # 鈫?shorter
+print(get_counterpart('apple', 'red', 'banana'))  # 鈫?yellow
 ```
 
-### 2.3 序列分类的 RNN 架构
+### 2.3 搴忓垪鍒嗙被鐨?RNN 鏋舵瀯
 
 ```
 "This movie is great"
-     ↓   ↓    ↓    ↓
-   [G] [G]  [G]  [G]    ← GloVe 词向量 (100维)
-     ↓   ↓    ↓    ↓
-   [GRU]→[GRU]→[GRU]→[GRU]  ← GRU 逐词编码
-                       ↓
-                    取最后隐藏状态
-                       ↓
-                  Linear → Sigmoid
-                       ↓
-                   正面 / 负面
+     鈫?  鈫?   鈫?   鈫?
+   [G] [G]  [G]  [G]    鈫?GloVe 璇嶅悜閲?(100缁?
+     鈫?  鈫?   鈫?   鈫?
+   [GRU]鈫抂GRU]鈫抂GRU]鈫抂GRU]  鈫?GRU 閫愯瘝缂栫爜
+                       鈫?
+                    鍙栨渶鍚庨殣钘忕姸鎬?
+                       鈫?
+                  Linear 鈫?Sigmoid
+                       鈫?
+                   姝ｉ潰 / 璐熼潰
 ```
 
-RNN 从左到右处理每个词，最后取**每条序列真实末尾的隐藏状态**作为整个句子的表示，送入分类器；批处理中的 padding 不应参与编码。
+RNN 浠庡乏鍒板彸澶勭悊姣忎釜璇嶏紝鏈€鍚庡彇**姣忔潯搴忓垪鐪熷疄鏈熬鐨勯殣钘忕姸鎬?*浣滀负鏁翠釜鍙ュ瓙鐨勮〃绀猴紝閫佸叆鍒嗙被鍣紱鎵瑰鐞嗕腑鐨?padding 涓嶅簲鍙備笌缂栫爜銆?
 
 ---
 
-## 3. 代码解析
+## 3. 浠ｇ爜瑙ｆ瀽
 
-### 3.1 数据加载与预处理
+### 3.1 鏁版嵁鍔犺浇涓庨澶勭悊
 
-```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
 GLOVE_DIM = 100
 GLOVE = GloVe(name='6B', dim=GLOVE_DIM)
 
@@ -107,23 +107,23 @@ class IMDBDataset(Dataset):
     def __getitem__(self, index):
         sentence = self.tokenizer(self.lines[index])
         # key-start
-        x = GLOVE.get_vecs_by_tokens(sentence)  # 每个词 → 100维 GloVe 向量
+        x = GLOVE.get_vecs_by_tokens(sentence)  # 姣忎釜璇?鈫?100缁?GloVe 鍚戦噺
         label = 1 if index < self.pos_length else 0
         # key-end
         return x, label
 ```
 
-### 3.2 变长序列的批处理
+### 3.2 鍙橀暱搴忓垪鐨勬壒澶勭悊
 
-不同影评长度不同，无法直接组成 batch。用 `pad_sequence` 填充到同一长度：
+涓嶅悓褰辫瘎闀垮害涓嶅悓锛屾棤娉曠洿鎺ョ粍鎴?batch銆傜敤 `pad_sequence` 濉厖鍒板悓涓€闀垮害锛?
 
-```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
 def get_dataloader(dir='data/aclImdb'):
     # key-start
     def collate_fn(batch):
         x, y = zip(*batch)
         lengths = torch.tensor([len(sentence) for sentence in x])
-        x_pad = pad_sequence(x, batch_first=True)  # 填充到 batch 内最大长度
+        x_pad = pad_sequence(x, batch_first=True)  # 濉厖鍒?batch 鍐呮渶澶ч暱搴?
         y = torch.Tensor(y)
         return x_pad, lengths, y
     # key-end
@@ -133,9 +133,9 @@ def get_dataloader(dir='data/aclImdb'):
     return train_dataloader, ...
 ```
 
-### 3.3 分类模型
+### 3.3 鍒嗙被妯″瀷
 
-```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
 class RNN(torch.nn.Module):
     def __init__(self, hidden_units=64, dropout_rate=0.5):
         super().__init__()
@@ -147,23 +147,23 @@ class RNN(torch.nn.Module):
         # key-end
 
     def forward(self, x, lengths):
-        emb = self.drop(x)                # Dropout 正则化
+        emb = self.drop(x)                # Dropout 姝ｅ垯鍖?
         # key-start
-        # 打包变长序列，让 GRU 跳过 padding
+        # 鎵撳寘鍙橀暱搴忓垪锛岃 GRU 璺宠繃 padding
         packed = pack_padded_sequence(emb, lengths.cpu(),
                                       batch_first=True,
                                       enforce_sorted=False)
         _, hidden = self.rnn(packed)
-        output = self.linear(hidden[-1])  # 每条影评真实末尾的隐藏状态
-        output = self.sigmoid(output)     # 二分类概率
+        output = self.linear(hidden[-1])  # 姣忔潯褰辫瘎鐪熷疄鏈熬鐨勯殣钘忕姸鎬?
+        output = self.sigmoid(output)     # 浜屽垎绫绘鐜?
         # key-end
         return output
 ```
 
-### 3.4 训练与评估
+### 3.4 璁粌涓庤瘎浼?
 
-```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
-# 训练
+```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+# 璁粌
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 citerion = nn.BCELoss()
 for epoch in range(100):
@@ -172,10 +172,10 @@ for epoch in range(100):
         loss = citerion(hat_y.squeeze(-1), y)
         optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 梯度裁剪
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)  # 姊害瑁佸壀
         optimizer.step()
 
-# 评估
+# 璇勪及
 model.eval()
 for x, lengths, y in test_dataloader:
     with torch.no_grad():
@@ -184,9 +184,9 @@ for x, lengths, y in test_dataloader:
     accuracy = torch.mean((predictions == y).float())
 ```
 
-### 3.5 推理：对新文本做情感判断
+### 3.5 鎺ㄧ悊锛氬鏂版枃鏈仛鎯呮劅鍒ゆ柇
 
-```python title="dldemos/SentimentAnalysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
 tokenizer = get_tokenizer('basic_english')
 article = 'U.S. stock indexes fell Tuesday, driven by expectations for ' \
     'tighter Federal Reserve policy...'
@@ -202,26 +202,26 @@ result = 'positive' if hat_y.item() > 0.5 else 'negative'
 
 ---
 
-## 4. 模型架构总结
+## 4. 妯″瀷鏋舵瀯鎬荤粨
 
 ```
-输入: 变长英文文本
-  ↓ basic_english tokenizer 分词
-  ↓ GloVe(6B, 100d) 词嵌入
-  ↓ Dropout(0.5)
-  ↓ pack_padded_sequence 跳过 padding
-  ↓ GRU(input=100, hidden=64, layers=1)
-  ↓ 取每条影评真实末尾的隐藏状态 (64维)
-  ↓ Linear(64 → 1)
-  ↓ Sigmoid
-输出: 情感概率 [0, 1]
+杈撳叆: 鍙橀暱鑻辨枃鏂囨湰
+  鈫?basic_english tokenizer 鍒嗚瘝
+  鈫?GloVe(6B, 100d) 璇嶅祵鍏?
+  鈫?Dropout(0.5)
+  鈫?pack_padded_sequence 璺宠繃 padding
+  鈫?GRU(input=100, hidden=64, layers=1)
+  鈫?鍙栨瘡鏉″奖璇勭湡瀹炴湯灏剧殑闅愯棌鐘舵€?(64缁?
+  鈫?Linear(64 鈫?1)
+  鈫?Sigmoid
+杈撳嚭: 鎯呮劅姒傜巼 [0, 1]
 ```
 
 ---
 
-## 5. 延伸阅读
+## 5. 寤朵几闃呰
 
-- 📄 [GloVe: Global Vectors for Word Representation（Pennington et al.，2014）](https://nlp.stanford.edu/pubs/glove.pdf)
-- 📄 [IMDB Dataset（Maas et al.，2011）](https://ai.stanford.edu/~amaas/data/sentiment/)
-- 🔗 [本章源码：`dldemos/SentimentAnalysis/`](https://github.com/luochang212/DL-Demos/tree/master/dldemos/SentimentAnalysis)
-- ⬅️ **上一章**：[RNN — 循环神经网络](./rnn)
+- 馃搫 [GloVe: Global Vectors for Word Representation锛圥ennington et al.锛?014锛塢(https://nlp.stanford.edu/pubs/glove.pdf)
+- 馃搫 [IMDB Dataset锛圡aas et al.锛?011锛塢(https://ai.stanford.edu/~amaas/data/sentiment/)
+- 馃敆 [鏈珷婧愮爜锛歚chapters/sequence_models/sentiment_analysis/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/sentiment_analysis)
+- 猬咃笍 **涓婁竴绔?*锛歔RNN 鈥?寰幆绁炵粡缃戠粶](./rnn)

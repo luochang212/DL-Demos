@@ -1,0 +1,4 @@
+name: multiclass_classification_smoke
+description: Minimal multiclass classifier forward/backward and visualization smoke run.
+data: synthetic_points
+output: work_dirs/multiclass_classification/smoke.png

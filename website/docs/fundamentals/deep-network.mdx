@@ -26,7 +26,7 @@ $$dZ^{[l]}=dA^{[l]}\odot g'^{[l]}(Z^{[l]})$$
 $$dW^{[l]}=\frac{1}{m}dZ^{[l]}(A^{[l-1]})^T,\qquad
 dA^{[l-1]}=(W^{[l]})^TdZ^{[l]}$$
 
-实现位于 `dldemos/DeepNetwork/model.py`。
+实现位于 `chapters/fundamentals/deep_network/model.py`。
 
 ## 3. 代码解析
 
@@ -43,7 +43,7 @@ for i in range(self.num_layer):
 准备猫狗数据集后运行：
 
 ```bash
-uv run python dldemos/DeepNetwork/main.py
+uv run python -m chapters.fundamentals.deep_network.main
 ```
 
 深层网络更难优化。继续学习参数初始化、正则化和优化器，才能理解如何让它可靠训练。

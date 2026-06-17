@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from chapters.common.utils.device import resolve_device
 from chapters.generative_models.ddpm.dataset import get_dataloader, get_img_shape
 from chapters.generative_models.ddpm.ddpm_simple import DDPM
 from chapters.generative_models.ddpm.network import (
@@ -17,7 +18,6 @@ from chapters.generative_models.ddpm.network import (
     unet_1_cfg,
     unet_res_cfg,
 )
-from dldemos.utils.device import resolve_device
 
 batch_size = 512
 n_epochs = 100

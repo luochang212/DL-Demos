@@ -6,9 +6,9 @@ import torch
 import torch.nn.functional as F
 from torchvision.transforms import ToPILImage
 
+from chapters.common.utils.device import resolve_device
 from chapters.generative_models.vae.code.dataset import get_dataloader
 from chapters.generative_models.vae.code.model import VAE
-from dldemos.utils.device import resolve_device
 
 # Hyperparameters
 n_epochs = 10
