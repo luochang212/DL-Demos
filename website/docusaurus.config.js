@@ -74,12 +74,6 @@ const config = {
         },
         items: [
           {
-            type: 'docSidebar',
-            sidebarId: 'tutorialSidebar',
-            position: 'left',
-            label: '📚 教程',
-          },
-          {
             href: 'https://github.com/luochang212/DL-Demos',
             label: 'GitHub',
             position: 'right',
