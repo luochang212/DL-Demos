@@ -22,16 +22,6 @@ slug: /
 | 3 | [深层 MLP](./fundamentals/deep-network) | 通用前向与反向传播 |
 | 4 | [多分类](./fundamentals/multiclass-classification) | Logits + Softmax 交叉熵 |
 
-## 🎨 生成模型系列
-
-| 章节 | 算法 | 核心思想 |
-|------|------|---------|
-| 1 | [VAE](./generative-models/vae) | 隐变量模型 + 重参数化技巧 |
-| 2 | [DDPM](./generative-models/ddpm) | 马尔可夫链扩散 + 去噪分数匹配 |
-| 3 | [DDIM](./generative-models/ddim) | 非马尔可夫加速采样（20步 ≈ 1000步）|
-| 4 | [PixelCNN](./generative-models/pixelcnn) | 自回归像素生成 + 掩码卷积 |
-| 5 | [VQVAE](./generative-models/vqvae) | 离散隐空间 + Codebook 向量量化 |
-
 ## ⚙️ 训练技巧系列
 
 | 章节 | 算法 | 核心思想 |
@@ -39,13 +29,6 @@ slug: /
 | 1 | [参数初始化](./training-tricks/initialization) | He 初始化 vs 随机初始化 vs 全零初始化 |
 | 2 | [正则化](./training-tricks/regularization) | Weight Decay + Dropout 防过拟合 |
 | 3 | [优化器](./training-tricks/optimizer) | SGD → Momentum → RMSProp → Adam |
-
-## 🚀 工程实践系列
-
-| 章节 | 算法 | 核心思想 |
-|------|------|---------|
-| 1 | [傅里叶特征](./engineering/fourier-feature) | 频谱偏置 + Fourier Feature 映射 |
-| 2 | [分布式训练](./engineering/distributed) | PyTorch DDP 数据并行 |
 
 ## 🖼️ CNN 与视觉系列
 
@@ -64,6 +47,23 @@ slug: /
 | 2 | [情感分析](./sequence-models/sentiment-analysis) | GloVe 词向量 + GRU 文本分类 |
 | 3 | [Attention](./sequence-models/attention) | 对齐分数 + 上下文向量 |
 | 4 | [Transformer](./sequence-models/transformer) | 多头注意力 + Mask |
+
+## 🎨 生成模型系列
+
+| 章节 | 算法 | 核心思想 |
+|------|------|---------|
+| 1 | [VAE](./generative-models/vae) | 隐变量模型 + 重参数化技巧 |
+| 2 | [DDPM](./generative-models/ddpm) | 马尔可夫链扩散 + 去噪分数匹配 |
+| 3 | [DDIM](./generative-models/ddim) | 非马尔可夫加速采样（20步 ≈ 1000步）|
+| 4 | [PixelCNN](./generative-models/pixelcnn) | 自回归像素生成 + 掩码卷积 |
+| 5 | [VQVAE](./generative-models/vqvae) | 离散隐空间 + Codebook 向量量化 |
+
+## 🚀 工程实践系列
+
+| 章节 | 算法 | 核心思想 |
+|------|------|---------|
+| 1 | [傅里叶特征](./engineering/fourier-feature) | 频谱偏置 + Fourier Feature 映射 |
+| 2 | [分布式训练](./engineering/distributed) | PyTorch DDP 数据并行 |
 
 ---
 
