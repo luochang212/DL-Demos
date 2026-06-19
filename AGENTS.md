@@ -137,6 +137,73 @@ Allowed shared utilities once duplication is real:
 Do not create generic trainers, model base classes, or large config frameworks
 unless a migrated chapter already proves the need.
 
+## Chapter Improvement Pipeline
+
+When improving a tutorial chapter, follow this pipeline in order. Each step
+references the detailed policy or SOP that governs it. The generative model
+chapters (`chapters/generative_models/`) are the completed reference
+implementation of this pipeline.
+
+### 1. Research & Tutorial
+
+- Check [Zhou Yifan's blog](https://zhouyifan.net/archives/) for relevant
+  articles on the topic. Use the blog as a reference to improve explanation
+  structure, intuition, and terminology.
+- Update the chapter's website doc (`website/docs/.../<chapter>.mdx`) with
+  clearer derivations and tutorial text.
+- Cite the original method paper and any referenced blog articles (see
+  [Reference Policy](#reference-policy)).
+
+### 2. Complete Formulas
+
+- Write full symbolic derivations in
+  `chapters/.../<chapter>/derivations/formulas.md`.
+- Add a Lean4 file (`derivations/<chapter>.lean`) that checks the key algebraic
+  identities used in the derivations (see
+  [Formula Derivation Policy](#formula-derivation-policy)).
+- The website doc should link to `formulas.md` instead of embedding long proofs
+  in the tutorial body.
+
+### 3. Complete Code
+
+- Place the canonical implementation under `chapters/.../<chapter>/code/`.
+- Keep imports self-contained — do not import across chapter packages.
+- Provide a CLI entrypoint (`main.py`) that supports training, evaluation, and a
+  smoke mode that uses synthetic or tiny data.
+- Default outputs and checkpoints must go under `work_dirs/<chapter>/`.
+- Follow [Code Reuse Rules](#code-reuse-rules) when extracting shared utilities.
+
+### 4. Data & Checkpoint Documentation
+
+- Document the data source, license or usage constraints, expected local
+  directory layout, file format, and a minimal example in the chapter README
+  (see [Data Policy](#data-policy)).
+- If the chapter requires checkpoints or pretrained models, document the source,
+  expected local path, size, and whether the file is required for training,
+  reconstruction, generation, or evaluation.
+
+### 5. Verify Code
+
+- Write a CPU smoke test under `chapters/.../<chapter>/tests/`. It must
+  instantiate the model, run a forward pass, compute loss, run backward, and
+  perform a sample/generate step — all on synthetic or tiny input.
+- Run the smoke test and the real algorithm entrypoint (see
+  [Validation SOP](#validation-sop)).
+- Run `ruff check` and `ruff format --check` on the changed paths.
+
+### 6. Verify Formulas
+
+- Run `lake build` to compile all Lean derivation files.
+- Fix any type errors or unproven identities before considering the chapter
+  complete.
+
+### 7. Build & Commit
+
+- Run `npm run build` from `website/` to verify the site builds with all doc
+  changes.
+- Commit in small batches following [Commit Discipline](#commit-discipline):
+  research and doc → formulas and Lean → code → tests → website docs.
+
 ## Validation SOP
 
 Every generative model migration must pass three levels of validation.
