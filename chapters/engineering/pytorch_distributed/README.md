@@ -11,7 +11,7 @@ uv run pytest chapters/engineering/pytorch_distributed/tests -q
 ### 完整 DDP 运行（需要 CUDA + 多 GPU 或单 GPU 多进程）
 
 ```bash
-torchrun --nproc_per_node=2 chapters/engineering/pytorch_distributed/main.py
+torchrun --nproc_per_node=2 chapters/engineering/pytorch_distributed/code/main.py
 ```
 
 ### 代码入口
@@ -36,5 +36,6 @@ print(f'ToyModel: {model}')
 
 ## 参考资料
 
+- Goyal, P., et al. (2017). [Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour](https://arxiv.org/abs/1706.02677).
 - Li, S., et al. (2020). [PyTorch Distributed: Experiences on Multi-Node Training](https://arxiv.org/abs/2006.15704).
 - PyTorch 官方：[Distributed Data Parallel Tutorial](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html).

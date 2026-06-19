@@ -12,7 +12,7 @@ keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel,
 - 理解**数据并行** vs **模型并行**：两种分布式训练策略
 - 掌握 **DDP 完整流程**：初始化 → 数据分片 → 模型包装 → 梯度同步 → 清理
 - 理解 **rank / world_size / DistributedSampler** 等核心概念
-- 读懂 [`chapters/engineering/pytorch_distributed/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/pytorch_distributed/main.py) 的最小可运行示例
+- 读懂 [`chapters/engineering/pytorch_distributed/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/pytorch_distributed/code/main.py) 的最小可运行示例
 :::
 
 ---
@@ -81,7 +81,7 @@ keywords: [分布式训练, DDP, PyTorch, 数据并行, DistributedDataParallel,
 
 ### 3.1 初始化与清理
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 import torch.distributed as dist
 
 def setup():
@@ -101,7 +101,7 @@ NCCL（NVIDIA Collective Communications Library）是 GPU 间通信的最高性�
 
 ### 3.2 数据集与采样器
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 class MyDataset(Dataset):
     def __init__(self):
         self.data = torch.tensor([1, 2, 3, 4], dtype=torch.float32)
@@ -122,7 +122,7 @@ dataloader = DataLoader(dataset, batch_size=2, sampler=sampler)
 
 ### 3.3 模型包装
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 device_id = rank % torch.cuda.device_count()
 
 model = ToyModel().to(device_id)
@@ -137,7 +137,7 @@ DDP 在 `forward()` 时自动注册反向传播的钩子，在 `backward()` 后�
 
 ### 3.4 权重保存与加载（跨设备）
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 # key-start
 if rank == 0:
     # 只有 rank 0 保存权重，避免多个进程同时写文件
@@ -156,7 +156,7 @@ ddp_model.load_state_dict(state_dict)
 
 ### 3.5 训练循环
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 for epoch in range(2):
     # key-start
     sampler.set_epoch(epoch)  # 每个 epoch 设置不同的随机种子，保证数据打乱不同
@@ -174,7 +174,7 @@ for epoch in range(2):
 
 ### 3.6 完整主函数
 
-```python title="chapters/engineering/pytorch_distributed/main.py" showLineNumbers
+```python title="chapters/engineering/pytorch_distributed/code/main.py" showLineNumbers
 def main():
     setup()
     rank = dist.get_rank()
@@ -212,16 +212,16 @@ DDP 脚本不能用 `python main.py` 直接运行，需要用 `torchrun` 启动�
 
 ```bash
 # 单机 2 GPU
-torchrun --nproc_per_node=2 chapters/engineering/pytorch_distributed/main.py
+torchrun --nproc_per_node=2 chapters/engineering/pytorch_distributed/code/main.py
 
 # 单机 4 GPU
-torchrun --nproc_per_node=4 chapters/engineering/pytorch_distributed/main.py
+torchrun --nproc_per_node=4 chapters/engineering/pytorch_distributed/code/main.py
 
 # 双机，每机 2 GPU：主节点执行
-torchrun --nnodes=2 --node_rank=0 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 chapters/engineering/pytorch_distributed/main.py
+torchrun --nnodes=2 --node_rank=0 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 chapters/engineering/pytorch_distributed/code/main.py
 
 # 第二个节点执行
-torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 chapters/engineering/pytorch_distributed/main.py
+torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=主节点IP --master_port=29500 chapters/engineering/pytorch_distributed/code/main.py
 ```
 
 `torchrun` 会自动设置 `RANK`、`WORLD_SIZE`、`MASTER_ADDR` 等环境变量，`init_process_group` 会读取这些变量完成初始化。
@@ -242,8 +242,8 @@ torchrun --nnodes=2 --node_rank=1 --nproc_per_node=2 --master_addr=主节点IP -
 
 ## 6. 延伸阅读
 
-- 📄 [PyTorch Distributed Data Parallel 官方教程](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
-- 📄 [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 📄 [Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour（Goyal et al.，2017）](https://arxiv.org/abs/1706.02677)
 - 📄 [PyTorch Distributed: Experiences on Multi-Node Training（Li et al.，2020）](https://arxiv.org/abs/2006.15704)
-- 🔗 [本章源码：`chapters/engineering/pytorch_distributed/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/pytorch_distributed)
+- 📄 [PyTorch Distributed Data Parallel 官方教程](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html)
+- 🔗 [本章源码：`chapters/engineering/pytorch_distributed/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/pytorch_distributed/code)
 - ⬅️ **上一章**：[傅里叶特征](./fourier-feature)

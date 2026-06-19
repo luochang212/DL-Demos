@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from chapters.engineering.pytorch_distributed.main import ToyModel
+from chapters.engineering.pytorch_distributed.code.main import ToyModel
 
 
 def test_toy_model_forward_save_on_cpu():
