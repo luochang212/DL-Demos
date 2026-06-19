@@ -2,13 +2,13 @@ from pathlib import Path
 
 import torch
 
-from chapters.fundamentals.multiclass_classification.points_classification import (
+from chapters.fundamentals.multiclass_classification.code.model import (
+    MulticlassClassificationNet,
+)
+from chapters.fundamentals.multiclass_classification.code.points_classification import (
     generate_plot_set,
     generate_points,
     visualize,
-)
-from chapters.fundamentals.multiclass_classification.pt_main import (
-    MulticlassClassificationNet,
 )
 
 
