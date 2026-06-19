@@ -93,8 +93,7 @@ W1 = np.random.randn(n_1, n_x) * 0.01
 
 $$\frac{\partial L}{\partial Z^{[2]}} = A^{[2]} - Y$$
 
-$$\frac{\partial L}{\partial W^{[2]}} = \frac{1}{m} dZ^{[2]} A^{[1]T}, \quad
-\frac{\partial L}{\partial b^{[2]}} = \frac{1}{m} \sum dZ^{[2]}$$
+$$\frac{\partial L}{\partial W^{[2]}} = \frac{1}{m} dZ^{[2]} A^{[1]T}, \quad \frac{\partial L}{\partial b^{[2]}} = \frac{1}{m} \sum dZ^{[2]}$$
 
 ### 4.2 隐藏层
 
@@ -108,8 +107,7 @@ $$\frac{\partial L}{\partial Z^{[1]}} = dA^{[1]} \odot g^{[1]'}(Z^{[1]})$$
 
 最后：
 
-$$\frac{\partial L}{\partial W^{[1]}} = \frac{1}{m} dZ^{[1]} X^T, \quad
-\frac{\partial L}{\partial b^{[1]}} = \frac{1}{m} \sum dZ^{[1]}$$
+$$\frac{\partial L}{\partial W^{[1]}} = \frac{1}{m} dZ^{[1]} X^T, \quad \frac{\partial L}{\partial b^{[1]}} = \frac{1}{m} \sum dZ^{[1]}$$
 
 完整的推导步骤见 [derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/shallow_network/derivations/formulas.md)。
 
