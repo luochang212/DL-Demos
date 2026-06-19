@@ -10,3 +10,4 @@ import chapters.fundamentals.multiclass_classification.derivations.multiclass_cl
 import chapters.training_tricks.initialization.derivations.initialization
 import chapters.training_tricks.regularization.derivations.regularization
 import chapters.training_tricks.advanced_optimizer.derivations.advanced_optimizer
+import chapters.cv.basic_cnn.derivations.basic_cnn

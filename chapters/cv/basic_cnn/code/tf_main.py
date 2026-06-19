@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from chapters.cv.basic_cnn.dataset import get_cat_set
+from chapters.cv.basic_cnn.code.dataset import get_cat_set
 
 
 def init_model(input_shape=(224, 224, 3)):

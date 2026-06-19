@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from chapters.common.utils.device import resolve_device
-from chapters.cv.basic_cnn.dataset import get_cat_set
+from chapters.cv.basic_cnn.code.dataset import get_cat_set
 
 
 def init_model(device='cpu'):

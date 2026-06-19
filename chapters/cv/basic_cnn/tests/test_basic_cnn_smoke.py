@@ -1,6 +1,6 @@
 import torch
 
-from chapters.cv.basic_cnn.pt_main import init_model
+from chapters.cv.basic_cnn.code.pt_main import init_model
 
 
 def test_basic_cnn_forward_loss_backward_on_cpu():
