@@ -149,13 +149,22 @@ implementation of this pipeline.
 
 ### 1. Research & Tutorial
 
-- Check [Zhou Yifan's blog](https://zhouyifan.net/archives/) for relevant
-  articles on the topic. Use the blog as a reference to improve explanation
-  structure, intuition, and terminology.
+- **MUST** check [Zhou Yifan's blog](https://zhouyifan.net/archives/) for relevant
+  articles on the topic.  If the blog cannot be accessed (HTTP error, timeout, or
+  DNS failure), **stop and report the error** — do not proceed to later steps.
+  Use `curl` as a fallback when `WebFetch` is blocked; the site is hosted on
+  GitHub Pages.
+- Read the relevant blog article(s) **before** writing or revising the tutorial
+  text.  Extract teaching structure, intuitive explanations, visual metaphors,
+  and step-by-step derivations.  The tutorial must genuinely reflect blog
+  insights, not merely cite the article as an afterthought.
 - Update the chapter's website doc (`website/docs/.../<chapter>.mdx`) with
-  clearer derivations and tutorial text.
+  clearer derivations, better intuition, and improved terminology informed by
+  the blog.
 - Cite the original method paper and any referenced blog articles (see
-  [Reference Policy](#reference-policy)).
+  [Reference Policy](#reference-policy)).  Blog citations must include the
+  exact article title and URL.  Place them prominently in the "参考资料"
+  section, not buried in footnotes.
 
 ### 2. Complete Formulas
 

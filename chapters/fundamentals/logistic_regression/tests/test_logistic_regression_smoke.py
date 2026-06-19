@@ -1,6 +1,6 @@
 import numpy as np
 
-from chapters.fundamentals.logistic_regression.main import (
+from chapters.fundamentals.logistic_regression.code.model import (
     init_weights,
     loss,
     predict,

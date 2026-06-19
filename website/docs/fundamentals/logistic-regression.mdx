@@ -2,48 +2,162 @@
 id: logistic-regression
 title: Logistic Regression — 二分类起点
 sidebar_label: 1. Logistic Regression
-description: 从线性打分、Sigmoid 和二元交叉熵推导二分类模型。
+description: 从线性打分、Sigmoid 和二元交叉熵推导二分类模型，理解极大似然、计算图求导与熵的联系。
 ---
 
 # Logistic Regression — 二分类起点
 
-Logistic Regression 是最小的可训练神经网络：它没有隐藏层，却完整包含参数、前向传播、损失函数、反向传播和梯度下降。
+Logistic Regression 是最小的可训练「神经网络」：它没有隐藏层，却完整包含参数、前向传播、损失函数、反向传播和梯度下降。理解它，就理解了深度学习训练循环的骨架。
 
-## 1. 模型
+## 1. 问题定义：从图像到向量
 
-给定样本 $x$，先计算线性分数，再通过 Sigmoid 转为正类概率：
+我们要做一个二分类器：给一张图片，判断是不是猫。每张图片是 $H \times W \times 3$ 的张量（RGB 三通道），把它「拉直」成一个向量 $x \in \mathbb{R}^{n_x}$，其中 $n_x = H \times W \times 3$。
 
-$$z=w^Tx+b,\qquad \hat y=\sigma(z)=\frac{1}{1+e^{-z}}$$
+模型的任务是：给定输入 $x$，输出 $\hat{y} \in [0, 1]$，表示「是猫」的概率。
 
-二元交叉熵衡量预测概率与标签的差异：
+## 2. 模型：为什么是 Sigmoid
 
-$$L=-\frac{1}{m}\sum_i[y_i\log\hat y_i+(1-y_i)\log(1-\hat y_i)]$$
+最容易想到的拟合函数是线性函数：
 
-实现计算对数前会把概率裁剪到安全区间，避免 `log(0)` 产生无穷值。
+$$z = w^T x + b = \sum_{i=1}^{n_x} w_i x_i + b$$
 
-## 2. 梯度
+但线性函数的值域是 $(-\infty, +\infty)$，而概率必须在 $[0, 1]$ 之间。我们需要一个「压缩」函数，把整个实数轴映射到 $[0, 1]$。
 
-Sigmoid 与交叉熵组合后，输出层梯度简化为：
+Sigmoid 函数完成这个映射：
 
-$$dZ=\hat Y-Y,\quad dW=\frac{1}{m}X(dZ)^T,\quad db=\mathrm{mean}(dZ)$$
+$$\sigma(z) = \frac{1}{1 + e^{-z}}$$
 
-对应实现位于 `chapters/fundamentals/logistic_regression/main.py` 的 `train_step`。
+它的趋势很直观：$z$ 越大，$\sigma(z)$ 越靠近 1；$z$ 越小，$\sigma(z)$ 越靠近 0。因此模型为：
 
-## 3. 代码解析
+$$\hat{y} = \sigma(w^T x + b)$$
+
+> **统计视角**：从对数几率的角度，我们假设 $\log\frac{p}{1-p} = w^T x + b$，解出 $p$ 正好是 Sigmoid 形式。这意味着模型认为决策边界是线性的，类别条件概率从边界向两侧以指数速度衰减。
+
+## 3. 损失函数：从极大似然到交叉熵
+
+### 3.1 误差函数与损失函数
+
+机器学习问题本质上是优化问题：定义一个**损失函数**（Cost Function），通过优化参数来最小化它。
+
+首先定义单个样本的**误差函数**（Loss Function）。标签 $y \in \{0, 1\}$，预测 $\hat{y} \in [0, 1]$，我们需要衡量二者之间的「距离」：
+
+$$L(\hat{y}, y) = -(y \log \hat{y} + (1-y) \log(1-\hat{y}))$$
+
+这就是**二元交叉熵**。为什么不用均方误差？因为交叉熵搭配 Sigmoid 时梯度更平滑——这一点在第 4 节会看得更清楚。
+
+整个训练集上的**损失函数**是所有样本误差的均值：
+
+$$J(w, b) = \frac{1}{m} \sum_{i=1}^m L(\hat{y}^{(i)}, y^{(i)})$$
+
+### 3.2 极大似然的视角（选读）
+
+如果你好奇交叉熵从何而来，它可以从 Bernoulli 分布的极大似然估计导出。单个样本的似然为 $P(y \mid x) = \hat{y}^y (1-\hat{y})^{1-y}$，取负对数再对 $m$ 个样本求均值就得到 $J(w,b)$。这意味着最小化交叉熵，等价于最大化模型在数据上的似然。
+
+> 关于熵、交叉熵和 KL 散度的完整直觉解释，推荐周弈帆的《[从零理解熵、交叉熵、KL散度](https://zhouyifan.net/2022/10/13/20221012-entropy/)》。
+
+## 4. 优化：梯度下降
+
+有了优化目标 $J(w, b)$，如何找到让它最小的参数？答案是**梯度下降**（Gradient Descent）。
+
+**直觉**：想象你站在山坡上，想走到山谷最低点。每走一步，你环顾四周，沿最陡峭的下坡方向迈一小步。梯度就是那个「最陡下降方向」。
+
+为什么必须「一小步一小步」地走？如果步伐太大，你可能直接迈过最低点，跑到对面的山坡上去——损失函数不降反升。**学习率** $\alpha$ 就是控制步伐大小的旋钮：
+
+$$w \leftarrow w - \alpha \frac{\partial J}{\partial w}, \qquad b \leftarrow b - \alpha \frac{\partial J}{\partial b}$$
+
+初始时令 $w = 0, b = 0$；迭代次数视损失是否收敛而定。
+
+## 5. 梯度推导：用计算图拆解链式法则
+
+现在要算出 $\frac{\partial J}{\partial w}$ 和 $\frac{\partial J}{\partial b}$。复杂函数求导的技巧是**计算图**（Computation Graph）——把运算拆成原子步骤，再用链式法则逐层回传梯度。
+
+逻辑回归的计算图如下（从右向左求导）：
+
+```
+x, w, b  →  z = wᵀx + b  →  a = σ(z)  →  L = -(y·log(a) + (1-y)·log(1-a))
+```
+
+### 步骤 1：损失对 Sigmoid 输出
+
+$$\frac{\partial L}{\partial a} = -\left(\frac{y}{a} - \frac{1-y}{1-a}\right)$$
+
+### 步骤 2：Sigmoid 的导数
+
+$$\frac{da}{dz} = \sigma'(z) = \sigma(z)(1 - \sigma(z)) = a(1-a)$$
+
+> 推导：$\frac{d}{dz}(1+e^{-z})^{-1} = -(1+e^{-z})^{-2} \cdot (-e^{-z}) = \frac{e^{-z}}{(1+e^{-z})^2} = \frac{1}{1+e^{-z}} \cdot \frac{e^{-z}}{1+e^{-z}} = a(1-a)$
+
+### 步骤 3：链式法则 — 关键消去
+
+$$\frac{\partial L}{\partial z} = \frac{\partial L}{\partial a} \cdot \frac{da}{dz}$$
+
+乘法展开后 $a(1-a)$ 与分母精确消去：
+
+$$
+\begin{aligned}
+\frac{\partial L}{\partial z} &= -\left(\frac{y}{a} - \frac{1-y}{1-a}\right) \cdot a(1-a) \\
+&= -(y(1-a) - (1-y)a) \\
+&= -(y - ya - a + ya) \\
+&= a - y
+\end{aligned}
+$$
+
+**这是 Sigmoid + 交叉熵组合最优雅的性质**：梯度的最终形式简单到只是「预测值减标签」。如果用均方误差，Sigmoid 的导数 $a(1-a)$ 在饱和区趋近于零，导致梯度消失，优化停滞。
+
+### 步骤 4：损失对参数
+
+由 $z = w^T x + b$：
+
+$$\frac{\partial z}{\partial w} = x, \qquad \frac{\partial z}{\partial b} = 1$$
+
+$$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot x = (a - y) \cdot x, \qquad \frac{\partial L}{\partial b} = a - y$$
+
+### 步骤 5：对整个 batch 求平均
+
+以上是对单个样本的梯度。对 $m$ 个样本，梯度是所有样本梯度的均值。用矩阵表示（样本为列）：
+
+$$dZ = A - Y \quad \in \mathbb{R}^{1 \times m}$$
+
+$$dw = \frac{1}{m} X (dZ)^T, \qquad db = \frac{1}{m} \sum_{i=1}^m dZ^{(i)}$$
+
+完整的代数推导（含每一步的展开）见 [derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/logistic_regression/derivations/formulas.md)。
+
+## 6. 代码解析：向量化实现
+
+Python 的 `for` 循环跑大量数据会很慢。NumPy 利用 SIMD（单指令多数据流）一次性对 16 或 32 个数做计算，同时避免了 Python 循环的解释开销。这就是**向量化**。
+
+### 广播机制
+
+NumPy 允许不同形状的数组做运算，通过「广播」自动扩充维度。比如形状 `[1]` 的标量乘形状 `[10]` 的向量，标量会自动广播到每个元素。同样，`(d, 1)` 加 `(1, m)` 会广播成 `(d, m)` 再逐元素相加。
+
+### 实现
+
+`train_step` 六行 NumPy 完成一次梯度更新：
 
 ```python
 def train_step(w, b, X, Y, lr):
     m = X.shape[1]
-    A = sigmoid(np.dot(w.T, X) + b)
-    d_Z = A - Y
-    d_w = np.dot(X, d_Z.T) / m
-    d_b = np.mean(d_Z)
-    return w - lr * d_w, b - lr * d_b
+    Z = np.dot(w.T, X) + b        # (1, d) @ (d, m) → (1, m)
+    A = sigmoid(Z)                # (1, m) — 整个 batch 同时算
+    dZ = A - Y                    # (1, m) — 消去后的简洁梯度
+    dw = np.dot(X, dZ.T) / m      # (d, 1) — 矩阵乘法聚合
+    db = np.mean(dZ)              # 标量
+    return w - lr * dw, b - lr * db
 ```
 
-样本沿列排列，因此 `X` 的形状是 `[特征数, 样本数]`。矩阵乘法一次完成整个 batch 的预测与梯度聚合。
+`X` 的形状是 `[特征数, 样本数]`——样本沿列排列。`np.dot(w.T, X)` 一次算出整个 batch 的线性分数，梯度聚合同理。这避免了 $m$ 和 $n_x$ 两重 `for` 循环。
 
-## 4. 运行与验证
+## 7. 决策边界
+
+训练好的参数在输入空间中定义了一个超平面：
+
+$$w^T x + b = 0$$
+
+当 $w^T x + b > 0$ 时 $\hat{y} > 0.5$，预测为正类；否则为负类。这解释了为什么 Logistic Regression **只能学习线性可分的模式**——它的决策边界永远是一条直线（或高维超平面）。
+
+> 想看更多实战细节？周弈帆的《[吴恩达《深度学习专项》笔记+代码实战（二）：简单的神经网络——逻辑回归](https://zhouyifan.net/2022/05/10/DLS-note-2/)》从推导到小猫辨别器实战，与本章内容高度互补。
+
+## 8. 运行与验证
 
 猫狗图片需按模块 README 准备。运行：
 
@@ -51,12 +165,13 @@ def train_step(w, b, X, Y, lr):
 uv run python -m chapters.fundamentals.logistic_regression.main
 ```
 
-验证重点：训练损失应总体下降，测试准确率应高于随机猜测。该模型只能学习线性决策边界，复杂图像任务上能力有限。
+验证重点：训练损失应总体下降，测试准确率应高于随机猜测。
 
 ## 参考资料
 
 - Cox, D. R. (1958). [The Regression Analysis of Binary Sequences](https://www.jstor.org/stable/2983890). *Journal of the Royal Statistical Society: Series B*, 20(2), 215–232.
 - Nelder, J. A., & Wedderburn, R. W. M. (1972). [Generalized Linear Models](https://www.jstor.org/stable/2344614). *Journal of the Royal Statistical Society: Series A*, 135(3), 370–384.
-- Goodfellow, I., Bengio, Y., & Courville, A. (2016). [*Deep Learning*](https://www.deeplearningbook.org/). MIT Press.（第 6 章：Deep Feedforward Networks）
+- 周弈帆（2022-05-10）。[吴恩达《深度学习专项》笔记+代码实战（二）：简单的神经网络——逻辑回归](https://zhouyifan.net/2022/05/10/DLS-note-2/)。
 - 周弈帆（2022-10-13）。[从零理解熵、交叉熵、KL散度](https://zhouyifan.net/2022/10/13/20221012-entropy/)。
+- 完整公式推导：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/logistic_regression/derivations/formulas.md)
 - 本项目源码：[chapters/fundamentals/logistic_regression/](https://github.com/luochang212/DL-Demos/tree/master/chapters/fundamentals/logistic_regression)。

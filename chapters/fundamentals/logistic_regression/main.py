@@ -5,6 +5,13 @@ from random import shuffle
 import cv2
 import numpy as np
 
+from chapters.fundamentals.logistic_regression.code.model import (
+    init_weights,
+    loss,
+    predict,
+    train_step,
+)
+
 
 def generate_data(dir='data/archive/dataset', input_shape=(224, 224)):
 
@@ -44,35 +51,6 @@ def resize_input(a: np.ndarray):
     h, w, c = a.shape
     a.resize((h * w * c))
     return a
-
-
-def init_weights(n_x=224 * 224 * 3):
-    w = np.zeros((n_x, 1))
-    b = 0.0
-    return w, b
-
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
-def predict(w, b, X):
-    return sigmoid(np.dot(w.T, X) + b)
-
-
-def loss(y_hat, y):
-    y_hat = np.clip(y_hat, 1e-12, 1 - 1e-12)
-    return np.mean(-(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat)))
-
-
-def train_step(w, b, X, Y, lr):
-    m = X.shape[1]
-    Z = np.dot(w.T, X) + b
-    A = sigmoid(Z)
-    d_Z = A - Y
-    d_w = np.dot(X, d_Z.T) / m
-    d_b = np.mean(d_Z)
-    return w - lr * d_w, b - lr * d_b
 
 
 def train(train_X, train_Y, step=1000, learning_rate=0.00001):
