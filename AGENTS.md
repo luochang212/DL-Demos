@@ -388,7 +388,7 @@ tests, ruff checks, and website build.
 | fundamentals | 4 | ✅ | ✅ | ✅ | ✅ |
 | sequence_models | 4 | ✅ | ✅ | ✅ | ✅ |
 | cv | 4 | ✅ | ✅ ⚠️ | ✅ | ✅ |
-| engineering | 2 | ✅ | ✅ | ✅ | ✅ |
+| engineering | 2 | ✅ | ✅ | ✅ | ✅ + formulas (fourier_feature) |
 
 ⚠️ resnet smoke test requires TensorFlow (skipped when unavailable).
 
