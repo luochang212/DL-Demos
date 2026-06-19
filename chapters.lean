@@ -13,3 +13,4 @@ import chapters.training_tricks.advanced_optimizer.derivations.advanced_optimize
 import chapters.cv.basic_cnn.derivations.basic_cnn
 import chapters.cv.resnet.derivations.resnet
 import chapters.cv.style_transfer.derivations.style_transfer
+import chapters.cv.nms.derivations.nms

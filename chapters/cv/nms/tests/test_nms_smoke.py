@@ -1,7 +1,7 @@
 import numpy as np
 
-from chapters.cv.nms.iou import area, box_intersection, iou
-from chapters.cv.nms.nms import nms
+from chapters.cv.nms.code.iou import area, box_intersection, iou
+from chapters.cv.nms.code.nms import nms
 
 
 def test_iou_area_and_intersection():

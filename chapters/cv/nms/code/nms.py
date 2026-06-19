@@ -1,8 +1,8 @@
 import numpy as np
 from PIL import Image
 
-from chapters.cv.nms.iou import iou
-from chapters.cv.nms.show_bbox import draw_bbox
+from chapters.cv.nms.code.iou import iou
+from chapters.cv.nms.code.show_bbox import draw_bbox
 
 
 class BoxRenderer:
