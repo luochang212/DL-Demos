@@ -18,7 +18,7 @@ def test_rnn_forward_loss_backward_on_cpu():
     sys.modules['torchtext.vocab'] = MagicMock()
     sys.modules['torchtext.data.utils'] = MagicMock()
 
-    from chapters.sequence_models.sentiment_analysis.main import GLOVE_DIM, RNN
+    from chapters.sequence_models.sentiment_analysis.code.model import GLOVE_DIM, RNN
 
     torch.manual_seed(0)
     model = RNN(hidden_units=16, dropout_rate=0.0)
@@ -58,7 +58,7 @@ def test_rnn_output_range_on_cpu():
         if mod not in sys.modules:
             sys.modules[mod] = MagicMock()
 
-    from chapters.sequence_models.sentiment_analysis.main import GLOVE_DIM, RNN
+    from chapters.sequence_models.sentiment_analysis.code.model import GLOVE_DIM, RNN
 
     torch.manual_seed(1)
     model = RNN(hidden_units=16, dropout_rate=0.0)

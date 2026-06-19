@@ -6,9 +6,6 @@ description: 使用 GloVe 词向量和 GRU 构建 IMDB 影评情感分类器，�
 keywords: [情感分析, GloVe, 词向量, GRU, IMDB, NLP, PyTorch]
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 :::caution Legacy 依赖
 本章源码依赖已停止维护的 `torchtext`，不属于项目默认 Python 3.13 环境的可运行性承诺。算法说明与源码仍作为教学材料保留。
 :::
@@ -219,9 +216,13 @@ result = 'positive' if hat_y.item() > 0.5 else 'negative'
 
 ---
 
-## 5. 延伸阅读
+## 参考资料
 
-- 📄 [GloVe: Global Vectors for Word Representation（Pennington et al.，2014）](https://nlp.stanford.edu/pubs/glove.pdf)
-- 📄 [IMDB Dataset（Maas et al.，2011）](https://ai.stanford.edu/~amaas/data/sentiment/)
-- 🔗 [本章源码：`chapters/sequence_models/sentiment_analysis/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/sentiment_analysis)
+- Pennington, J., Socher, R., & Manning, C. (2014). [GloVe: Global Vectors for Word Representation](https://nlp.stanford.edu/pubs/glove.pdf). *EMNLP 2014*.
+- Maas, A., Daly, R. E., Pham, P. T., Huang, D., Ng, A. Y., & Potts, C. (2011). [Learning Word Vectors for Sentiment Analysis](https://ai.stanford.edu/~amaas/data/sentiment/). *ACL 2011*.
+- 周弈帆（2022-09-21）。[吴恩达《深度学习专项》笔记（十五）：词嵌入 (Word2Vec, GloVe)](https://zhouyifan.net/2022/09/21/DLS-note-15/)。
+- 周弈帆（2022-09-21）。[在 PyTorch 中借助 GloVe 词嵌入完成情感分析](https://zhouyifan.net/2022/09/21/DLS-note-15-2/)。
+- 完整公式推导：[`derivations/formulas.md`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/sentiment_analysis/derivations/formulas.md)
+- 本项目源码：[`chapters/sequence_models/sentiment_analysis/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/sentiment_analysis)
 - ⬅️ **上一章**：[RNN — 循环神经网络](./rnn)
+- ➡️ **下一章**：[Attention — 让解码器选择信息](./attention)

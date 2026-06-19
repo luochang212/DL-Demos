@@ -1,7 +1,5 @@
 import os
 
-from torchtext.data import get_tokenizer
-
 
 def read_imdb(dir='data/aclImdb', split='pos', is_train=True):
     subdir = 'train' if is_train else 'test'
@@ -15,6 +13,8 @@ def read_imdb(dir='data/aclImdb', split='pos', is_train=True):
 
 
 def main():
+    from torchtext.data import get_tokenizer
+
     lines = read_imdb()
     print('Length of the file:', len(lines))
     print('lines[0]:', lines[0])
