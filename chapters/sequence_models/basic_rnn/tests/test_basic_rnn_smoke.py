@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 
-from chapters.sequence_models.basic_rnn.constant import EMBEDDING_LENGTH
-from chapters.sequence_models.basic_rnn.models import RNN1, RNN2
+from chapters.sequence_models.basic_rnn.code.constant import EMBEDDING_LENGTH
+from chapters.sequence_models.basic_rnn.code.model import RNN1, RNN2
 
 
 def test_rnn1_forward_loss_backward_on_cpu():

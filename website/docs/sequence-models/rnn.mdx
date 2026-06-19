@@ -6,9 +6,6 @@ description: 理解 RNN 的循环结构和沿时间步展开的计算方式，�
 keywords: [RNN, GRU, 循环神经网络, 语言模型, 字符级, 序列建模, PyTorch]
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # RNN — 循环神经网络
 
 :::tip 本章要点
@@ -62,13 +59,17 @@ x(1) ──→ [RNN] ──→ x(2) ──→ [RNN] ──→ x(3) ──→ ...
 
 ### 2.2 字符级语言模型
 
-将单词的每个字符用 one-hot 编码输入 RNN：
+语言模型的核心思想是将句子的联合概率分解为条件概率的乘积：
 
-- **输入**：当前字符的 embedding（或 one-hot）
-- **目标**：预测下一个字符的概率分布
-- **训练**：最小化交叉熵 $\sum_t -\log P(c^{(t+1)} \mid c^{(1)}, ..., c^{(t)})$
+$$
+P(c^{(1)}, ..., c^{(T)}) = P(c^{(1)}) \times P(c^{(2)} \mid c^{(1)}) \times ... \times P(c^{(T)} \mid c^{(1)}, ..., c^{(T-1)})
+$$
 
-训练完成后，RNN 可以按预测概率分布随机采样下一个字符，循环生成新的「单词」。
+RNN 的每一轮输出恰好拟合其中一个条件概率。例如第三轮 RNN 的条件是 $c^{(1)}, c^{(2)}$，待求事件是 $c^{(3)}$——因此第三轮的**输入**为前两个字符，**标签**为第三个字符。
+
+具体到代码实现：输入序列为 $\langle sos \rangle, x_1, x_2, ..., x_{T-1}$，标签序列为 $x_1, x_2, ..., x_T, \langle eos \rangle$，即输入和标签**错开一个位置**。
+
+训练完成后，RNN 可以按预测概率分布随机采样下一个字符，循环生成新的「单词」：从 $\langle sos \rangle$ 开始，每一轮采样出下一个字符作为新一轮的输入，直到采样出 $\langle eos \rangle$（空格）。
 
 ### 2.3 梯度裁剪
 
@@ -241,9 +242,17 @@ uv run python chapters/sequence_models/basic_rnn/main.py --model rnn1 --mode sam
 
 ---
 
-## 5. 延伸阅读
+## 5. 与后续章节的关系
 
-- 📄 [Learning Representations by Back-propagating Errors（Rumelhart et al.，1986）](https://www.nature.com/articles/323533a0)
-- 📄 [Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling（Chung et al.，2014）](https://arxiv.org/abs/1412.3555) — GRU
-- 🔗 [本章源码：`chapters/sequence_models/basic_rnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/basic_rnn)
-- ➡️ **下一章**：[情感分析 — RNN 实战](./sentiment-analysis)
+字符级语言模型展示了 RNN 如何在时间步之间传递隐藏状态。下一章[情感分析](./sentiment-analysis)将 RNN 用于完整的句子分类，并引入词嵌入（GloVe）来提高语义表达能力。而 [Attention](./attention) 和 [Transformer](./transformer) 则进一步解决了 RNN 无法并行和长距离依赖的问题。
+
+---
+
+## 参考资料
+
+- Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). [Learning Representations by Back-propagating Errors](https://www.nature.com/articles/323533a0). *Nature*, 323, 533–536.
+- Chung, J., Gulcehre, C., Cho, K., & Bengio, Y. (2014). [Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling](https://arxiv.org/abs/1412.3555). *arXiv:1412.3555*.
+- 周弈帆（2022-09-21）。[吴恩达《深度学习专项》笔记（十四）：循环神经网络基础](https://zhouyifan.net/2022/09/21/DLS-note-14/)。
+- 周弈帆（2022-09-21）。[你的第一个 PyTorch RNN 模型——字母级语言模型](https://zhouyifan.net/2022/09/21/DLS-note-14-2/)。
+- 完整公式推导：[`derivations/formulas.md`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/basic_rnn/derivations/formulas.md)
+- 本项目源码：[`chapters/sequence_models/basic_rnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/basic_rnn)
