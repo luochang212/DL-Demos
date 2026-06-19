@@ -12,9 +12,12 @@ build/
 # Caches
 .pytest_cache/
 .ruff_cache/
+.lake/
 
 # Data, outputs, checkpoints
-data/
+data/*
+!data/
+!data/README.md
 .vector_cache
 work_dirs/
 *.pth
@@ -26,6 +29,7 @@ work_dirs/
 website/node_modules/
 website/build/
 website/.docusaurus/
+website/static/readable/
 
 # Editors / OS
 .vscode/

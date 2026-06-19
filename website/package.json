@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prestart": "npm run readable:generate",
     "start": "docusaurus start",
+    "readable:generate": "node scripts/generate-readable-assets.mjs",
+    "prebuild": "npm run readable:generate",
     "build": "docusaurus build",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve"
