@@ -87,6 +87,20 @@ $$
 
 这种编码的一个重要性质是 $PE_{pos+k}$ 可以表示为 $PE_{pos}$ 的线性函数，使模型更容易学习相对位置关系。
 
+### 从 Sinusoidal 到 RoPE
+
+正弦位置编码是 2017 年原始 Transformer 的做法。后续研究发现，把位置信息**直接注入注意力计算**比加在输入上更有效。**旋转位置编码（RoPE）** 是当前的主流方案（LLaMA、FLUX、Qwen 等均采用），其核心思想是：
+
+给注意力中的 $Q$ 和 $K$ 向量分别乘上一个与位置相关的旋转矩阵，使得 $Q_m$ 和 $K_n$ 的内积天然包含相对位置 $(m-n)$ 的信息：
+
+$$
+\langle \mathbf{q}_m e^{im\theta}, \mathbf{k}_n e^{in\theta} \rangle \propto f(m-n)
+$$
+
+RoPE 带来的一个重要能力是**长度外推**：在短序列上训练的模型，可以通过调整旋转频率（如 NTK-aware scaling、YaRN 等技术）直接在长序列上推理。这对图像生成尤其有意义——在 $256\times256$ 图像上训练的 DiT，可以通过长度外推生成 $512\times512$ 乃至更高分辨率的图像。
+
+> 📖 苏剑林（2021）。[Transformer 升级之路：旋转位置编码](https://kexue.fm/archives/8265)。周弈帆（2024-12-08）。[位置编码长度外推技术](https://zhouyifan.net/2024/12/08/20241208-Context-Window-Extension/)。（本章教程仍使用正弦位置编码以便教学，生产环境建议使用 RoPE。）
+
 ---
 
 ## 4. Mask 策略

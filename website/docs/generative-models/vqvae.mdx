@@ -216,7 +216,41 @@ VQVAE 的生成流程分为两个阶段：
 
 ---
 
-## 5. 训练与运行
+## 5. 从 VQVAE 到 VQGAN
+
+VQVAE 的压缩-生成两阶段范式启发了后续一系列工作。其中最直接的后继者 **VQGAN**（Esser et al., 2021）在 VQVAE 的基础上做了三项关键改进，将生成质量提升到了高清级别：
+
+### 6.1 VQVAE 的局限
+
+VQVAE 只用 MSE 作为重建损失。MSE 能保证像素值尽可能接近，但对人眼感知来说，模糊的图也可以有很低的 MSE。这导致 VQVAE 的重建结果偏模糊，缺乏高频纹理。
+
+### 6.2 VQGAN 的三项改进
+
+**① 感知损失（Perceptual Loss）**
+
+不再只比较像素，而是把生成图和原图分别输入预训练 VGG，比较中间层特征的 MSE。高层特征对纹理和结构的感知更接近人眼。这与[风格迁移](../cv/style-transfer)中的内容损失思路一致。
+
+**② PatchGAN 判别器**
+
+引入 GAN 的对抗训练：加一个判别器来判断图像块（patch）的真假。判别器迫使生成器输出更逼真的纹理，而不仅仅是像素级接近。总损失变为：
+
+$$
+\mathcal{L} = \mathcal{L}_{\text{VQ}} + \lambda \mathcal{L}_{\text{GAN}}
+$$
+
+其中 $\mathcal{L}_{\text{VQ}}$ 保留了 VQVAE 原有的重建 + codebook 损失。
+
+**③ Transformer 替代 PixelCNN 作为先验**
+
+VQVAE 使用 PixelCNN 建模离散编码的分布，但 CNN 的感受野有限，难以捕获全局结构。VQGAN 改用 **Transformer**：将压缩图像的离散编码按光栅顺序排成一维序列，用自回归 Transformer 逐 token 生成。Transformer 的自注意力能更好地建模长程依赖，生成质量大幅提升。
+
+### 6.3 范式意义
+
+VQGAN 确立的「先压缩，再生成」范式直接影响了后续的 **Stable Diffusion** 等模型：用 VAE 将图像压缩到潜空间，在潜空间做扩散或自回归生成，再用解码器还原。理解 VQVAE → VQGAN 的演进，是理解现代图像生成体系的基石。
+
+---
+
+## 6. 训练与运行
 
 项目入口是 [`chapters/generative_models/vqvae/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/main.py)，支持两种模式：
 
@@ -269,7 +303,7 @@ uv run python -m chapters.generative_models.vqvae.code.main --mode full -c 0 --d
 
 ---
 
-## 6. 延伸阅读
+## 7. 延伸阅读
 
 - 📄 [Neural Discrete Representation Learning（van den Oord et al., 2017）](https://arxiv.org/abs/1711.00937)
 - 🔗 周弈帆（2023-06-06）。[轻松理解 VQ-VAE：首个提出 codebook 机制的生成模型](https://zhouyifan.net/2023/06/06/20230527-VQVAE/)
