@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from chapters.common.utils import get_activation_de_func, get_activation_func
-from chapters.training_tricks.advanced_optimizer.optimizer import BaseOptimizer
+from chapters.training_tricks.advanced_optimizer.code.optimizer import BaseOptimizer
 
 
 class BaseRegressionModel(metaclass=abc.ABCMeta):

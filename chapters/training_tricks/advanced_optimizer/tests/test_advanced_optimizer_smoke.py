@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 
-from chapters.training_tricks.advanced_optimizer.model import DeepNetwork, train
-from chapters.training_tricks.advanced_optimizer.optimizer import Adam
+from chapters.training_tricks.advanced_optimizer.code.model import DeepNetwork, train
+from chapters.training_tricks.advanced_optimizer.code.optimizer import Adam
 
 
 def test_adam_train_step_writes_checkpoint(tmp_path):

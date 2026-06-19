@@ -1,5 +1,5 @@
-from chapters.fundamentals.deep_network.dataset import get_cat_set
-from chapters.fundamentals.deep_network.model import DeepNetwork, train
+from chapters.fundamentals.deep_network.code.dataset import get_cat_set
+from chapters.fundamentals.deep_network.code.model import DeepNetwork, train
 
 
 def main():
