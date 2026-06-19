@@ -1,0 +1,106 @@
+---
+id: overview
+title: 生成模型概览
+sidebar_label: 0. 概览
+description: 从 VAE 到扩散模型，系统讲解深度生成模型的核心原理，以及 2022-2025 年的最新进展。
+slug: /generative-models
+---
+
+# 生成模型概览
+
+本章覆盖了深度生成模型从经典到前沿的核心范式。
+
+## 已覆盖模型
+
+| 模型 | 年份 | 范式 | 一句话 |
+|---|---|---|---|
+| VAE | 2013 | 变分推断 | 用编码器-解码器学习隐变量分布，重参数化技巧使梯度可回传 |
+| PixelCNN | 2016 | 自回归 | 逐像素预测下一个像素，因果卷积保证生成顺序 |
+| VQVAE | 2017 | 离散编码 | 引入 codebook 将连续特征量化为离散编码，搭配自回归先验 |
+| DDPM | 2020 | 去噪扩散 | 正向加噪 + 反向去噪，Markov 链逐步恢复数据 |
+| DDIM | 2021 | 确定性扩散 | 去掉 Markov 约束，用非马尔可夫过程大幅加速采样 |
+
+### 演化路径
+
+```
+VAE (2013)
+ ├─→ VQVAE (2017) ──→ VQGAN (2021) ──→ Stable Diffusion 潜空间量化
+ └─→ DDPM (2020) ──→ DDIM (2021) ──→ LDM/Stable Diffusion (2022)
+                                            ├─→ DiT (2023) ──→ SD3/FLUX (2024)
+                                            └─→ Flow Matching (2023) ──→ 新一代范式
+
+PixelCNN (2016) ──→ 自回归生成路线 ──→ VAR (2024, NIPS 最佳论文)
+```
+
+## 2022-2025 年关键进展
+
+本教程目前覆盖到 2021 年的 DDIM。以下是生成模型领域此后最重要的范式变迁，供拓展学习参考。
+
+### 1. 潜空间扩散（Stable Diffusion, 2022）
+
+**核心创新**：把扩散过程从像素空间搬到 VAE 压缩的潜空间。
+
+- 像素空间扩散太慢（DDPM 采样一张图需要上千步）
+- VAE 将 $512 \times 512$ 图像压缩到 $64 \times 64$ 的潜变量，扩散在此空间进行
+- 推理速度提升数十倍，直接催生了 Stable Diffusion 等实用化产品
+- 配套技术：条件注入（Cross-Attention 引入文本）、LoRA 微调
+
+> 📖 周弈帆博客：[Stable Diffusion 解读三部曲](https://zhouyifan.net/2023/07/07/20230707-SD1/)
+
+### 2. DiT：用 Transformer 替代 U-Net（2023）
+
+**核心创新**：扩散模型的主干网络从 CNN U-Net 升级为 Vision Transformer。
+
+- U-Net 的归纳偏置（局部性）在数据量充足时成为瓶颈
+- DiT（Diffusion Transformer）用 ViT 的 Patch Embedding + AdaLN 条件注入
+- SD3 的 MMDiT 进一步实现了图文双流 Transformer
+- FLUX.1 是目前最强的开源 DiT 模型（2024）
+
+> 📖 周弈帆博客：[JiT 解读与复现](https://zhouyifan.net/2025/12/02/20251124-jit/)、[Pixel DiT 对比解读](https://zhouyifan.net/2025/12/05/20251203-pixeldit/)
+
+### 3. Flow Matching：扩散之外的路线（2023）
+
+**核心创新**：用连续归一化流替代逐步去噪，直接学习速度场。
+
+- 传统扩散：学习噪声（score function）
+- Flow Matching：学习速度场（vector field），沿直线路径从噪声到数据
+- 训练更稳定，采样步数更少，理论更优雅
+- CFG-Zero*（2025）为 Flow Matching 适配了 Classifier-Free Guidance
+
+> 📖 周弈帆博客：[CFG-Zero*：流匹配时代的新版 CFG](https://zhouyifan.net/2025/05/10/20250425-cfgzero/)
+
+### 4. VAR：自回归的新生（2024, NIPS 最佳论文）
+
+**核心创新**：不是逐像素自回归，而是「下一尺度预测」。
+
+- 先生成低分辨率全图，再逐级生成更高分辨率
+- 避开了逐像素自回归的 $O(n^2)$ 复杂度
+- 在 ImageNet 256×256 上首次超越扩散模型
+- 证明了自回归范式在图像生成中仍然有强大生命力
+
+> 📖 周弈帆博客：[VAR 深度解读](https://zhouyifan.net/2024/12/20/20241218-VAR/)
+
+### 5. 视频生成（Sora, 2024）
+
+OpenAI 的 Sora 将 DiT 架构扩展到时空维度，证明了 Transformer + 扩散范式可以处理视频。
+
+### 6. 其他值得关注的进展
+
+- **VQGAN**（2021）：VQVAE + GAN 判别器 + Transformer 先验 → 前扩散时代的高清生成
+- **Sana**（2025）：用线性 Transformer 实现 4K 高效生成
+- **分形生成**（2025，何恺明团队）：用分形结构建模图像生成，本质是多叉树 ViT
+- **HART**（2024）：混合自回归 Transformer + 轻量扩散解码器
+
+## 学习建议
+
+1. **先学完本章 5 个模型**：VAE → DDPM → DDIM → PixelCNN → VQVAE
+2. **理解基础后，按兴趣深入**：
+   - 想做图像生成产品 → Stable Diffusion → FLUX → LoRA 微调
+   - 想理解架构演进 → DiT → MMDiT → JiT
+   - 想跟踪学术前沿 → Flow Matching → CFG-Zero* → VAR
+3. **关注周弈帆博客**：以上所有进展都有深入浅出的中文教程
+
+## 参考资料
+
+- 周弈帆博客归档：[https://zhouyifan.net/archives/](https://zhouyifan.net/archives/)
+- 本教程源码：[chapters/generative_models/](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models)

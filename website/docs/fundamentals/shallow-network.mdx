@@ -104,11 +104,7 @@ $$\frac{\partial L}{\partial A^{[1]}} = W^{[2]T} dZ^{[2]}$$
 
 $$\frac{\partial L}{\partial Z^{[1]}} = dA^{[1]} \odot g^{[1]'}(Z^{[1]})$$
 
-其中 $\odot$ 表示逐元素乘法，$g^{[1]'}$ 是 ReLU 的导数：
-
-$$
-\text{relu}'(z) = \begin{cases} 1 & z > 0 \\ 0 & z < 0 \end{cases}
-$$
+其中 $\odot$ 表示逐元素乘法。$g^{[1]'}$ 是 ReLU 的导数——正数区为 1，负数区为 0，$z=0$ 处取右极限 1。
 
 最后：
 

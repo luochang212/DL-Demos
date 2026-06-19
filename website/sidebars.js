@@ -136,13 +136,15 @@ const sidebars = {
       collapsible: true,
       collapsed: false,
       link: {
-        type: 'generated-index',
-        title: '生成模型系列',
-        description:
-          '从 VAE 到扩散模型，系统讲解深度生成模型的核心原理与 PyTorch 实现。',
-        slug: '/generative-models',
+        type: 'doc',
+        id: 'generative-models/overview',
       },
       items: [
+        {
+          type: 'doc',
+          id: 'generative-models/overview',
+          label: '0. 概览',
+        },
         {
           type: 'doc',
           id: 'generative-models/vae',

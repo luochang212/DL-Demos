@@ -62,10 +62,10 @@ $$dA^{[L]} = -\frac{Y}{A^{[L]}} + \frac{1-Y}{1-A^{[L]}}$$
 
 $$
 \begin{aligned}
-dZ^{[l]} &= dA^{[l]} \odot g^{[l]'}(Z^{[l]}) &\text{（使用缓存的 } Z^{[l]} \text{）} \\
-dW^{[l]} &= \frac{1}{m} dZ^{[l]} A^{[l-1]T} &\text{（使用缓存的 } A^{[l-1]} \text{）} \\
+dZ^{[l]} &= dA^{[l]} \odot g^{[l]'}(Z^{[l]}) \qquad &\text{(使用缓存的 } Z^{[l]}\text{)} \\
+dW^{[l]} &= \frac{1}{m} dZ^{[l]} A^{[l-1]T} \qquad &\text{(使用缓存的 } A^{[l-1]}\text{)} \\
 db^{[l]} &= \frac{1}{m} \sum dZ^{[l]} \\
-dA^{[l-1]} &= W^{[l]T} dZ^{[l]} &\text{（回传到上一层）}
+dA^{[l-1]} &= W^{[l]T} dZ^{[l]} \qquad &\text{(回传到上一层)}
 \end{aligned}
 $$
 
