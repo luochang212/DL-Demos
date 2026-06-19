@@ -75,7 +75,44 @@ uv run python -m chapters.sequence_models.transformer.code.main --help
 - 模型约 40MB（6 层，512 维）
 - 训练 60 epoch 在训练集上可达较好效果
 
+## 参考资料
+
+- Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [Attention Is All You Need](https://arxiv.org/abs/1706.03762).
+- 周弈帆（2022-09-21）。[吴恩达《深度学习专项》笔记（十七）：Transformer](https://zhouyifan.net/2022/09/21/DLS-note-17/)。
+- 周弈帆（2023-06-10）。[PyTorch Transformer 英中翻译超详细教程](https://zhouyifan.net/2023/06/10/20221106-transformer-pytorch/)。
+- 周弈帆（2025-08-24）。[FlashAttention 教程（算法原理篇）](https://zhouyifan.net/2025/08/24/20250511-flashattention-1/)。
+- 周弈帆（2024-12-08）。[位置编码长度外推技术](https://zhouyifan.net/2024/12/08/20241208-Context-Window-Extension/)。
+- 周弈帆（2025-12-18）。[Log-linear Sparse Attention](https://zhouyifan.net/2025/12/18/20251211-llsa-1/)。
+- 周弈帆（2024-12-04）。[位置编码背后的理论解释——傅里叶特征与核回归](https://zhouyifan.net/2024/12/04/20241202-fourier-feature/)。
+- 苏剑林（2021）。[Transformer 升级之路：旋转位置编码](https://kexue.fm/archives/8265)。
+- 完整公式推导：[derivations/formulas.md](derivations/formulas.md)
+
 ## 验证命令
+
+### 冒烟测试
+
+```shell
+uv run pytest chapters/sequence_models/transformer/tests -q
+```
+
+### 代码质量
+
+```shell
+uv run ruff check chapters/sequence_models/transformer
+uv run ruff format --check chapters/sequence_models/transformer
+```
+
+### 公式验证
+
+```shell
+lake build
+```
+
+### 网站构建
+
+```shell
+cd website && npm run build
+```
 
 ### 冒烟测试
 

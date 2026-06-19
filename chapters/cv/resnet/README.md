@@ -53,4 +53,5 @@ print('ResNet imported')
 
 - He, K., Zhang, X., Ren, S., & Sun, J. (2016). [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385).
 - He, K., Zhang, X., Ren, S., & Sun, J. (2016). [Identity Mappings in Deep Residual Networks](https://arxiv.org/abs/1603.05027).
+- 周弈帆（2022-08-09）。[ResNet 论文概览与精读](https://zhouyifan.net/2022/08/09/20220807-ResNet/)。
 - 完整公式推导：[derivations/formulas.md](derivations/formulas.md)

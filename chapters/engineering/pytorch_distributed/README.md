@@ -39,3 +39,4 @@ print(f'ToyModel: {model}')
 - Goyal, P., et al. (2017). [Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour](https://arxiv.org/abs/1706.02677).
 - Li, S., et al. (2020). [PyTorch Distributed: Experiences on Multi-Node Training](https://arxiv.org/abs/2006.15704).
 - PyTorch 官方：[Distributed Data Parallel Tutorial](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html).
+- 周弈帆（2022-12-19）。[PyTorch 并行训练极简 Demo](https://zhouyifan.net/2022/12/19/20221029-torch-parallel-training/)。

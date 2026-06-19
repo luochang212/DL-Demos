@@ -57,4 +57,5 @@ print('Style Transfer imported')
 
 - Gatys, L. A., Ecker, A. S., & Bethge, M. (2015). [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576).
 - Gatys, L. A., Ecker, A. S., & Bethge, M. (2016). [Image Style Transfer Using Convolutional Neural Networks](https://www.cv-foundation.org/openaccess/content_cvpr_2016/html/Gatys_Image_Style_Transfer_CVPR_2016_paper.html).
+- 周弈帆（2022-05-31）。[Neural Style Transfer 风格迁移经典论文讲解与 PyTorch 实现](https://zhouyifan.net/2022/05/31/20220531-styletransfer/)。
 - 完整公式推导：[derivations/formulas.md](derivations/formulas.md)

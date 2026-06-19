@@ -44,6 +44,15 @@ uv run python -m chapters.generative_models.vqvae.code.main --mode full -c 0 --d
 
 Hugging Face 上有 VQ-VAE、VQGAN 和离散 token 图像生成相关模型，但它们不是本章代码的必要依赖。磁盘空间不足时不要下载大模型；后续如果章节接入第三方预训练模型，需要在这里明确模型来源、大小、下载方式和本地路径。
 
+## 参考资料
+
+- van den Oord, A., Vinyals, O., & Kavukcuoglu, K. (2017). [Neural Discrete Representation Learning](https://arxiv.org/abs/1711.00937).
+- Esser, P., Rombach, R., & Ommer, B. (2021). [Taming Transformers for High-Resolution Image Synthesis](https://arxiv.org/abs/2012.09841).
+- 周弈帆（2023-06-06）。[轻松理解 VQ-VAE：首个提出 codebook 机制的生成模型](https://zhouyifan.net/2023/06/06/20230527-VQVAE/)。
+- 周弈帆（2023-06-30）。[VQVAE PyTorch 实现教程](https://zhouyifan.net/2023/06/30/20230622-VQVAE-2/)。
+- 周弈帆（2023-06-19）。[VQGAN 论文与源码解读](https://zhouyifan.net/2023/06/19/20230605-VQGAN/)。
+- 完整公式推导：[derivations/formulas.md](derivations/formulas.md)
+
 ## 验证命令
 
 ```powershell
