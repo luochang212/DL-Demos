@@ -2,55 +2,194 @@
 id: deep-network
 title: 深层 MLP — 把两层网络推广到任意深度
 sidebar_label: 3. 深层 MLP
-description: 使用列表化参数和缓存实现任意深度的全连接网络。
+description: 使用列表化参数和缓存实现任意深度的全连接网络，理解深度带来的层次化特征学习。
 ---
 
 # 深层 MLP — 把两层网络推广到任意深度
 
-深层网络的核心不是新的公式，而是把“线性层 + 激活函数”的计算稳定地重复多次。
+上一章我们手写了单隐藏层网络。现在我们要把它推广到任意 $L$ 层——深层神经网络并没有引入新的数学，只是把相同的模式**系统化地重复 $L$ 次**。
 
-## 1. 通用前向传播
+## 1. 符号与结构
 
-第 $l$ 层统一写作：
+### 1.1 统一的层表示
 
-$$Z^{[l]}=W^{[l]}A^{[l-1]}+b^{[l]},\qquad A^{[l]}=g^{[l]}(Z^{[l]})$$
+记网络总层数为 $L$（输入层不计入）。第 $l$ 层有 $n^{[l]}$ 个神经元，参数矩阵的形状为：
 
-源码用 `W`、`b`、`Z_cache` 和 `A_cache` 列表保存每层状态，因此网络深度由配置决定，而不是复制函数。
+$$W^{[l]} \in \mathbb{R}^{n^{[l]} \times n^{[l-1]}}, \quad b^{[l]} \in \mathbb{R}^{n^{[l]} \times 1}$$
 
-## 2. 通用反向传播
+输出矩阵形状：$A^{[l]} \in \mathbb{R}^{n^{[l]} \times m}$。矩阵乘法形状规则 $(a, b) \cdot (b, c) = (a, c)$ 可以帮助记忆。
 
-反向循环从最后一层走到第一层：
+### 1.2 前向传播：统一的循环
 
-$$dZ^{[l]}=dA^{[l]}\odot g'^{[l]}(Z^{[l]})$$
+对单样本：
 
-$$dW^{[l]}=\frac{1}{m}dZ^{[l]}(A^{[l-1]})^T,\qquad
-dA^{[l-1]}=(W^{[l]})^TdZ^{[l]}$$
+$$a^{[l]} = g^{[l]}(W^{[l]} a^{[l-1]} + b^{[l]}), \quad l = 1, 2, \ldots, L$$
 
-实现位于 `chapters/fundamentals/deep_network/model.py`。
+其中 $x = a^{[0]}$，$\hat{y} = a^{[L]}$。批量化只需把所有小写字母换成大写。
 
-## 3. 代码解析
+用代码实现时，就是一个遍历所有层的 `for` 循环——这个 `for` 循环**无法消除**（它遍历的是层数，不是数据维度）。向量化消除的是数据维度上的 `for` 循环。
 
 ```python
-for i in range(self.num_layer):
-    Z = np.dot(self.W[i], A) + self.b[i]
-    A = get_activation_func(self.activation_func[i])(Z)
+def forward(self, X, train_mode=True):
+    A = X
+    self.A_cache[0] = A
+    for i in range(self.num_layer):
+        Z = np.dot(self.W[i], A) + self.b[i]
+        A = get_activation_func(self.activation_func[i])(Z)
+        if train_mode:
+            self.Z_cache[i] = Z
+            self.A_cache[i + 1] = A
+    return A
 ```
 
-反向传播使用倒序索引遍历同一组层。激活函数名称与导数函数通过统一查找接口对应，新增层数不需要修改传播逻辑。
+训练模式下，每一层的 $Z^{[l]}$ 和 $A^{[l]}$ 被缓存到列表中，供反向传播复用。这是「空间换时间」的经典实践。
 
-## 4. 运行
+## 2. 为什么更深而不是更宽
 
-准备猫狗数据集后运行：
+直觉上，深层网络学习**层次化的特征**：第一层检测边缘，第二层组合成形状，第三层组合成物体部件，更深层识别完整物体。每一层在前一层的基础上构建更高级的抽象。
+
+从计算复杂度看也有优势。要拟合 $n$ 个数相加，可以构造 $\log n$ 层的二叉树式网络（每层做两两相加），只需 $O(n \log n)$ 个参数。而单层网络要在同一层穷举 $O(2^n)$ 种组合方式，需要指数级参数。深层用更少的参数实现更强的表达能力。
+
+> 当然，到底用多少层、多宽，最终由实际任务和实验决定。深度学习不是魔法，**实验才是检验真理的唯一标准**。
+
+## 3. 反向传播：倒序循环
+
+反向传播从输出层开始，逐层向输入方向计算梯度。第 $L$ 层（输出层）的起始梯度由损失函数直接给出：
+
+$$dA^{[L]} = -\frac{Y}{A^{[L]}} + \frac{1-Y}{1-A^{[L]}}$$
+
+之后对 $l = L, L-1, \ldots, 1$ 倒序循环：
+
+$$
+\begin{aligned}
+dZ^{[l]} &= dA^{[l]} \odot g^{[l]'}(Z^{[l]}) &\text{（使用缓存的 } Z^{[l]} \text{）} \\
+dW^{[l]} &= \frac{1}{m} dZ^{[l]} A^{[l-1]T} &\text{（使用缓存的 } A^{[l-1]} \text{）} \\
+db^{[l]} &= \frac{1}{m} \sum dZ^{[l]} \\
+dA^{[l-1]} &= W^{[l]T} dZ^{[l]} &\text{（回传到上一层）}
+\end{aligned}
+$$
+
+代码中，循环用倒序索引遍历同一组层：
+
+```python
+def backward(self, Y):
+    dA = -Y / self.A_cache[-1] + (1 - Y) / (1 - self.A_cache[-1])
+    for i in range(self.num_layer - 1, -1, -1):
+        dZ = dA * get_activation_de_func(self.activation_func[i])(self.Z_cache[i])
+        dW = np.dot(dZ, self.A_cache[i].T) / self.m
+        db = np.mean(dZ, axis=1, keepdims=True)
+        dA = np.dot(self.W[i].T, dZ)
+        self.dW_cache[i] = dW
+        self.db_cache[i] = db
+```
+
+注意：缓存的 `Z_cache` 和 `A_cache` 正好在反向传播中被使用——这就是正向传播时必须缓存它们的原因。
+
+完整的推导见 [derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/deep_network/derivations/formulas.md)。
+
+## 4. 参数与超参数
+
+这是深度学习中最容易混淆的一对概念：
+
+| | 参数（Parameters） | 超参数（Hyperparameters） |
+|---|---|---|
+| **定义** | 训练过程中学习的变量 | 训练前由人设定的变量 |
+| **例子** | $W^{[l]}$, $b^{[l]}$ | 学习率 $\alpha$, 层数 $L$, 每层神经元数 $n^{[l]}$, 迭代次数 |
+| **谁决定** | 优化算法（梯度下降） | **你**（手动调） |
+| **参与推理** | ✅ | ❌（只参与训练） |
+
+> 我们常说的「调参」，调的其实是超参数。
+
+## 5. 代码解析
+
+### 5.1 列表化参数管理
+
+```python
+class DeepNetwork(BaseRegressionModel):
+    def __init__(self, neuron_cnt: List[int], activation_func: List[str]):
+        # neuron_cnt 示例: [n_x, 30, 20, 1]
+        # activation_func: ['relu', 'relu', 'sigmoid']
+        self.num_layer = len(neuron_cnt) - 1
+        self.W: List[np.ndarray] = []
+        self.b: List[np.ndarray] = []
+        for i in range(self.num_layer):
+            self.W.append(
+                np.random.randn(neuron_cnt[i + 1], neuron_cnt[i]) * 0.2)
+            self.b.append(np.zeros((neuron_cnt[i + 1], 1)))
+```
+
+只要传入每层神经元数的列表和每层激活函数名的列表，网络结构就由配置决定，不需要重复代码。`neuron_cnt` 比 `activation_func` 多一个元素——因为前者包含了输入维度 $n_x$。
+
+### 5.2 激活函数查找
+
+```python
+def get_activation_func(name):
+    if name == 'sigmoid': return sigmoid
+    elif name == 'relu': return relu
+    else: raise KeyError(f'No such activation function {name}')
+```
+
+用字符串名查找激活函数，让网络配置更灵活。切换激活函数只需改配置列表，不用改传播逻辑。
+
+### 5.3 模型持久化
+
+`np.savez` 以键值对形式保存多个数组到一个 `.npz` 文件，`np.load` 反序列化为字典：
+
+```python
+def save(self, filename):
+    save_dict = {}
+    for i in range(len(self.W)):
+        save_dict[f'W{i}'] = self.W[i]
+    for i in range(len(self.b)):
+        save_dict[f'b{i}'] = self.b[i]
+    np.savez(filename, **save_dict)
+
+def load(self, filename):
+    params = np.load(filename)
+    for i in range(len(self.W)):
+        self.W[i] = params[f'W{i}']
+    for i in range(len(self.b)):
+        self.b[i] = params[f'b{i}']
+```
+
+### 5.4 抽象基类
+
+与 shallow_network 一样，`BaseRegressionModel` 定义统一接口（`forward`, `backward`, `gradient_descent`, `save`, `load`, `loss`, `evaluate`）。训练循环因此完全通用：
+
+```python
+def train(model, X, Y, step, learning_rate, ...):
+    for s in range(step):
+        Y_hat = model.forward(X)
+        model.backward(Y)
+        model.gradient_descent(learning_rate)
+```
+
+## 6. 实验：诚实的现实
+
+用 4 隐藏层网络（[n_x, 30, 30, 20, 20, 1]）训练猫狗分类：
+
+- 逻辑回归：~57.5%
+- 深层网络：~60.5%
+
+提升只有 3%——远低于直觉预期。这不是代码 bug，而是**深度学习项目的日常**：模型效果不佳，可能是模型结构不够好，可能是超参数不佳，也可能是没有用上正则化、更好的优化器、BatchNorm 等训练技巧。
+
+继续学习后续章节（参数初始化、正则化、优化器），这些才是让深层网络真正发挥威力的关键。
+
+> 这个实验记录来自周弈帆的《[吴恩达深度学习专项笔记（四）：深层神经网络](https://zhouyifan.net/2022/05/30/DLS-note-4/)》，其坦诚的问题分析很有价值。
+
+## 7. 运行
 
 ```bash
 uv run python -m chapters.fundamentals.deep_network.main
 ```
 
-深层网络更难优化。继续学习参数初始化、正则化和优化器，才能理解如何让它可靠训练。
+需要猫狗数据集。深层网络更难优化，后续章节（初始化、正则化、优化器）将解决这些训练问题。
 
 ## 参考资料
 
 - Cybenko, G. (1989). [Approximation by superpositions of a sigmoidal function](https://link.springer.com/article/10.1007/BF02551274). *Mathematics of Control, Signals and Systems*, 2(4), 303–314.
 - Hornik, K., Stinchcombe, M., & White, H. (1989). [Multilayer feedforward networks are universal approximators](https://www.sciencedirect.com/science/article/pii/0893608089900208). *Neural Networks*, 2(5), 359–366.
 - LeCun, Y., Bengio, Y., & Hinton, G. (2015). [Deep learning](https://www.nature.com/articles/nature14539). *Nature*, 521(7553), 436–444.
+- 周弈帆（2022-05-30）。[吴恩达《深度学习专项》笔记+代码实战（四）：深层神经网络](https://zhouyifan.net/2022/05/30/DLS-note-4/)。
+- 完整公式推导：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/deep_network/derivations/formulas.md)
 - 本项目源码：[chapters/fundamentals/deep_network/](https://github.com/luochang212/DL-Demos/tree/master/chapters/fundamentals/deep_network)。
