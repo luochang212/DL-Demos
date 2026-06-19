@@ -1,6 +1,6 @@
 import torch
 
-from chapters.sequence_models.transformer.model import (
+from chapters.sequence_models.transformer.code.model import (
     MultiHeadAttention,
     PositionalEncoding,
     Transformer,

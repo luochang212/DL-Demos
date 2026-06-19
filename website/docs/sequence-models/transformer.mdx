@@ -2,41 +2,138 @@
 id: transformer
 title: Transformer — 从注意力到序列转换
 sidebar_label: 4. Transformer
-description: 从零实现多头注意力、位置编码、Mask 和英译中推理。
+description: 从零实现多头注意力、位置编码、Mask 和英译中推理，理解 Transformer 如何用 Self-Attention 替代 RNN。
+keywords: [Transformer, Self-Attention, Multi-Head Attention, 位置编码, 英中翻译, PyTorch, Attention Is All You Need]
 ---
 
 # Transformer — 从注意力到序列转换
 
-Transformer 用 Attention 替代循环结构，使序列位置可以并行计算。项目实现一个英语到中文的 Encoder-Decoder Transformer。
+:::tip 本章要点
+- 理解 **Scaled Dot-Product Attention** 的数学公式和 $1/\sqrt{d_k}$ 缩放因子的作用
+- 掌握 **Multi-Head Attention**：多头拆分、并行计算、拼接投影
+- 理解三种 **Mask**（padding / causal / source-target）的用途和代码实现
+- 读懂位置编码的 sin/cos 公式和训练/推理的输入输出契约
+:::
 
-## 1. Scaled Dot-Product Attention
+---
 
-$$\mathrm{Attention}(Q,K,V)=
-\mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}+M\right)V$$
+## 1. 从 Attention 到 Self-Attention
 
-$1/\sqrt{d_k}$ 防止点积随维度增大而让 Softmax 饱和。Multi-Head Attention 将特征拆成多个头，分别学习不同关系后再拼接。
+[上一章的 Attention](./attention) 是 Decoder 对 Encoder 输出的跨序列关注。Transformer 将这一思想推广为三种 Attention：
 
-## 2. 位置与 Mask
+| 类型 | Query 来源 | Key/Value 来源 | 作用 |
+|------|-----------|---------------|------|
+| Encoder Self-Attention | Encoder | Encoder | 输入序列内部的词间关系 |
+| Decoder Self-Attention | Decoder | Decoder | 已生成序列的内部关系（causal） |
+| Cross-Attention | Decoder | Encoder | Decoder 关注 Encoder 输出 |
 
-- 位置编码：为并行输入加入顺序信息。
-- Source padding mask：忽略英文输入中的补齐 token。
-- Target causal mask：禁止 Decoder 查看未来中文 token。
-- Source-target mask：Decoder 交叉注意力忽略英文 padding。
+三种 Attention 的核心计算完全相同，区别仅在于 Q、K、V 的来源和 Mask 策略。
 
-## 3. 训练契约
+---
 
-`load_train_data()` 明确返回 `(english_source, chinese_target)`。训练输入使用中文目标序列去掉最后一个 token，标签使用去掉第一个 token 的序列。
-训练和推理都为英文源序列添加 `<S>`、`</S>`，并将词表外单词映射为 `<UNK>`，避免输入分布不一致。
+## 2. Scaled Dot-Product Attention
+
+单个注意力头的计算：
+
+$$
+\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}} + M\right)V
+$$
+
+其中：
+- $Q \in \mathbb{R}^{n \times d_k}$：Query 矩阵
+- $K \in \mathbb{R}^{m \times d_k}$：Key 矩阵
+- $V \in \mathbb{R}^{m \times d_v}$：Value 矩阵
+- $\sqrt{d_k}$：缩放因子，防止点积过大导致 softmax 梯度饱和
+- $M$：Mask 矩阵（$-\infty$ 在禁止关注的位置，0 在其他位置）
+
+代码实现中 `MY_INF = 1e12` 作为 $-\infty$ 的近似：
 
 ```python
-y_input = y_batch[:, :-1]
-y_label = y_batch[:, 1:]
+scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
+scores = scores.masked_fill(mask == 0, -MY_INF)
+attn = F.softmax(scores, dim=-1)
+output = torch.matmul(attn, V)
+```
+
+### Multi-Head Attention
+
+将 $d_{\text{model}}$ 维的 Q、K、V 拆成 $h$ 个头，每个头独立计算 Attention，最后拼接：
+
+$$
+\mathrm{MultiHead}(Q, K, V) = \mathrm{Concat}(\text{head}_1, ..., \text{head}_h) W^O
+$$
+
+$$
+\text{head}_i = \mathrm{Attention}(Q W_i^Q, K W_i^K, V W_i^V)
+$$
+
+每个头的维度 $d_k = d_v = d_{\text{model}} / h$。本项目默认 $d_{\text{model}} = 512$，$h = 8$，$d_k = 64$。
+
+---
+
+## 3. 位置编码
+
+Transformer 没有循环结构，需要显式注入位置信息。使用正弦/余弦位置编码：
+
+$$
+PE_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i / d_{\text{model}}}}\right)
+$$
+
+$$
+PE_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i / d_{\text{model}}}}\right)
+$$
+
+其中 $pos$ 是位置，$i$ 是维度索引。位置编码与词嵌入相加后送入 Encoder/Decoder。
+
+这种编码的一个重要性质是 $PE_{pos+k}$ 可以表示为 $PE_{pos}$ 的线性函数，使模型更容易学习相对位置关系。
+
+---
+
+## 4. Mask 策略
+
+### Padding Mask（Encoder + Cross-Attention）
+
+英文源序列中的 `<PAD>` token 不应参与 Attention。将对应位置的 score 设为 $-\infty$：
+
+```python
+# mask shape: [batch, 1, 1, src_len]
+encoder_output = encoder(x, src_padding_mask)
+```
+
+### Causal Mask（Decoder Self-Attention）
+
+禁止 Decoder 在生成第 $t$ 个 token 时"偷看"未来的 token $t+1, t+2, ...$。使用**下三角矩阵**：
+
+```python
+causal_mask = torch.tril(torch.ones(seq_len, seq_len))  # 下三角为 1
+```
+
+### Source-Target Mask（Cross-Attention）
+
+Decoder 的 Cross-Attention 应忽略英文 padding token。直接复用 Encoder 的 padding mask。
+
+---
+
+## 5. 训练契约
+
+数据加载函数 `load_train_data()` 返回 `(english_source, chinese_target)`。
+
+训练时输入和标签**错开一个位置**：Decoder 输入为去掉最后一个 token 的目标序列，标签为去掉第一个 token 的目标序列：
+
+```python
+# y_batch 包含 <S> token, target, ..., <EOS>
+y_input = y_batch[:, :-1]   # <S>, target, ...
+y_label = y_batch[:, 1:]    # target, ..., <EOS>
 logits = model(x_batch, y_input)
 ```
 
-## 4. 自回归推理
+英文源序列添加 `<S>` 和 `</S>` 边界标记，词表外单词映射为 `<UNK>`。
 
-解码从中文词表的 `<S>` 开始，每一步选择当前最后位置的预测；生成 `</S>` 后停止，其余位置保持 padding。
+---
+
+## 6. 自回归推理
+
+解码从中文词表的 `<S>` 开始，每步将当前完整序列送入 Decoder，取最后位置的预测作为下一个 token。生成 `</S>` 后停止：
 
 ```python
 y[:, 0] = start_id
@@ -51,16 +148,32 @@ for i in range(1, max_len):
         break
 ```
 
+本实现使用贪心解码（每次取概率最大的 token），未包含 beam search 或 KV cache。
+
+---
+
+## 7. 运行
+
 ```bash
-uv run python chapters/sequence_models/transformer/data_load.py
-uv run python chapters/sequence_models/transformer/train.py
-uv run python chapters/sequence_models/transformer/translate.py
+# 下载语料和词表
+uv run python -m chapters.sequence_models.transformer.code.data_load
+
+# 训练
+uv run python -m chapters.sequence_models.transformer.code.main --mode train
+
+# 翻译
+uv run python -m chapters.sequence_models.transformer.code.main --mode translate
 ```
 
-默认实现使用贪心解码，没有 beam search、学习率 warmup 或 KV cache，重点是展示 Transformer 数据流。
+---
 
 ## 参考资料
 
 - Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [Attention Is All You Need](https://arxiv.org/abs/1706.03762). *NeurIPS 2017*.
-- 本章 Attention 教程讲解的 Bahdanau 注意力机制，见：[Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473)。
-- 本项目源码：[chapters/sequence_models/transformer/](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/transformer)。
+- Bahdanau, D., Cho, K., & Bengio, Y. (2015). [Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473). *ICLR 2015*.
+- 周弈帆（2022-09-21）。[吴恩达《深度学习专项》笔记（十七）：Transformer](https://zhouyifan.net/2022/09/21/DLS-note-17/)。
+- 周弈帆（2023-06-10）。[PyTorch Transformer 英中翻译超详细教程](https://zhouyifan.net/2023/06/10/20221106-transformer-pytorch/)。
+- 周弈帆（2025-08-24）。[不会 CUDA 也能轻松看懂的 FlashAttention 教程（算法原理篇）](https://zhouyifan.net/2025/08/24/20250511-flashattention-1/)。
+- 周弈帆（2024-12-04）。[位置编码背后的理论解释——傅里叶特征 (Fourier Feature）与核回归](https://zhouyifan.net/2024/12/04/20241202-fourier-feature/)。
+- 完整公式推导：[`derivations/formulas.md`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/transformer/derivations/formulas.md)
+- 本项目源码：[`chapters/sequence_models/transformer/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/transformer)
