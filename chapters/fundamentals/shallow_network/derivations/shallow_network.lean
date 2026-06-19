@@ -26,10 +26,8 @@ theorem zero_init_symmetry (a b d : Int) (h_eq : a = b) :
 /-- The keepdims identity: summing along axis=1 with keepdims=True
     preserves the second dimension as 1, enabling broadcasting. -/
 theorem keepdims_broadcast_shape (m : Int) (h : m > 0) :
-    m / m = 1 := by
+    m / m = (1 : Int) := by
   have hm : m ≠ 0 := by omega
-  apply Int.ediv_eq_of_eq_dvd_right ?_
-  · exact hm
-  · rfl
+  exact Int.ediv_eq_of_eq_mul_right hm (by simp)
 
 end DLDemos.Fundamentals.ShallowNetwork

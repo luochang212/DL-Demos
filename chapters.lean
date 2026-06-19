@@ -3,6 +3,10 @@ import chapters.generative_models.ddpm.derivations.ddpm
 import chapters.generative_models.ddim.derivations.ddim
 import chapters.generative_models.pixelcnn.derivations.pixelcnn
 import chapters.generative_models.vqvae.derivations.vqvae
+import chapters.fundamentals.logistic_regression.derivations.logistic_regression
+import chapters.fundamentals.shallow_network.derivations.shallow_network
+import chapters.fundamentals.deep_network.derivations.deep_network
+import chapters.fundamentals.multiclass_classification.derivations.multiclass_classification
 import chapters.training_tricks.initialization.derivations.initialization
 import chapters.training_tricks.regularization.derivations.regularization
 import chapters.training_tricks.advanced_optimizer.derivations.advanced_optimizer
