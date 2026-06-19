@@ -83,23 +83,6 @@ const config = {
 
       footer: {
         style: 'dark',
-        links: [
-          {
-            title: '教程系列',
-            items: [
-              { label: '生成模型', to: '/generative-models/vae' },
-            ],
-          },
-          {
-            title: '资源',
-            items: [
-              {
-                label: 'GitHub 仓库',
-                href: 'https://github.com/luochang212/DL-Demos',
-              },
-            ],
-          },
-        ],
         copyright: `Copyright © ${new Date().getFullYear()} DL-Demos. Built with Docusaurus.`,
       },
 

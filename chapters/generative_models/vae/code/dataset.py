@@ -3,7 +3,7 @@ import os
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torchvision import datasets, transforms
 
 
 class CelebADataset(Dataset):
@@ -29,9 +29,43 @@ class CelebADataset(Dataset):
         return pipeline(img)
 
 
-def get_dataloader(root='data/celebA/img_align_celeba', **kwargs):
+class ImageOnlyDataset(Dataset):
+    def __init__(self, dataset) -> None:
+        super().__init__()
+        self.dataset = dataset
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int):
+        image, _ = self.dataset[index]
+        return image
+
+
+def get_celeba_dataloader(root='data/celebA/img_align_celeba', **kwargs):
     dataset = CelebADataset(root, **kwargs)
     return DataLoader(dataset, 16, shuffle=True)
+
+
+def get_mnist_dataloader(root='data/mnist', img_shape=(64, 64)):
+    pipeline = transforms.Compose(
+        [
+            transforms.Resize(img_shape),
+            transforms.Grayscale(num_output_channels=3),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = datasets.MNIST(root=root, train=True, transform=pipeline, download=True)
+    dataset = ImageOnlyDataset(dataset)
+    return DataLoader(dataset, 16, shuffle=True)
+
+
+def get_dataloader(dataset='celeba', root=None, **kwargs):
+    if dataset == 'celeba':
+        return get_celeba_dataloader(root or 'data/celebA/img_align_celeba', **kwargs)
+    if dataset == 'mnist':
+        return get_mnist_dataloader(root or 'data/mnist', **kwargs)
+    raise ValueError(f'Unknown dataset: {dataset}')
 
 
 if __name__ == '__main__':

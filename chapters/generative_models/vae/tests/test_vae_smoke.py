@@ -1,6 +1,6 @@
 import torch
 
-from chapters.generative_models.vae.code.main import loss_fn
+from chapters.generative_models.vae.code.main import loss_fn, smoke
 from chapters.generative_models.vae.code.model import VAE
 
 
@@ -16,3 +16,13 @@ def test_vae_forward_loss_backward_and_sample_on_cpu():
     assert output.shape == x.shape
     assert sample.shape == x.shape
     assert torch.isfinite(loss)
+
+
+def test_vae_cli_smoke_path_writes_outputs(tmp_path):
+    checkpoint = tmp_path / 'smoke_model.pth'
+    output = tmp_path / 'smoke_sample.jpg'
+
+    smoke(torch.device('cpu'), str(checkpoint), str(output))
+
+    assert checkpoint.exists()
+    assert output.exists()

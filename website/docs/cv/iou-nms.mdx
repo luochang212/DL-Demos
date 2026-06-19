@@ -93,7 +93,7 @@ filtered_predicts, indices = nms(
 核心算法不依赖外部图片，可直接运行测试：
 
 ```bash
-uv run pytest tests/test_tutorial_models.py -k DetectionPostprocessing
+uv run pytest chapters/cv/nms/tests -q
 ```
 
 测试覆盖相同框、无重叠框、零面积框、低分过滤和高重叠框抑制。

@@ -16,19 +16,25 @@ import FormulaCode from '@site/src/components/FormulaCode';
 - 理解**前向过程**：如何用固定方差逐步给图像加噪
 - 推导**训练目标**：如何从变分下界得到常用的噪声预测目标
 - 掌握**逆向采样**：从纯噪声逐步去噪生成图像
-- 读懂 [`chapters/generative_models/ddpm/ddpm.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/ddpm.py) 和 [`chapters/generative_models/ddpm/network.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/network.py)
+- 读懂 [`chapters/generative_models/ddpm/code/ddpm.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/ddpm.py) 和 [`chapters/generative_models/ddpm/code/network.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/network.py)
 :::
 
 ---
 
 ## 1. 核心思想
 
-扩散模型的设计灵感来自非平衡热力学：
+扩散模型可以从两个角度理解。第一个角度来自非平衡热力学：一个复杂数据分布可以通过不断添加噪声，逐渐变成简单的标准正态分布；如果能学会这个过程的逆过程，就能从噪声生成数据。
 
 - **前向过程**：逐步给图像添加高斯噪声，最终变成纯噪声
 - **逆向过程**：学习如何从噪声中一步步恢复出图像
 
-关键洞察：如果我们能训练一个网络精确预测每一步添加的噪声，就能从纯噪声出发逐步去噪，生成全新图像。
+第二个角度是把它看成一种特殊的 VAE：
+
+- 普通 VAE 会学习一个编码器，把图像压缩成隐变量，再学习解码器把隐变量还原成图像。
+- DDPM 不学习编码器，而是把“编码”固定为逐步加噪；它也不把图像压成短向量，而是在和原图同样大小的张量上逐步变化。
+- 因此，DDPM 真正要学习的是“解码器”：也就是每一步如何去掉噪声。
+
+关键洞察：如果我们能训练一个网络精确预测每一步添加的噪声，就能从纯噪声出发逐步去噪，生成全新图像。这样做绕开了 GAN 的对抗训练，同时把生成任务转化成了更稳定的有监督回归问题：给定带噪图像 $x_t$ 和时间步 $t$，预测生成它时用到的噪声 $\varepsilon$。
 
 ---
 
@@ -44,6 +50,8 @@ $$
 
 其中 $\beta_t$ 是预先设定的噪声调度（线性从 $\beta_{\min}$ 到 $\beta_{\max}$）。
 
+这个公式不是简单地把 $\beta_t$ 倍噪声加到图像上，而是从一个正态分布里采样新图像。系数 $\sqrt{1-\beta_t}$ 和方差 $\beta_t I$ 配合使用，是为了让每一步的信号缩放和噪声方差保持可控：当 $\beta_t$ 从很小的值逐步增大时，图像信息会由慢到快地衰减，最终 $x_T$ 接近标准正态噪声。
+
 令 $\alpha_t = 1 - \beta_t$，$\bar{\alpha}_t = \prod_{s=1}^{t}\alpha_s$，则可以**一步**从 $x_0$ 得到任意时刻的 $x_t$：
 
 $$
@@ -56,7 +64,7 @@ $$
 x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1 - \bar\alpha_t}\, \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
 $$
 
-这就是代码中 `sample_forward` 的公式。
+这就是代码中 `sample_forward` 的公式。它很重要，因为训练时不需要真的从 $x_0$ 连续加噪 $t$ 次；只要随机采样一个时间步 $t$ 和一个噪声 $\varepsilon$，就能直接构造对应的 $x_t$。
 
 ### 2.2 训练目标
 
@@ -80,6 +88,15 @@ $$
 
 即：**让网络预测添加的噪声 $\varepsilon$**。训练时随机采样 $t$ 和 $\varepsilon$，构造 $x_t$，然后让网络从 $x_t$ 预测 $\varepsilon$。
 
+为什么可以预测噪声而不是直接预测均值？因为在均值公式里，$x_t$ 和 $t$ 已知，真正未知的是构造 $x_t$ 时用到的噪声 $\varepsilon$。网络只要预测出这个噪声，就能代回公式得到逆向分布的均值。
+
+更完整地说，DDPM 原始目标来自变分下界（VLB）：最大化训练图像通过反向过程生成出来的概率。展开后，每个时间步都会比较两个正态分布：
+
+- 固定前向过程诱导出的真实后验 $q(x_{t-1} \mid x_t, x_0)$
+- 神经网络定义的逆向分布 $p_\theta(x_{t-1} \mid x_t)$
+
+由于方差通常固定或预设，这个 KL 项主要变成均值之间的误差；再把均值写成噪声形式，并丢掉经验上不必要的时间步权重，就得到常见的 MSE 噪声预测目标。
+
 ### 2.3 逆向采样
 
 从 $x_T \sim \mathcal{N}(0, I)$ 出发，每一步：
@@ -91,6 +108,8 @@ $$
 代码实现了两种方差选择：
 - **simple_var=True**：$\sigma_t^2 = \beta_t$（固定方差）
 - **simple_var=False**：$\sigma_t^2 = \frac{1 - \bar\alpha_{t-1}}{1 - \bar\alpha_t}\,\beta_t$（后验方差）
+
+最后一步通常不再加入随机噪声。直观上，采样已经到达 $x_0$，再加噪会破坏最终图像；公式上，当把 $\bar\alpha_0$ 约定为 $1$ 时，后验方差在最后一步为 $0$。
 
 ---
 
@@ -128,7 +147,7 @@ $$
 
 ### 4.1 前向扩散系数预计算
 
-```python title="chapters/generative_models/ddpm/ddpm.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/code/ddpm.py" showLineNumbers
 class DDPM():
 
     def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
@@ -176,7 +195,7 @@ if eps is None:
 res = eps * torch.sqrt(1 - alpha_bar) + torch.sqrt(alpha_bar) * x
 return res`}
   language="python"
-  title="chapters/generative_models/ddpm/ddpm.py — sample_forward"
+  title="chapters/generative_models/ddpm/code/ddpm.py — sample_forward"
   mappings={[
     { partIndex: 0, lines: [3] },
     { partIndex: 2, lines: [0] },
@@ -186,7 +205,7 @@ return res`}
 
 ### 4.3 逆向单步去噪
 
-```python title="chapters/generative_models/ddpm/ddpm.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/code/ddpm.py" showLineNumbers
     def sample_backward_step(self, x_t, t, net, simple_var=True, clip_x0=True):
         n = x_t.shape[0]
         t_tensor = torch.tensor([t] * n,
@@ -224,7 +243,7 @@ return res`}
 
 ### 4.4 UNet 时间步嵌入
 
-```python title="chapters/generative_models/ddpm/network.py" showLineNumbers
+```python title="chapters/generative_models/ddpm/code/network.py" showLineNumbers
 class PositionalEncoding(nn.Module):
 
     def __init__(self, max_seq_len, d_model):
@@ -252,7 +271,7 @@ class PositionalEncoding(nn.Module):
 <Tabs>
   <TabItem value="loss" label="训练循环" default>
 
-核心训练逻辑：随机采样时间步 $t$，前向加噪，然后让网络预测噪声。
+核心训练逻辑：随机采样时间步 $t$，前向加噪，然后让网络预测噪声。虽然 DDPM 有 $T$ 个去噪步骤，但每次训练只抽一个时间步；长期训练后，网络会在所有噪声强度上都学会预测噪声。
 
 ```python title="训练伪代码"
 for x_0 in dataloader:
@@ -264,6 +283,26 @@ for x_0 in dataloader:
     loss.backward()
     optimizer.step()
 ```
+
+  </TabItem>
+  <TabItem value="sampling" label="采样循环">
+
+采样阶段从随机噪声开始，按时间步倒序调用同一个去噪网络。每一步先预测噪声，再用预测噪声计算均值，并根据方差设置决定是否加入随机扰动。
+
+```python title="采样伪代码"
+x_t = torch.randn(batch_size, channels, height, width)
+for t in reversed(range(n_steps)):
+    eps_pred = net(x_t, t)
+    mean = compute_reverse_mean(x_t, t, eps_pred)
+    if t > 0:
+        noise = torch.randn_like(x_t)
+        x_t = mean + sigma_t * noise
+    else:
+        x_t = mean
+return x_t
+```
+
+采样速度慢是 DDPM 的主要代价：标准设置会执行约 1000 次网络推理。下一章 DDIM 会保留同一个训练好的噪声预测网络，但改用跳步采样来减少推理次数。
 
   </TabItem>
   <TabItem value="hyperparams" label="超参数">
@@ -283,9 +322,76 @@ for x_0 in dataloader:
 
 ---
 
-## 6. 延伸阅读
+## 6. 训练与运行
+
+项目入口是 [`chapters/generative_models/ddpm/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/main.py)，支持三种模式：
+
+| 模式 | 命令 | 依赖 |
+| --- | --- | --- |
+| 自检 | `--mode smoke` | 无真实数据集依赖 |
+| 训练 | `--mode train` | MNIST 数据集 |
+| 采样 | `--mode sample` | checkpoint |
+
+### 6.1 数据准备
+
+DDPM 训练使用 MNIST 手写数字图片。
+
+- 数据来源：`torchvision.datasets.MNIST`
+- 官方来源：[The MNIST Database](http://yann.lecun.com/exdb/mnist/)
+- 默认路径：`data/mnist/`
+- 数据规模：60,000 张训练图片，10,000 张测试图片，灰度 28×28
+- 用途：快速训练和观察扩散模型从噪声生成数字的效果
+
+数据加载代码会执行：
+
+```python title="chapters/generative_models/ddpm/code/dataset.py"
+ToTensor()
+Lambda(lambda x: (x - 0.5) * 2)
+```
+
+也就是把像素从 `[0, 1]` 归一化到 `[-1, 1]`，与采样输出范围保持一致。
+
+### 6.2 Checkpoint 和预训练模型
+
+本章当前不依赖第三方预训练模型。训练和采样使用的是本项目代码训练出的 checkpoint。
+
+| 文件 | 默认路径 | 说明 |
+| --- | --- | --- |
+| 训练 checkpoint | `work_dirs/ddpm/model_unet_res.pth` | `--mode train` 输出，供采样使用 |
+| 自检 checkpoint | `work_dirs/ddpm/smoke_model.pth` | `--mode smoke` 输出，只用于验证链路 |
+| 默认输出图 | `work_dirs/ddpm/diffusion.jpg` | 采样生成结果 |
+| 自检输出图 | `work_dirs/ddpm/smoke_sample.jpg` | smoke 生成的样例图 |
+
+Hugging Face 上有大量扩散模型和预训练 VAE/UNet，但它们不是本章 DDPM 代码的必要依赖。磁盘空间不足时不要下载大模型；后续如果章节接入第三方预训练模型，应同时说明模型来源、大小、下载方式和本地路径。
+
+### 6.3 运行命令
+
+不依赖 MNIST 的真实 CLI 自检：
+
+```powershell
+uv run python -m chapters.generative_models.ddpm.code.main --mode smoke --device cpu
+```
+
+快速训练和采样：
+
+```powershell
+uv run python -m chapters.generative_models.ddpm.code.main --mode train --epochs 1 --batch-size 128 --config-id 0 --n-steps 100 --device auto --checkpoint work_dirs/ddpm/mnist_model.pth
+uv run python -m chapters.generative_models.ddpm.code.main --mode sample --config-id 0 --n-steps 100 --device auto --checkpoint work_dirs/ddpm/mnist_model.pth --output work_dirs/ddpm/mnist_sample.jpg --n-sample 16
+```
+
+`--device auto` 会优先选择 CUDA，其次选择 macOS MPS，最后回退到 CPU。
+
+### 6.4 完整公式推导
+
+如果想查看前向闭式公式、后验均值/方差、噪声预测目标与代码采样公式的完整推导，可以直接点击 [完整公式推导](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/derivations/formulas.md)，或者打开 [ddpm.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/ddpm.py)、[network.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/network.py) 和 [main.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddpm/code/main.py)。这些本仓库文件链接会自动在弹窗中打开。
+
+---
+
+## 7. 延伸阅读
 
 - 📄 [Denoising Diffusion Probabilistic Models（Ho et al., 2020）](https://arxiv.org/abs/2006.11239)
+- 📄 [Deep Unsupervised Learning using Nonequilibrium Thermodynamics（Sohl-Dickstein et al., 2015）](https://arxiv.org/abs/1503.03585)
 - 📄 [Understanding Diffusion Models: A Unified Perspective（Luo, 2022）](https://arxiv.org/abs/2208.11970)
+- 🔗 周弈帆（2023-07-07）。[扩散模型（Diffusion Model）详解：直观理解、数学原理、PyTorch 实现](https://zhouyifan.net/2023/07/07/20230330-diffusion-model/)
 - 🔗 [本章源码：`chapters/generative_models/ddpm/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/ddpm)
 - ➡️ **下一章**：[DDIM — 去噪扩散隐式模型](./ddim)

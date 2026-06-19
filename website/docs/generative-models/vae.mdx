@@ -165,6 +165,10 @@ z = eps * std + mean`}
 模型输出的是 `logvar`，也就是 $\log\sigma^2$，而不是直接输出 $\sigma^2$。这样可以避免方差为负数，也避免在损失函数里对接近 0 的方差再取对数导致数值不稳定。
 :::
 
+:::tip 完整公式推导
+如果想查看从 ELBO、重建似然、KL 解析式到代码损失的完整推导，可以直接点击 [完整公式推导](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vae/derivations/formulas.md)，或者打开 [model.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vae/code/model.py) 与 [main.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vae/code/main.py)。这些本仓库文件链接会自动在弹窗中打开。
+:::
+
 ## 4. 模型结构
 
 本项目的 VAE 针对 **64×64 CelebA 人脸图像**设计。
@@ -256,15 +260,39 @@ def sample(self, device=None):
 
 ## 5. 训练与运行
 
-项目入口是 [`chapters/generative_models/vae/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vae/code/main.py)，支持三种模式：
+项目入口是 [`chapters/generative_models/vae/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vae/code/main.py)，支持四种模式：
 
 | 模式 | 命令 | 依赖 |
 | --- | --- | --- |
-| 训练 | `--mode train` | CelebA 数据集 |
-| 重建 | `--mode reconstruct` | CelebA 数据集 + checkpoint |
+| 自检 | `--mode smoke` | 无真实数据集依赖 |
+| 训练 | `--mode train` | MNIST 或 CelebA 数据集 |
+| 重建 | `--mode reconstruct` | MNIST 或 CelebA 数据集 + checkpoint |
 | 生成 | `--mode generate` | checkpoint |
 
 ### 5.1 数据准备
+
+VAE 正式训练使用 CelebA 的对齐人脸图片；如果只想快速看到模型学习效果，可以先用 MNIST。
+
+#### MNIST 快速效果
+
+- 数据来源：`torchvision.datasets.MNIST`
+- 默认路径：`data/mnist/`
+- 用途：快速训练和观察数字重建/生成效果，不代表最终人脸生成质量
+- 处理方式：`Resize((64, 64))`、转成 3 通道、`ToTensor()`，以复用同一个 VAE 网络结构
+
+```powershell
+uv run python -m chapters.generative_models.vae.code.main --mode train --dataset mnist --epochs 1 --device auto --checkpoint work_dirs/vae/mnist_model.pth
+uv run python -m chapters.generative_models.vae.code.main --mode generate --device auto --checkpoint work_dirs/vae/mnist_model.pth --output work_dirs/vae/mnist_sample.jpg
+```
+
+#### CelebA 正式数据
+
+VAE 正式训练使用 CelebA 的对齐人脸图片。本章代码只读取图片，不使用属性标注。
+
+- 官方来源：[CelebA Dataset - MMLab](https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
+- 可用镜像：[Kaggle CelebA Dataset](https://www.kaggle.com/datasets/jessicali9530/celeba-dataset)
+- 数据规模：官方说明包含 202,599 张人脸图片和 40 个属性标注
+- 使用限制：CelebA 主要用于非商业研究；下载和使用时应遵守原始数据集许可
 
 默认数据目录是：
 
@@ -293,7 +321,22 @@ transforms.ToTensor()
 
 CelebA 的对齐图片是长方形，先中心裁剪成正方形，再缩放到 64×64。
 
-### 5.2 Windows / PowerShell 运行
+### 5.2 Checkpoint 和预训练模型
+
+本章当前不依赖第三方预训练模型。训练、重建和生成使用的是本项目代码训练出的 checkpoint。
+
+| 文件 | 默认路径 | 说明 |
+| --- | --- | --- |
+| 训练 checkpoint | `work_dirs/vae/model.pth` | `--mode train` 输出，供重建和生成使用 |
+| 自检 checkpoint | `work_dirs/vae/smoke_model.pth` | `--mode smoke` 输出，只用于验证链路 |
+| 默认输出图 | `work_dirs/vae/tmp.jpg` | 重建或生成结果 |
+| 自检输出图 | `work_dirs/vae/smoke_sample.jpg` | smoke 生成的样例图 |
+
+`--mode reconstruct` 和 `--mode generate` 需要先有 checkpoint；如果还没有训练过，请先运行 `--mode smoke` 验证链路，或运行 `--mode train` 在 CelebA 上训练。
+
+Hugging Face 上有 MNIST VAE、Stable Diffusion VAE 等预训练模型，但它们不是本章代码的必要依赖。磁盘空间不足时不要下载大模型；后续如果章节接入第三方预训练模型，应同时说明模型来源、大小、下载方式和本地路径。
+
+### 5.3 Windows / PowerShell 运行
 
 如果 PowerShell 里中文显示成乱码，通常是终端代码页问题，不是 `.mdx` 文件损坏。可以先切到 UTF-8：
 
@@ -306,10 +349,14 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 推荐使用 `uv` 运行项目命令：
 
 ```powershell
+uv run python -m chapters.generative_models.vae.code.main --mode smoke --device cpu
+uv run python -m chapters.generative_models.vae.code.main --mode train --dataset mnist --epochs 1 --device auto --checkpoint work_dirs/vae/mnist_model.pth
 uv run python -m chapters.generative_models.vae.code.main --mode train --device cuda:0
 uv run python -m chapters.generative_models.vae.code.main --mode reconstruct --device cuda:0
 uv run python -m chapters.generative_models.vae.code.main --mode generate --device cuda:0
 ```
+
+`--device auto` 会优先选择 CUDA，其次选择 macOS MPS，最后回退到 CPU。没有 GPU 也可以用 `--mode smoke --device cpu` 跑通代码链路。
 
 如果当前环境已经安装好 PyTorch 和项目依赖，也可以直接用：
 
@@ -329,7 +376,7 @@ work_dirs/vae/model.pth
 work_dirs/vae/tmp.jpg
 ```
 
-### 5.3 CUDA 检查
+### 5.4 CUDA 检查
 
 在 Windows 上先确认 PyTorch 能看到 GPU：
 

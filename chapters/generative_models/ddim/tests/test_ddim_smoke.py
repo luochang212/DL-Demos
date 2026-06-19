@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import torch
 import torch.nn as nn
 
-from chapters.generative_models.ddim.ddim import DDIM
-from chapters.generative_models.ddim.main import sample_imgs
+from chapters.generative_models.ddim.code.ddim import DDIM
+from chapters.generative_models.ddim.code.main import sample_imgs, smoke
 
 
 class ZeroNoisePredictor(nn.Module):
@@ -12,7 +10,7 @@ class ZeroNoisePredictor(nn.Module):
         return torch.zeros_like(x)
 
 
-def test_ddim_sampling_and_output_path():
+def test_ddim_sampling_and_output_path(tmp_path):
     device = torch.device('cpu')
     ddim = DDIM(device, n_steps=4)
     x = torch.zeros(1, 1, 8, 8)
@@ -20,7 +18,7 @@ def test_ddim_sampling_and_output_path():
     sample = ddim.sample_backward(
         x, ZeroNoisePredictor(), device, simple_var=False, ddim_step=2, eta=0.5
     )
-    output_path = Path('work_dirs/ddim/test_sample.jpg')
+    output_path = tmp_path / 'test_sample.jpg'
     sample_imgs(
         ddim,
         ZeroNoisePredictor(),
@@ -35,3 +33,13 @@ def test_ddim_sampling_and_output_path():
 
     assert sample.shape == x.shape
     assert output_path.exists()
+
+
+def test_ddim_smoke_runner(tmp_path):
+    checkpoint = tmp_path / 'smoke_model.pth'
+    output = tmp_path / 'smoke_sample.jpg'
+
+    smoke(device='cpu', checkpoint=str(checkpoint), output=str(output))
+
+    assert checkpoint.exists()
+    assert output.exists()

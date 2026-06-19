@@ -3,7 +3,7 @@
 Run the unit-tested core implementation:
 
 ```shell
-uv run pytest tests/test_tutorial_models.py -k DetectionPostprocessing
+uv run pytest chapters/cv/nms/tests -q
 ```
 
 The visualization examples in `iou.py`, `show_bbox.py`, and `nms.py` require

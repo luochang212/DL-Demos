@@ -2,142 +2,198 @@
 id: ddim
 title: DDIM — 去噪扩散隐式模型
 sidebar_label: 3. DDIM
-description: 理解 DDIM 如何将扩散采样从 1000 步加速到 20 步，掌握非马尔可夫逆向过程的 eta 参数控制。
+description: 理解 DDIM 如何在不重新训练模型的前提下，把扩散采样从 1000 步加速到更少步数。
 keywords: [DDIM, 扩散模型, 加速采样, 隐式模型, ODE, 生成模型]
 ---
 
 # DDIM — 去噪扩散隐式模型
 
 :::tip 本章要点
-- 理解 DDIM 与 DDPM 的核心差异：**非马尔可夫逆向过程**
-- 掌握 **子序列采样**：用 20 步跳步采样达到 1000 步的效果
-- 理解 **eta 参数**：$\eta=0$ 确定性采样；使用完整相邻时间步时，$\eta=1$ 对应 DDPM
-- 读懂 [`chapters/generative_models/ddim/ddim.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/ddim.py) 的 57 行实现
+- DDIM 是 DDPM 的采样器改造：训练目标不变，采样过程改变。
+- DDIM 使用时间步子序列，从 $x_{\tau_i}$ 直接跳到 $x_{\tau_{i-1}}$。
+- $\eta=0$ 时采样是确定性的；$\eta>0$ 时重新引入随机噪声。
+- 源码入口在 [`chapters/generative_models/ddim/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/code/main.py)。
 :::
 
-:::info 前置要求
-本章是 [DDPM](./ddpm) 的延伸章节。请先阅读 DDPM 章节，理解前向过程和噪声预测目标。
+:::info 前置章节
+DDIM 复用了 DDPM 的前向扩散和噪声预测训练目标。建议先读 [DDPM](./ddpm)。
 :::
 
 ---
 
-## 1. DDPM 的瓶颈
+## 1. DDPM 的采样瓶颈
 
-DDPM 生成一张图像需要完整跑 $T=1000$ 步逆向去噪，每一步都调用一次网络推理。这导致：
-- 生成速度极慢（MNIST 上几秒，高分辨率图像几分钟）
-- 1000 步中大部分是微小变化，许多步是「冗余」的
+DDPM 的标准逆向过程逐步采样：
 
-DDIM 的核心问题：能不能只跑 20 步，跳过中间步骤？
+$$
+x_T \rightarrow x_{T-1} \rightarrow \cdots \rightarrow x_0
+$$
+
+如果 $T=1000$，生成一张图就要调用 1000 次噪声预测网络。DDIM 的问题是：
+
+> 能不能不改训练目标，只在采样时跳过一部分时间步？
+
+答案是可以。DDIM 构造一个更短的时间步子序列：
+
+$$
+\tau_1 < \tau_2 < \cdots < \tau_S,\quad S \ll T
+$$
+
+反向采样时直接从 $x_{\tau_i}$ 跳到 $x_{\tau_{i-1}}$。
 
 ---
 
-## 2. 数学原理
+## 2. 训练目标不变
 
-### 2.1 非马尔可夫逆向过程
-
-DDPM 的逆向过程是严格马尔可夫的：$x_{t-1}$ 只依赖 $x_t$。DDIM 放松了这个约束，允许**跳步**。
-
-DDIM 定义了一个子序列 $\tau = [\tau_1, \tau_2, ..., \tau_S]$（$S \ll T$），逆向过程直接从 $x_{\tau_i}$ 跳到 $x_{\tau_{i-1}}$，中间的时间步完全跳过。
-
-### 2.2 DDIM 更新公式
-
-从 $x_{\tau_i}$ 到 $x_{\tau_{i-1}}$ 的更新分解为三项：
+DDIM 仍然使用 DDPM 的前向闭式：
 
 $$
-x_{\tau_{i-1}} = \underbrace{\sqrt{\bar\alpha_{\tau_{i-1}} / \bar\alpha_{\tau_i}}\, x_{\tau_i}}_{\text{第一项：确定性缩放}} + \underbrace{\left(\sqrt{1 - \bar\alpha_{\tau_{i-1}} - \sigma^2} - \sqrt{\bar\alpha_{\tau_{i-1}}(1 - \bar\alpha_{\tau_i}) / \bar\alpha_{\tau_i}}\right) \varepsilon_\theta}_{\text{第二项：噪声校正}} + \underbrace{\sigma\, z}_{\text{第三项：随机扰动}}
+x_t = \sqrt{\bar\alpha_t}x_0 + \sqrt{1-\bar\alpha_t}\epsilon
 $$
 
-其中方差 $\sigma^2$ 由 $\eta$ 参数控制：
+训练网络预测噪声：
 
 $$
-\sigma = \eta \sqrt{\frac{1 - \bar\alpha_{\tau_{i-1}}}{1 - \bar\alpha_{\tau_i}} \cdot \frac{1 - \bar\alpha_{\tau_i} / \bar\alpha_{\tau_{i-1}}}}
+L_{\text{simple}}
+=
+\mathbb{E}_{x_0,t,\epsilon}
+\left[
+\left\|
+\epsilon-\epsilon_\theta(x_t,t)
+\right\|_2^2
+\right]
 $$
 
-- **$\eta = 0$**：第三项消失，变成确定性 ODE 采样——同样的起点一定生成同样的图像
-- **$\eta = 1$**：使用完整、相邻的时间步序列时，对应 DDPM 的马尔可夫采样；跳步采样时不等价于原始的完整 DDPM 采样
-
-这就是代码中 `first_term` / `second_term` / `third_term` 的来源。
+所以 DDPM 训练好的噪声预测网络可以直接用于 DDIM 采样。
 
 ---
 
-## 3. 代码解析
+## 3. DDIM 更新公式
 
-DDIM 直接继承 DDPM 类，只重写了 `sample_backward` 方法——全部差异就在这一个方法里。
+从 $x_t$ 跳到更早的 $x_s$，其中 $s<t$。先用网络预测噪声恢复 $\hat{x}_0$：
 
-### 3.1 继承与子序列构造
+$$
+\hat{x}_0
+=
+\frac{x_t-\sqrt{1-\bar\alpha_t}\epsilon_\theta(x_t,t)}
+{\sqrt{\bar\alpha_t}}
+$$
 
-```python title="chapters/generative_models/ddim/ddim.py" showLineNumbers
-class DDIM(DDPM):
+DDIM 采样公式写作：
 
-    def __init__(self, device, n_steps, min_beta=0.0001, max_beta=0.02):
-        # 复用 DDPM 的前向过程和系数计算
-        super().__init__(device, n_steps, min_beta, max_beta)
+$$
+x_s
+=
+\sqrt{\bar\alpha_s}\hat{x}_0
++
+\sqrt{1-\bar\alpha_s-\sigma_t^2}\epsilon_\theta(x_t,t)
++
+\sigma_t z
+$$
 
-    def sample_backward(self, img_or_shape, net, device,
-                        simple_var=True, ddim_step=20, eta=1):
-        if simple_var:
-            eta = 1
-        # key-start
-        # 子序列：在 [0, n_steps] 之间均匀取 ddim_step+1 个点
-        # 例如 n_steps=100, ddim_step=20 → ts = [100,95,90,...,5,0]
-        ts = torch.linspace(self.n_steps, 0,
-                            (ddim_step + 1)).to(device).to(torch.long)
-        # key-end
+其中：
+
+$$
+\sigma_t
+=
+\eta
+\sqrt{
+\frac{1-\bar\alpha_s}{1-\bar\alpha_t}
+\left(
+1-\frac{\bar\alpha_t}{\bar\alpha_s}
+\right)
+}
+$$
+
+把 $\hat{x}_0$ 展开后，就是代码里的三项：
+
+```python title="chapters/generative_models/ddim/code/ddim.py"
+first_term = (ab_prev / ab_cur) ** 0.5 * x
+second_term = (
+    (1 - ab_prev - var) ** 0.5
+    - (ab_prev * (1 - ab_cur) / ab_cur) ** 0.5
+) * eps
+third_term = var**0.5 * noise
+x = first_term + second_term + third_term
 ```
 
-### 3.2 三项更新公式
-
-```python title="chapters/generative_models/ddim/ddim.py" showLineNumbers
-        for i in tqdm(range(1, ddim_step + 1),
-                      f'DDIM sampling with eta {eta}'):
-            cur_t = ts[i - 1] - 1
-            prev_t = ts[i] - 1
-
-            ab_cur = self.alpha_bars[cur_t]
-            ab_prev = self.alpha_bars[prev_t] if prev_t >= 0 else 1
-
-            t_tensor = torch.tensor([cur_t] * batch_size,
-                                    dtype=torch.long).to(device).unsqueeze(1)
-            eps = net(x, t_tensor)
-            # key-start
-            # eta 控制的标准 DDIM 方差
-            var = eta**2 * (1 - ab_prev) / (1 - ab_cur) * (1 - ab_cur / ab_prev)
-
-            # 三项更新公式，与论文公式一一对应
-            first_term  = (ab_prev / ab_cur)**0.5 * x
-            second_term = ((1 - ab_prev - var)**0.5 -
-                           (ab_prev * (1 - ab_cur) / ab_cur)**0.5) * eps
-            if simple_var:
-                third_term = (1 - ab_cur / ab_prev)**0.5 * noise
-            else:
-                third_term = var**0.5 * noise
-            x = first_term + second_term + third_term
-            # key-end
-```
-
 ---
 
-## 4. DDIM vs DDPM 对比
+## 4. eta 控制随机性
 
-| 维度 | DDPM | DDIM |
-|------|------|------|
-| 逆向过程 | 马尔可夫，严格 $x_t → x_{t-1}$ | 非马尔可夫，跳步 $x_{\tau_i} → x_{\tau_{i-1}}$ |
-| 采样步数 | 标准采样使用全部 1000 步 | 20 步（可调 `ddim_step`）|
-| 随机性 | 除最后一步外加入随机噪声 | $\eta$ 控制：0=确定性；完整相邻时间步下，1 对应 DDPM |
-| 训练方式 | 完全相同 | **完全相同**（只改采样，不改训练）|
-| 生成速度 | 慢 | 快 50×（20步 vs 1000步）|
+当 $\eta=0$：
 
-**关键结论**：DDIM 不需要重新训练模型。任何 DDPM 训练好的权重都可以直接用 DDIM 采样——只需把 `sample_backward` 替换为 DDIM 版本。
+$$
+\sigma_t = 0
+$$
+
+采样过程不再加入额外噪声。给定同一个初始 $x_T$，输出固定，因此这是确定性采样。
+
+当 $\eta=1$ 且使用完整相邻时间步时，方差形式对应 DDPM 的逐步采样。若使用跳步子序列，$\eta=1$ 仍然不是原始 1000 步 DDPM 的完整马尔可夫链。
 
 :::warning 项目中的 `simple_var`
-源码默认参数 `simple_var=True` 是项目提供的简化方差模式：它会强制 `eta=1`，并使用与标准 DDIM 公式不同的噪声方差。要使用本节介绍的标准 $\eta$ 控制，请传入 `simple_var=False`。
+源码保留了一个教学用的 `simple_var=True` 简化分支。要观察标准 DDIM 的 $\eta$ 控制，请使用 `simple_var=False`，命令行采样默认走这个分支。
 :::
 
 ---
 
-## 5. 延伸阅读
+## 5. 运行代码
+
+不下载数据的 smoke：
+
+```powershell
+uv run python -m chapters.generative_models.ddim.code.main --help
+uv run python -m chapters.generative_models.ddim.code.main --mode smoke --device cpu
+```
+
+MNIST 训练：
+
+```powershell
+uv run python -m chapters.generative_models.ddim.code.main --mode train --device auto --data-root data/mnist --epochs 1 --batch-size 128
+```
+
+DDIM 采样：
+
+```powershell
+uv run python -m chapters.generative_models.ddim.code.main --mode sample --device auto --checkpoint work_dirs/ddim/mnist.pth --output work_dirs/ddim/sample.jpg --ddim-step 20 --eta 0
+```
+
+输出默认写入 `work_dirs/ddim/`。
+
+---
+
+## 6. 数据与权重
+
+- MNIST 数据来自 `torchvision.datasets.MNIST`，默认放在 `data/mnist/`。
+- 本仓库不提交 `data/`、checkpoint 或生成的大批量图片。
+- 默认 checkpoint 是 `work_dirs/ddim/mnist.pth`。
+- 本章暂不内置 Hugging Face 预训练权重。若后续引入，应在章节中记录来源、许可证、文件大小、保存路径和加载命令。
+
+---
+
+## 7. 公式推导
+
+完整公式推导和核心采样代码可以直接点击 [完整公式推导](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/derivations/formulas.md)，或者打开 [ddim.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/code/ddim.py) 和 [main.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/ddim/code/main.py)。这些本仓库文件链接会自动在弹窗中打开。
+
+Lean4 检查放在：
+
+```text
+chapters/generative_models/ddim/derivations/ddim.lean
+```
+
+运行：
+
+```powershell
+lake build
+```
+
+---
+
+## 8. 延伸阅读
 
 - 📄 [Denoising Diffusion Implicit Models（Song et al., 2021）](https://arxiv.org/abs/2010.02502)
+- 📄 [Denoising Diffusion Probabilistic Models（Ho et al., 2020）](https://arxiv.org/abs/2006.11239)
+- 🔗 [周一帆：DDIM 是什么？](https://zhouyifan.net/2023/07/07/20230702-DDIM/)
 - 🔗 [本章源码：`chapters/generative_models/ddim/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/ddim)
-- ⬅️ **前置章节**：[DDPM — 去噪扩散概率模型](./ddpm)
-- ➡️ **下一章**：[PixelCNN — 自回归像素生成](./pixelcnn)
+- ⬅️ 前置章节：[DDPM — 去噪扩散概率模型](./ddpm)
+- ➡️ 下一章：[PixelCNN — 自回归像素生成](./pixelcnn)

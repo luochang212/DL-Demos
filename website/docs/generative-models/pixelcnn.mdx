@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**自回归分解**：把图像生成拆解为像素级的条件概率链
 - 掌握**掩码卷积**（A 型/B 型）：如何让卷积只「看到」已生成的像素
 - 理解**门控激活**：Gated PixelCNN 如何解决盲点问题
-- 读懂 [`chapters/generative_models/pixelcnn/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/model.py) 的实现
+- 读懂 [`chapters/generative_models/pixelcnn/code/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/code/model.py) 的实现
 :::
 
 ---
@@ -83,7 +83,7 @@ Gated PixelCNN 用**双分支结构**解决：
 
 ### 3.1 掩码卷积
 
-```python title="chapters/generative_models/pixelcnn/model.py" showLineNumbers
+```python title="chapters/generative_models/pixelcnn/code/model.py" showLineNumbers
 class MaskConv2d(nn.Module):
 
     def __init__(self, conv_type, *args, **kwags):
@@ -112,7 +112,7 @@ class MaskConv2d(nn.Module):
 
 ### 3.2 门控块（GatedBlock）
 
-```python title="chapters/generative_models/pixelcnn/model.py" showLineNumbers
+```python title="chapters/generative_models/pixelcnn/code/model.py" showLineNumbers
 class GatedBlock(nn.Module):
 
     def __init__(self, conv_type, in_channels, p, bn=False):
@@ -186,9 +186,64 @@ loss = F.cross_entropy(output, target)
 
 ---
 
-## 5. 延伸阅读
+## 5. 训练与运行
 
+项目入口是 [`chapters/generative_models/pixelcnn/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/code/main.py)，支持三种模式：
+
+| 模式 | 命令 | 依赖 |
+| --- | --- | --- |
+| 自检 | `--mode smoke` | 无真实数据集依赖 |
+| 训练 | `--mode train` | MNIST 数据集 |
+| 采样 | `--mode sample` | checkpoint |
+
+### 5.1 数据准备
+
+PixelCNN 训练使用 MNIST 手写数字图片。
+
+- 数据来源：`torchvision.datasets.MNIST`
+- 官方来源：[The MNIST Database](http://yann.lecun.com/exdb/mnist/)
+- 默认路径：`data/mnist/`
+- 数据规模：60,000 张训练图片，10,000 张测试图片，灰度 28×28
+
+### 5.2 Checkpoint 和预训练模型
+
+本章当前不依赖第三方预训练模型。训练和采样使用的是本项目代码训练出的 checkpoint。
+
+| 文件 | 默认路径 | 说明 |
+| --- | --- | --- |
+| 训练 checkpoint | `work_dirs/pixelcnn/model_1_8.pth` | `--mode train` 输出，供采样使用 |
+| 自检 checkpoint | `work_dirs/pixelcnn/smoke_model.pth` | `--mode smoke` 输出，只用于验证链路 |
+| 默认输出图 | `work_dirs/pixelcnn/pixelcnn_1_8.jpg` | 采样生成结果 |
+| 自检输出图 | `work_dirs/pixelcnn/smoke_sample.jpg` | smoke 生成的样例图 |
+
+### 5.3 运行命令
+
+不依赖 MNIST 的真实 CLI 自检：
+
+```powershell
+uv run python -m chapters.generative_models.pixelcnn.code.main --mode smoke --device cpu
+```
+
+快速训练和采样：
+
+```powershell
+uv run python -m chapters.generative_models.pixelcnn.code.main --mode train --epochs 1 --batch-size 128 --model-id 1 --color-level 8 --device auto --checkpoint work_dirs/pixelcnn/mnist_model.pth
+uv run python -m chapters.generative_models.pixelcnn.code.main --mode sample --model-id 1 --color-level 8 --device auto --checkpoint work_dirs/pixelcnn/mnist_model.pth --output work_dirs/pixelcnn/mnist_sample.jpg --n-sample 16
+```
+
+`--device auto` 会优先选择 CUDA，其次选择 macOS MPS，最后回退到 CPU。
+
+### 5.4 完整公式推导
+
+如果想查看自回归概率分解、交叉熵训练目标和掩码约束的完整推导，可以直接点击 [完整公式推导](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/derivations/formulas.md)，或者打开 [model.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/code/model.py) 和 [main.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/pixelcnn/code/main.py)。这些本仓库文件链接会自动在弹窗中打开。
+
+---
+
+## 6. 延伸阅读
+
+- 📄 [Pixel Recurrent Neural Networks（van den Oord et al., 2016）](https://arxiv.org/abs/1601.06759)
 - 📄 [PixelCNN++（Salimans et al., 2017）](https://arxiv.org/abs/1701.00105)
 - 📄 [Gated PixelCNN（van den Oord et al., 2016）](https://arxiv.org/abs/1606.05328)
+- 🔗 周弈帆（2023-05-27）。[冷门的自回归生成模型 ~ 详解 PixelCNN 大家族](https://zhouyifan.net/2023/05/27/20230522-pixelcnn/)
 - 🔗 [本章源码：`chapters/generative_models/pixelcnn/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/pixelcnn)
 - ➡️ **下一章**：[VQVAE — 向量量化变分自编码器](./vqvae)（其中 PixelCNN 作为先验模型，原理见本章）

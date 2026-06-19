@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 - 掌握**码本（Codebook）**：用有限个向量近似编码器输出
 - 理解**直通梯度估计**：绕过不可微的量化操作
 - 掌握**三段损失函数**：重建损失 + 嵌入损失 + 承诺损失
-- 读懂 [`chapters/generative_models/vqvae/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/model.py)
+- 读懂 [`chapters/generative_models/vqvae/code/model.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/model.py)
 :::
 
 :::info 前置知识
@@ -79,7 +79,7 @@ $$
 
 ### 3.1 编码器 + 码本 + 解码器结构
 
-```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/code/model.py" showLineNumbers
 class VQVAE(nn.Module):
 
     def __init__(self, input_dim, dim, n_embedding):
@@ -106,7 +106,7 @@ class VQVAE(nn.Module):
 
 ### 3.2 量化过程（forward 核心）
 
-```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/code/model.py" showLineNumbers
     def forward(self, x):
         ze = self.encoder(x)
         embedding = self.vq_embedding.weight.data
@@ -138,7 +138,7 @@ class VQVAE(nn.Module):
 
 ### 3.3 推断：编码与解码分离
 
-```python title="chapters/generative_models/vqvae/model.py" showLineNumbers
+```python title="chapters/generative_models/vqvae/code/model.py" showLineNumbers
     @torch.no_grad()
     def encode(self, x):
         ze = self.encoder(x)
@@ -162,7 +162,7 @@ class VQVAE(nn.Module):
 <Tabs>
   <TabItem value="loss" label="三段损失" default>
 
-```python title="chapters/generative_models/vqvae/main.py"
+```python title="chapters/generative_models/vqvae/code/main.py"
 x_hat, ze, zq = model(x)
 l_reconstruct  = mse_loss(x, x_hat)            # 重建损失
 l_embedding    = mse_loss(ze.detach(), zq)      # 嵌入损失：码本靠近编码器
@@ -216,8 +216,62 @@ VQVAE 的生成流程分为两个阶段：
 
 ---
 
-## 5. 延伸阅读
+## 5. 训练与运行
+
+项目入口是 [`chapters/generative_models/vqvae/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/main.py)，支持两种模式：
+
+| 模式 | 命令 | 依赖 |
+| --- | --- | --- |
+| 自检 | `--mode smoke` | 无真实数据集依赖 |
+| 完整训练 | `--mode full` | MNIST / CelebA 配置数据 |
+
+### 5.1 数据准备
+
+VQVAE 快速训练使用 MNIST；配置文件也保留 CelebA / CelebA-HQ 路径。
+
+- MNIST 来源：`torchvision.datasets.MNIST`
+- MNIST 默认路径：`data/mnist/`
+- CelebA 默认路径：`data/celebA/img_align_celeba/`
+- CelebA-HQ 默认路径：`data/celebA/celeba_hq_256/`
+
+### 5.2 Checkpoint 和预训练模型
+
+本章当前不依赖第三方预训练模型。两阶段训练会产生两个本项目 checkpoint：
+
+| 文件 | 默认路径 | 说明 |
+| --- | --- | --- |
+| VQ-VAE checkpoint | `work_dirs/vqvae/model.pth` | 第一阶段训练输出 |
+| PixelCNN 先验 checkpoint | `work_dirs/vqvae/gen_model.pth` | 第二阶段训练输出 |
+| 自检 VQ-VAE checkpoint | `work_dirs/vqvae/smoke_model.pth` | `--mode smoke` 输出 |
+| 自检 PixelCNN checkpoint | `work_dirs/vqvae/smoke_gen_model.pth` | `--mode smoke` 输出 |
+
+Hugging Face 上有 VQ-VAE、VQGAN 和离散 token 图像生成相关模型，但它们不是本章代码的必要依赖。磁盘空间不足时不要下载大模型；后续如果章节接入第三方预训练模型，应同时说明模型来源、大小、下载方式和本地路径。
+
+### 5.3 运行命令
+
+不依赖 MNIST 的真实 CLI 自检：
+
+```powershell
+uv run python -m chapters.generative_models.vqvae.code.main --mode smoke --device cpu
+```
+
+完整训练：
+
+```powershell
+uv run python -m chapters.generative_models.vqvae.code.main --mode full -c 0 --device auto
+```
+
+`--device auto` 会优先选择 CUDA，其次选择 macOS MPS，最后回退到 CPU。
+
+### 5.4 完整公式推导
+
+如果想查看向量量化、直通梯度和三段损失的完整推导，可以直接点击 [完整公式推导](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/derivations/formulas.md)，或者打开 [model.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/model.py)、[pixelcnn_model.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/pixelcnn_model.py) 和 [main.py](https://github.com/luochang212/DL-Demos/blob/master/chapters/generative_models/vqvae/code/main.py)。这些本仓库文件链接会自动在弹窗中打开。
+
+---
+
+## 6. 延伸阅读
 
 - 📄 [Neural Discrete Representation Learning（van den Oord et al., 2017）](https://arxiv.org/abs/1711.00937)
+- 🔗 周弈帆（2023-06-06）。[轻松理解 VQ-VAE：首个提出 codebook 机制的生成模型](https://zhouyifan.net/2023/06/06/20230527-VQVAE/)
 - 🔗 [本章源码：`chapters/generative_models/vqvae/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/generative_models/vqvae)
 - ⬅️ **前置章节**：[PixelCNN — 自回归像素生成](./pixelcnn)
