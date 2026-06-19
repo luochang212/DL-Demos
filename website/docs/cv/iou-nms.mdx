@@ -105,8 +105,10 @@ uv run python chapters/cv/nms/iou.py
 uv run python chapters/cv/nms/nms.py
 ```
 
-## 7. 延伸阅读
+## 7. 参考资料
 
-- Soft-NMS：不直接删除重叠框，而是降低其分数。
-- DIoU-NMS：在 IoU 之外考虑中心点距离。
+- Felzenszwalb, P. F., Girshick, R. B., McAllester, D., & Ramanan, D. (2010). [Object Detection with Discriminatively Trained Part-Based Models](https://people.cs.uchicago.edu/~rbg/papers/disc-parts-pami.pdf). *IEEE TPAMI*, 32(9), 1627–1645.
+- Bodla, N., Singh, B., Chellappa, R., & Davis, L. S. (2017). [Soft-NMS — Improving Object Detection with One Line of Code](https://arxiv.org/abs/1704.04503). *ICCV 2017*.
+- Zheng, Z., Wang, P., Ren, D., Liu, W., Ye, R., Hu, Q., & Zuo, W. (2020). [Enhancing Geometric Factors in Model Learning and Inference for Object Detection and Instance Segmentation](https://arxiv.org/abs/2005.03572). *IEEE TPAMI*.（DIoU-NMS / CIoU-NMS）
 - `torchvision.ops.nms`：生产代码优先使用框架优化实现。
+- 本项目源码：[chapters/cv/nms/](https://github.com/luochang212/DL-Demos/tree/master/chapters/cv/nms)
