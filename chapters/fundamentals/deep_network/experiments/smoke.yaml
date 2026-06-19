@@ -1,4 +1,0 @@
-name: deep_network_smoke
-description: Minimal deep-network forward/backward/save smoke run.
-data: synthetic
-checkpoint: work_dirs/deep_network/smoke_model.npz

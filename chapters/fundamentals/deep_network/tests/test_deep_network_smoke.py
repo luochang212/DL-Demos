@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from chapters.fundamentals.deep_network.model import DeepNetwork, train
+from chapters.fundamentals.deep_network.code.model import DeepNetwork, train
 
 
 def test_deep_network_train_and_checkpoint_path():
