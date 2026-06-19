@@ -1,12 +1,4 @@
-import sys
-from unittest.mock import MagicMock
-
 import pytest
-
-# The tf_main module imports cv2 via chapters.cv.basic_cnn.dataset.
-# Mock cv2 before any imports from the chapter.
-mock_cv2 = MagicMock()
-sys.modules['cv2'] = mock_cv2
 
 pytest.importorskip('tensorflow', reason='TensorFlow not installed')
 tf = pytest.importorskip('tensorflow')
