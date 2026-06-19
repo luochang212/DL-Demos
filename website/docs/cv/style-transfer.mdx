@@ -3,51 +3,302 @@ id: style-transfer
 title: Style Transfer — 优化一张图像
 sidebar_label: 3. Style Transfer
 description: 使用 VGG 特征、内容损失和 Gram Matrix 完成神经风格迁移。
+keywords: [风格迁移, Style Transfer, VGG, Gram Matrix, Gatys, 内容损失, 风格损失]
 ---
 
 # Style Transfer — 优化一张图像
 
-神经风格迁移不训练新的生成网络，而是冻结预训练 VGG，直接把输出图像像素作为待优化参数。
+:::tip 本章要点
+- 理解风格迁移的**核心思想**：不训练生成网络，而是**直接优化图像像素**
+- 掌握**内容损失**：用 VGG 高层特征的距离保持图像内容
+- 掌握**风格损失**：用 **Gram Matrix** 捕获纹理和笔触的统计特征
+- 看懂把损失模块**作为 hook 插入 VGG** 的工程技巧
+- 理解 **LBFGS** 为什么比 SGD/Adam 更适合这个任务
+:::
 
-## 1. 内容与风格
+---
 
-内容损失比较输出图像与内容图像的高层特征：
+## 1. 核心思想：优化图像，而不是训练网络
 
-$$L_{content}=\|F_l(x)-F_l(c)\|_2^2$$
+神经风格迁移（Gatys et al., 2015）的做法和大多数深度学习任务相反：
 
-风格使用 Gram Matrix 描述通道之间的相关性：
+| 常规任务 | 风格迁移 |
+|---------|---------|
+| 输入固定，**更新网络参数** | **冻结网络**，更新输入图像像素 |
+| 最小化任务 loss | 最小化「内容 + 风格」的组合 loss |
+| 输出是训练好的模型 | 输出是一张图片 |
 
-$$G(F)=FF^T,\qquad L_{style}=\sum_l\|G(F_l(x))-G(F_l(s))\|_2^2$$
+具体来说：有一张**内容图像**（你想保留的构图）和一张**风格图像**（你想模仿的笔触/纹理），目标是生成一张新图像，使它经过 VGG 提取的特征同时接近：
 
-总损失是两者的加权和。VGG 参数被冻结，梯度只更新输入图像。
+- 内容图像的高层特征（保留「是什么」）  
+- 风格图像的各层 Gram Matrix（模仿「怎么画的」）
 
-## 2. 代码解析
+VGG 只当特征提取器，参数从头到尾冻结。梯度从 loss 一路回传到输入图像 `input_img` 的像素值上。
+
+---
+
+## 2. 内容损失：高层特征匹配
+
+### 2.1 为什么用 VGG 高层
+
+VGG 不同层提取的信息层次不同：
+
+| 层 | 感受野 | 编码信息 | 用途 |
+|---|--------|---------|------|
+| `conv_1` ~ `conv_2` | 小（3~5 px） | 边缘、颜色、纹理 | 风格 |
+| `conv_3` ~ `conv_4` | 中（14~30 px） | 局部形状、物体部件 | 风格 / 内容 |
+| `conv_5` | 大（~60 px） | 整体结构、语义 | 内容 |
+
+内容损失通常只用 `conv_4` 一层：它的感受野足够感知物体结构，但还没抽象到丢失空间信息。
+
+### 2.2 公式
+
+给定生成图像 $\vec{x}$ 和内容图像 $\vec{c}$，在 VGG 第 $l$ 层特征图 $F^l$ 上计算 MSE：
+
+$$
+\mathcal{L}_{\text{content}}(\vec{x}, \vec{c}, l) = \frac{1}{2} \sum_{i,j} \left(F_{ij}^l(\vec{x}) - F_{ij}^l(\vec{c})\right)^2
+$$
+
+$F_{ij}^l$ 是第 $l$ 层特征图在位置 $j$ 通道 $i$ 的激活值。两者越接近，生成图像在该层的「看到的东西」越像内容图像。
+
+---
+
+## 3. 风格损失：Gram Matrix 捕获纹理
+
+### 3.1 什么是风格
+
+风格不是「像素在哪里」，而是**通道之间的共现模式**。比如：
+
+- 某层中，通道 3（竖条纹检测器）和通道 7（蓝色检测器）总是一起激活 → 画面有蓝色竖条纹
+- 通道 12（曲线检测器）和通道 21（橙色调）相关性高 → 画面有橙色调的曲线笔触
+
+这种「谁和谁一起出现」的统计信息，不关心激活发生在图的哪个位置。
+
+### 3.2 Gram Matrix 定义
+
+将第 $l$ 层特征图 $F^l$（形状 $C_l \times H_l W_l$）展平成矩阵，Gram Matrix 是它和自身转置的乘积：
+
+$$
+G_{ij}^l = \sum_k F_{ik}^l \cdot F_{jk}^l
+$$
+
+矩阵形式：$G^l = F^l \cdot (F^l)^T$，结果形状 $C_l \times C_l$。
+
+- $G_{ij}$ 表示通道 $i$ 和通道 $j$ 在整个空间上的激活相关性
+- 空间信息（$H, W$）被求和「抹平」——这就是**丢弃位置、只留统计**的关键
+- Gram Matrix **自动对称**：$G_{ij} = G_{ji}$，与通道标号顺序无关
+
+### 3.3 代码
 
 ```python
-features = x.reshape(n * c, h * w)
-gram_matrix = torch.mm(features, features.T) / (n * c * h * w)
+def gram(x: torch.Tensor):
+    n, c, h, w = x.shape
+    features = x.reshape(n * c, h * w)           # (C, H*W)
+    G = torch.mm(features, features.T)            # (C, C)
+    return G / (n * c * h * w)                    # 除以元素数做归一化
 ```
 
-Gram Matrix 抛弃特征出现的具体位置，只保留通道共同出现的统计关系，因此适合表达纹理和笔触。
+`n` 通常是 1（单张图），`c * h * w` 是特征图的元素总数。除以它能防止不同尺寸的层对损失的贡献差异过大。
 
-优化阶段使用 LBFGS。每次 closure 先把图像裁剪到合法像素范围，再计算内容损失与风格损失，梯度只回传到 `input_img`。
+### 3.4 风格损失公式
 
-## 3. 可调用入口
+对每一层计算生成图像和风格图像的 Gram Matrix 差异，求和：
 
-`run_style_transfer(content_path, style_path, output_path, num_steps, device)` 是无导入副作用的公共入口。导入模块不会下载权重或开始训练。
+$$
+\mathcal{L}_{\text{style}}(\vec{x}, \vec{s}) = \sum_l w_l \cdot \frac{1}{4 N_l^2 M_l^2} \sum_{i,j} \left(G_{ij}^l(\vec{x}) - G_{ij}^l(\vec{s})\right)^2
+$$
+
+- $N_l$：第 $l$ 层通道数
+- $M_l$：第 $l$ 层空间尺寸（$H_l \times W_l$）
+- $w_l$：层权重（本实现中各层等权 $w_l = 1$）
+- 系数 $\frac{1}{4N_l^2 M_l^2}$ 是原论文的归一化因子
+
+风格损失通常跨越多层（`conv_1` 到 `conv_5`），因为不同尺度提取不同粒度的纹理：低层捕获局部笔触，高层捕获整体色调布局。
+
+---
+
+## 4. VGG 特征提取：把 Loss 插入网络
+
+### 4.1 整体架构
+
+代码用了一个巧妙的设计：不单独前向传播再算 loss，而是**把 loss 模块直接插入 VGG 的 Sequential**：
+
+```
+input_img → Normalization → VGG[conv_1] → Content/Style Loss Hook → VGG[conv_2] → ... → 多个 Loss Hook
+```
+
+每次前向传播时，特征流过 VGG，顺便在每个挂钩层计算并记录 loss。
+
+### 4.2 Normalization
+
+VGG 在 ImageNet 上训练时用了特定的均值和标准差。输入图像必须做同样的归一化，否则特征分布会偏移：
+
+```python
+class Normalization(nn.Module):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.register_buffer('mean', torch.tensor(mean).reshape(-1, 1, 1))
+        self.register_buffer('std', torch.tensor(std).reshape(-1, 1, 1))
+
+    def forward(self, img):
+        return (img - self.mean) / self.std
+```
+
+使用 `register_buffer` 确保均值和标准差随模型一起移到 GPU，但不参与梯度计算。
+
+### 4.3 ContentLoss 和 StyleLoss 作为 Hook
+
+```python
+class ContentLoss(nn.Module):
+    def __init__(self, target):
+        super().__init__()
+        self.target = target.detach()     # 冻结目标，不计算梯度
+        self.loss = torch.tensor(0.0)
+
+    def forward(self, input):
+        self.loss = F.mse_loss(input, self.target)
+        return input                       # 转发特征，不改变数据流
+```
+
+关键设计：
+- `target.detach()` 冻结内容/风格图像的特征，loss 只算在生成图像上
+- `forward` 把输入原样返回——对网络来说是透明的，但 loss 已经被记录
+- StyleLoss 同理，只是在 `__init__` 中把 target 先转成 Gram Matrix
+
+### 4.4 构建模型
+
+`get_model_and_losses()` 遍历 VGG 的每一层，重命名后插入 `Sequential`，遇到指定的 `content_layers` 或 `style_layers` 就去算一次 target 特征并挂上对应的 loss 模块：
+
+```python
+if name in content_layers:
+    content_loss = ContentLoss(model(content_img))
+    model.add_module(f'content_loss_{conv_index}', content_loss)
+    content_losses.append(content_loss)
+if name in style_layers:
+    style_loss = StyleLoss(model(style_img))
+    model.add_module(f'style_loss_{conv_index}', style_loss)
+    style_losses.append(style_loss)
+```
+
+注意 `model(content_img)` 和 `model(style_img)` 这两次前向传播：每次前向都会依次经过已添加的模块，但因为后面还没挂 loss，所以实际上只是提取 target 特征。
+
+---
+
+## 5. 优化过程
+
+### 5.1 为什么用 LBFGS
+
+风格迁移的待优化参数只有一张图的像素（$3 \times H \times W$ 个值），参数量不大但 loss 曲面高度非凸。LBFGS 是一种**准牛顿法**，利用历史梯度近似 Hessian 矩阵，比 SGD/Adam 收敛更快、更稳。
+
+```python
+input_img = content_img.clone().requires_grad_(True)
+optimizer = optim.LBFGS([input_img])
+```
+
+### 5.2 LBFGS 的 closure
+
+LBFGS 要求目标函数封装在一个闭包（`closure`）中，返回 loss 值。框架会多次调用 `closure` 做线搜索：
+
+```python
+def closure():
+    with torch.no_grad():
+        input_img.clamp_(0, 1)          # 保持像素合法
+    optimizer.zero_grad()
+    model(input_img)                     # 前向传播，各 loss hook 自动记录
+    content_loss = sum(l.loss for l in content_losses)
+    style_loss = sum(l.loss for l in style_losses)
+    total_loss = content_weight * content_loss + style_weight * style_loss
+    total_loss.backward()
+    return total_loss
+```
+
+### 5.3 权重平衡
+
+内容损失和风格损失的量级不同，需要权重来平衡：
+
+```python
+content_weight = 1
+style_weight = 1e4
+```
+
+- 内容权重太大 → 输出像内容图的模糊版，风格不明显
+- 风格权重太大 → 纹理非常强烈，但内容结构崩坏
+- 默认 `1:1e4` 是一个经验值，可以根据具体图片调整
+
+### 5.4 像素裁剪
+
+每次更新后用 `clamp_(0, 1)` 把像素值约束到合法范围。如果不裁剪，优化器可能把像素推到 $[0,1]$ 之外，导致保存时图像异常。
+
+---
+
+## 6. 辅助脚本
+
+`code/` 目录下还有两个教学脚本，建议在学习时按顺序理解：
+
+### copy_img.py — 纯风格匹配
+
+直接让输入图像像素值去匹配风格图（MSE on raw pixels）：
+
+```python
+loss = F.mse_loss(input_img, style_img)
+```
+
+这会得到一张完全等于风格图的复制品。它验证了「优化像素」这条路径跑得通，但没有任何内容保留。
+
+### combine_img.py — 像素级混合
+
+将内容图和风格图的像素直接加和作为目标：
+
+```python
+loss = F.mse_loss(input_img, style_img) + F.mse_loss(input_img, content_img)
+```
+
+结果是两张图的像素平均。这是理解完整风格迁移的中间步骤——真正的风格迁移把「像素匹配」升级为「特征 + Gram 匹配」。
+
+---
+
+## 7. 方法对比
+
+| 方法 | 速度 | 质量 | 原理 |
+|------|------|------|------|
+| Gatys (2015) — 本章 | 慢（每张图都要优化） | 高 | 像素优化 + VGG 特征 |
+| Johnson (2016) — 快速风格迁移 | 快（前馈网络） | 中-高 | 训练一个图像变换网络 |
+| AdaIN (2017) | 快 | 中 | 自适应实例归一化 |
+| 基于扩散 | 慢 | 很高 | 扩散模型 + ControlNet / IP-Adapter |
+
+本章实现的是 Gatys 的原始方法，速度慢但概念清晰，是理解后续所有方法的基础。
+
+---
+
+## 8. 运行与验证
+
+烟雾测试不加载 VGG 权重，只验证 Gram Matrix、各 loss 模块和梯度回传：
 
 ```bash
-uv run python chapters/cv/style_transfer/style_transfer.py \
+uv run pytest chapters/cv/style_transfer/tests -q
+```
+
+完整运行（会下载 VGG19 预训练权重）：
+
+```bash
+uv run python -m chapters.cv.style_transfer.code.style_transfer \
   --content chapters/cv/style_transfer/dancing.jpg \
   --style chapters/cv/style_transfer/picasso.jpg \
   --output work_dirs/style-transfer.jpg \
   --steps 300
 ```
 
-首次运行会下载 torchvision 的 VGG19 默认权重。该方法优化速度慢，适合理解特征损失，不适合实时风格迁移。
+> 首次运行需联网下载 torchvision 的 VGG19 权重（约 500 MB）。该方法在 CPU 上很慢，建议有 GPU 时运行。
+
+完整公式推导见：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/style_transfer/derivations/formulas.md)
+
+---
 
 ## 参考资料
 
 - Gatys, L. A., Ecker, A. S., & Bethge, M. (2015). [A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576). *arXiv:1508.06576*.
 - Gatys, L. A., Ecker, A. S., & Bethge, M. (2016). [Image Style Transfer Using Convolutional Neural Networks](https://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Gatys_Image_Style_Transfer_CVPR_2016_paper.pdf). *CVPR 2016*.
-- 本项目源码：[chapters/cv/style_transfer/](https://github.com/luochang212/DL-Demos/tree/master/chapters/cv/style_transfer)。
+- Johnson, J., Alahi, A., & Li, F. (2016). [Perceptual Losses for Real-Time Style Transfer and Super-Resolution](https://arxiv.org/abs/1603.08155). *ECCV 2016*.
+- Huang, X., & Belongie, S. (2017). [Arbitrary Style Transfer in Real-Time with Adaptive Instance Normalization](https://arxiv.org/abs/1703.06868). *ICCV 2017*.
+- 完整公式推导：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/style_transfer/derivations/formulas.md)
+- 本项目源码：[chapters/cv/style_transfer/](https://github.com/luochang212/DL-Demos/tree/master/chapters/cv/style_transfer)
