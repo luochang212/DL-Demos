@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
-from chapters.cv.basic_cnn.dataset import get_cat_set
+from chapters.cv.basic_cnn.code.dataset import get_cat_set
 
 
 def identity_block_2(x, f, use_shortcut=True):

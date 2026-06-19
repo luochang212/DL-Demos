@@ -13,7 +13,7 @@ tf = pytest.importorskip('tensorflow')
 
 
 def test_identity_block_forward_on_cpu():
-    from chapters.cv.resnet.tf_main import identity_block_2
+    from chapters.cv.resnet.code.tf_main import identity_block_2
 
     x = tf.random.normal((2, 56, 56, 64))
     out = identity_block_2(x, f=3, use_shortcut=True)
@@ -24,7 +24,7 @@ def test_identity_block_forward_on_cpu():
 
 
 def test_convolution_block_forward_on_cpu():
-    from chapters.cv.resnet.tf_main import convolution_block_2
+    from chapters.cv.resnet.code.tf_main import convolution_block_2
 
     x = tf.random.normal((2, 56, 56, 64))
     out = convolution_block_2(x, f=3, filters=128, s=2, use_shortcut=True)
@@ -35,7 +35,7 @@ def test_convolution_block_forward_on_cpu():
 
 
 def test_init_model_resnet18_on_cpu():
-    from chapters.cv.resnet.tf_main import init_model
+    from chapters.cv.resnet.code.tf_main import init_model
 
     model = init_model(
         input_shape=(64, 64, 3), model_name='ResNet18', use_shortcut=True
@@ -46,7 +46,7 @@ def test_init_model_resnet18_on_cpu():
 
 
 def test_init_model_resnet50_on_cpu():
-    from chapters.cv.resnet.tf_main import init_model
+    from chapters.cv.resnet.code.tf_main import init_model
 
     model = init_model(
         input_shape=(64, 64, 3), model_name='ResNet50', use_shortcut=True
