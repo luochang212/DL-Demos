@@ -57,9 +57,7 @@ def test_conv_forward(
 @pytest.mark.parametrize('kernel_size', [3, 5])
 @pytest.mark.parametrize('stride', [1, 2])
 @pytest.mark.parametrize('padding', [0, 1])
-def test_conv_backward(
-    c_i: int, c_o: int, kernel_size: int, stride: int, padding: str
-):
+def test_conv_backward(c_i: int, c_o: int, kernel_size: int, stride: int, padding: str):
 
     # Preprocess
     input = np.random.randn(20, 20, c_i)
@@ -67,13 +65,9 @@ def test_conv_backward(
     bias = np.random.randn(c_o)
 
     torch_input = (
-        torch.from_numpy(np.transpose(input, (2, 0, 1)))
-        .unsqueeze(0)
-        .requires_grad_()
+        torch.from_numpy(np.transpose(input, (2, 0, 1))).unsqueeze(0).requires_grad_()
     )
-    torch_weight = (
-        torch.from_numpy(np.transpose(weight, (0, 3, 1, 2))).requires_grad_()
-    )
+    torch_weight = torch.from_numpy(np.transpose(weight, (0, 3, 1, 2))).requires_grad_()
     torch_bias = torch.from_numpy(bias).requires_grad_()
 
     # forward
@@ -94,9 +88,7 @@ def test_conv_backward(
     torch_sum.backward()
     torch_dW = np.transpose(torch_weight.grad.numpy(), (0, 2, 3, 1))
     torch_db = torch_bias.grad.numpy()
-    torch_dA_prev = np.transpose(
-        torch_input.grad.numpy().squeeze(0), (1, 2, 0)
-    )
+    torch_dA_prev = np.transpose(torch_input.grad.numpy().squeeze(0), (1, 2, 0))
 
     dZ = np.ones(numpy_output.shape)
     dW, db, dA_prev = conv2d_backward(dZ, cache, stride, padding)

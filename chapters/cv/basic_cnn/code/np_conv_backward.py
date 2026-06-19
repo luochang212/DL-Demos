@@ -117,5 +117,3 @@ def conv2d_backward(
     else:
         dA_prev = dA_prev_pad
     return dW, db, dA_prev
-
-

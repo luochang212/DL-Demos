@@ -78,5 +78,3 @@ def conv2d(
                 if bias is not None:
                     output[i_h, i_w, i_c] += bias[i_c]
     return output
-
-
