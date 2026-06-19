@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 
+from chapters.fundamentals.shallow_network.code.generate_points import visualize
 from chapters.fundamentals.shallow_network.code.model import ShallowNetwork
-from chapters.fundamentals.shallow_network.genereate_points import visualize
 
 
 def test_shallow_network_forward_backward_and_output_path():

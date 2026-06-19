@@ -1,11 +1,11 @@
 import numpy as np
 
-from chapters.fundamentals.shallow_network.genereate_points import (
+from chapters.fundamentals.shallow_network.code.generate_points import (
     generate_plot_set,
     generate_point_set,
     visualize,
 )
-from chapters.fundamentals.shallow_network.model import (
+from chapters.fundamentals.shallow_network.code.model import (
     LogisticRegression,
     ShallowNetwork,
     train_model,

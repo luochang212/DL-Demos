@@ -1,4 +1,0 @@
-name: shallow_network_smoke
-description: Minimal shallow-network forward/backward smoke run.
-data: synthetic_points
-output: work_dirs/shallow_network/smoke.png
