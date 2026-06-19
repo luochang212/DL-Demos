@@ -2,51 +2,112 @@
 id: multiclass-classification
 title: 多分类 — Softmax 与交叉熵
 sidebar_label: 4. 多分类
-description: 从二分类推广到互斥多类别分类，并解释 logits 与概率的边界。
+description: 从二分类推广到互斥多类别分类，深入理解 Softmax、交叉熵和 logits 的设计逻辑。
 ---
 
 # 多分类 — Softmax 与交叉熵
 
-多分类网络为每个类别输出一个分数（logit）。Softmax 把 logits 转为概率：
+前几章我们一直在做二分类（是/否）。现实中有大量多分类问题：这张图是小猫、小狗、小鸡还是其他？网络需要同时输出 $C$ 个类别的概率。
 
-$$p_k=\frac{e^{z_k}}{\sum_j e^{z_j}}$$
+## 1. 从 Sigmoid 到 Softmax
 
-## 1. 为什么模型返回 logits
+二分类中，Sigmoid 将单个 logit 映射为概率。多分类中，网络最后一层输出 $C$ 个 logit $z^{[L]} \in \mathbb{R}^C$，需要将它们映射为 $C$ 个概率，且满足 $\sum_{k=1}^C p_k = 1$。
 
-PyTorch 的 `CrossEntropyLoss` 内部已经组合了数值稳定的 LogSoftmax 与负对数似然。因此训练时模型必须直接返回 logits，不能先调用 Softmax 再交给损失函数。
+**Softmax** 完成这个任务——分两步：「求指数，归一化」：
+
+$$t_k = e^{z_k}, \qquad a_k = \frac{t_k}{\sum_{j=1}^C t_j}$$
+
+### 为什么用指数
+
+考虑两个输入向量 $[1, 2]$ 和 $[10, 20]$。直接做归一化（除以和），两者都得到 $[0.33, 0.67]$——不同强度的信号得到相同的概率，丢失了置信度信息。
+
+Softmax 通过指数放大数值差异：$[10, 20]$ 的 $e^{20} / e^{10}$ 比值远大于 $[1, 2]$ 的 $e^2 / e^1$，因此前者对第二个类别的置信度更高。这与直觉一致：信号越强，模型越有把握。
+
+### soft 与 hard
+
+对比 **hardmax**（直接取最大值为 1，其余为 0）：$[5, 2, -1, 3] \xrightarrow{\text{hardmax}} [1, 0, 0, 0]$——太「硬」了，丢失了所有相对大小信息。Softmax 保留了这个信息：$[0.842, 0.042, 0.002, 0.114]$。
+
+### 退化性质
+
+当 $C=2$ 时，Softmax 等价于 Sigmoid。直觉上：两个概率中知道一个就确定了另一个——这正是二分类的情况。
+
+## 2. 损失函数：多分类交叉熵
+
+标签不再是 $y \in \{0, 1\}$，而是 $y \in \{0, 1, \ldots, C-1\}$。先将整数标签转为 **one-hot 编码**——一个长度为 $C$ 的向量，只有正确类别的位置为 $1$，其余为 $0$。
+
+多分类交叉熵是二分类的自然推广：
+
+$$L = -\sum_{k=1}^C y_k \log \hat{y}_k$$
+
+因为 one-hot 中只有一个 $1$，求和实际上只剩正确类别那一项：$L = -\log \hat{y}_{y_{\text{true}}}$。最小化这个损失就是最大化正确类别的预测概率——与直觉完全一致。
+
+## 3. 梯度：跨分类的优雅简化
+
+与 Sigmoid + 二分类交叉熵类似，**Softmax + 多分类交叉熵的组合也有一个优雅的梯度简化**：
+
+$$\frac{\partial L}{\partial Z^{[L]}} = \hat{Y} - Y$$
+
+其中 $Y$ 是 one-hot 标签矩阵。这个简洁的结果意味着：不管有多少类别，输出层的梯度总是「预测概率分布减真实概率分布」。
+
+完整的推导见 [derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/multiclass_classification/derivations/formulas.md)。
+
+## 4. 代码解析：logits 陷阱
+
+### 4.1 为什么模型返回 logits
+
+PyTorch 的 `CrossEntropyLoss` 内部已经组合了 `LogSoftmax` + `NLLLoss`，且做了数值稳定处理。因此：
 
 ```python
-logits = model.forward(x)
+logits = model.forward(x)            # 返回 logits，不要先 softmax
 loss = torch.nn.CrossEntropyLoss()(logits.T, labels)
-prediction = torch.argmax(logits, dim=0)
+prediction = torch.argmax(logits, dim=0)  # argmax 对 logits 和概率结果相同
 ```
 
-Softmax 只在需要展示概率时显式调用。
+**如果把 softmax 后的概率传入 CrossEntropyLoss，损失函数会再做一次 log-softmax，导致梯度完全错误**。这是新手最高频的 bug 之一。
 
-## 2. 参数初始化
+### 4.2 网络实现
 
-权重使用适合 ReLU 的 Kaiming 初始化，bias 使用零初始化。随机初始化 bias 不增加表达能力，反而给训练引入无意义噪声。
-
-## 3. 代码解析
+最后一层不激活（保留 logits），前面层用 ReLU：
 
 ```python
-for i in range(self.num_layer):
-    Z = torch.matmul(self.W[i], A) + self.b[i]
-    A = Z if i == self.num_layer - 1 else F.relu(Z)
+class MulticlassClassificationNet:
+    def forward(self, X):
+        A = X
+        for i in range(self.num_layer):
+            Z = torch.matmul(self.W[i], A) + self.b[i]
+            if i == self.num_layer - 1:
+                A = Z           # 最后一层：输出 logits
+            else:
+                A = F.relu(Z)   # 隐藏层：ReLU 激活
+        return A
 ```
 
-隐藏层应用 ReLU，最后一层保留 logits。评估时 `argmax` 对 logits 与 Softmax 概率给出相同类别，因此同样不需要先计算 Softmax。
+### 4.3 参数初始化
 
-## 4. 运行
+使用 Kaiming 初始化（适合 ReLU）：
+
+```python
+torch.nn.init.kaiming_normal_(new_W, nonlinearity='relu')
+```
+
+Bias 使用零初始化——随机初始化 bias 不增加表达能力，只会给训练引入无意义噪声。
+
+### 4.4 评估
+
+`torch.argmax(logits, dim=0)` 对 logits 和 softmax 概率给出相同类别——因为 argmax 只关心相对大小，不关心绝对值的缩放。
+
+## 5. 运行
 
 ```bash
 uv run python -m chapters.fundamentals.multiclass_classification.pt_main
 ```
 
-该示例学习二维平面上的三分类边界。默认教程只覆盖 PyTorch 实现；同目录 TensorFlow 文件作为 legacy 对照保留。
+该示例学习二维平面上的三分类边界。默认教程只覆盖 PyTorch 实现；同目录 TensorFlow 文件（`tf_main.py`）作为 legacy 对照保留。
 
 ## 参考资料
 
 - Bridle, J. S. (1990). Probabilistic interpretation of feedforward classification network outputs, with relationships to statistical pattern recognition. In *Neurocomputing* (pp. 227–236). Springer.
 - Goodfellow, I., Bengio, Y., & Courville, A. (2016). [*Deep Learning*](https://www.deeplearningbook.org/). MIT Press.（第 6 章：Softmax 与交叉熵）
+- 周弈帆（2022-06-20）。[吴恩达《深度学习专项》笔记（七）：调参、批归一化、多分类任务、编程框架](https://zhouyifan.net/2022/06/20/DLS-note-7/)。
+- 完整公式推导：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/multiclass_classification/derivations/formulas.md)
 - 本项目源码：[chapters/fundamentals/multiclass_classification/](https://github.com/luochang212/DL-Demos/tree/master/chapters/fundamentals/multiclass_classification)。
