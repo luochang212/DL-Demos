@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from chapters.sequence_models.attention.main import (
+from chapters.sequence_models.attention.code.model import (
     EMBEDDING_LENGTH,
     AttentionModel,
 )

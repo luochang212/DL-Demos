@@ -2,54 +2,204 @@
 id: attention
 title: Attention — 让解码器选择信息
 sidebar_label: 3. Attention
-description: 用日期格式转换理解 Encoder、Decoder、对齐分数和上下文向量。
+description: 理解注意力机制的动机与数学原理，掌握 Encoder-Decoder 架构中对齐分数、上下文向量的计算，并逐行解析 PyTorch 实现。
+keywords: [Attention, Bahdanau, 注意力机制, Encoder-Decoder, 对齐分数, 上下文向量, 机器翻译, PyTorch]
 ---
 
 # Attention — 让解码器选择信息
 
-固定长度向量要求 Encoder 把所有输入信息压缩到一个状态。Attention 允许 Decoder 在每个输出步骤重新选择输入序列中的相关位置。
+:::tip 本章要点
+- 理解 **Encoder-Decoder 瓶颈**：定长向量无法保留长序列的全部信息
+- 掌握 **注意力机制的核心公式**：对齐分数 → softmax → 上下文向量
+- 读懂 [`chapters/sequence_models/attention/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/attention/main.py) 中注意力模型的逐行实现
+- 了解注意力与后续 Transformer 中 Self-Attention 的联系
+:::
 
-## 1. 计算过程
+---
 
-编码器输出每个输入位置的表示 $a_i$。第 $t$ 个解码步骤根据上一状态计算对齐分数：
+## 1. 为什么需要 Attention
 
-$$e_{t,i}=f(s_{t-1},a_i),\qquad
-\alpha_{t,i}=\mathrm{softmax}(e_{t,i})$$
+经典的 Encoder-Decoder 架构将整个输入序列压缩成**一个定长向量**，再让 Decoder 从这个向量中解码出目标序列：
 
-上下文向量是编码器状态的加权和：
+```
+输入序列 → [Encoder] → 定长编码 → [Decoder] → 输出序列
+```
 
-$$c_t=\sum_i\alpha_{t,i}a_i$$
+这种架构在翻译短句时效果尚可，但面对长句就捉襟见肘——无论输入多长，信息都被压缩到同一个向量中。人类翻译时并不会一次性读完再一次性翻译，而是**逐词对应**：翻译 "Jane" 时关注「简」，翻译 "visits" 时关注「访问」。
 
-Decoder 使用 $c_t$ 与上一输出生成当前字符。
+注意力机制（Bahdanau et al., 2015）正是这一直觉的数学表达：**Decoder 在每一步生成时，以不同权重去关注 Encoder 各位置的输出**。
 
-## 2. Padding Mask
+---
 
-同一 batch 中的日期字符串长度不同。源码先用 `pack_padded_sequence` 让双向 LSTM 跳过 padding，再把 padding 位置的对齐分数设为负无穷，确保 Softmax 不会为其分配概率。
+## 2. 数学原理
+
+### 2.1 Encoder-Decoder 框架
+
+用双向 RNN 作为 Encoder，对输入序列的每个位置 $t'$ 提取特征：
+
+$$
+a^{(t')} = [\overrightarrow{a}^{(t')}; \overleftarrow{a}^{(t')}]
+$$
+
+Decoder 用单向 RNN，在每一步 $t$ 生成输出。除上一轮的输出 $y^{(t-1)}$ 外，Decoder 还会接收**注意力上下文** $c^{(t)}$：
+
+$$
+s^{(t)} = \text{RNN}(s^{(t-1)}, [y^{(t-1)}; c^{(t)}])
+$$
+
+### 2.2 对齐分数与注意力权重
+
+第 $t$ 个输出对第 $t'$ 个输入的相关性由**对齐分数** $e_{t,t'}$ 衡量：
+
+$$
+e_{t,t'} = f(s^{(t-1)}, a^{(t')})
+$$
+
+其中 $f$ 是一个小型全连接网络（Bahdanau 原论文使用 `tanh` 激活），输入为 $[s^{(t-1)}; a^{(t')}]$，输出为一个标量。
+
+对 $e_{t,t'}$ 做 softmax 得到归一化的**注意力权重**：
+
+$$
+\alpha_{t,t'} = \frac{\exp(e_{t,t'})}{\sum_{k=1}^{T_x} \exp(e_{t,k})}, \quad \sum_{t'} \alpha_{t,t'} = 1
+$$
+
+### 2.3 上下文向量
+
+上下文向量是所有 Encoder 状态按注意力权重的加权平均：
+
+$$
+c^{(t)} = \sum_{t'=1}^{T_x} \alpha_{t,t'} \cdot a^{(t')}
+$$
+
+"注意力"这个听上去高端的词，本质上就是一个**加权平均数**——$\alpha$ 是权重，$a$ 是值。
+
+---
+
+## 3. 任务与数据
+
+本项目不直接使用真实翻译语料，而是用一个**日期格式转换**任务来演示注意力机制：
+
+| 输入 | 输出 |
+|------|------|
+| `Nov 23, 1999` | `1999-11-23` |
+| `3 April 2005` | `2005-04-03` |
+| `Thursday, February 7, 1985` | `1985-02-07` |
+
+数据集由 `Faker` 和 `babel` 自动生成，无需额外下载：
+
+```python
+from babel.dates import format_date
+from faker import Faker
+
+faker = Faker()
+date_obj = faker.date_object()                          # 标准日期
+formatted = format_date(date_obj, format='d MMM YYY', locale='en')  # 变体格式
+```
+
+首次运行时会生成 `train.txt`（50000 条）和 `test.txt`（10000 条），存储在 `chapters/sequence_models/attention/` 目录下。
+
+---
+
+## 4. 代码解析
+
+### 4.1 模型结构总览
+
+```python title="chapters/sequence_models/attention/main.py" showLineNumbers
+class AttentionModel(nn.Module):
+    def __init__(self, embeding_dim=32, encoder_dim=32, decoder_dim=32, dropout_rate=0.5):
+        super().__init__()
+        self.drop = nn.Dropout(dropout_rate)
+        self.embedding = nn.Embedding(EMBEDDING_LENGTH, embeding_dim)
+        # key-start
+        self.attention_linear = nn.Linear(2 * encoder_dim + decoder_dim, 1)
+        self.encoder = nn.LSTM(embeding_dim, encoder_dim, 1,
+                               batch_first=True, bidirectional=True)
+        self.decoder = nn.LSTM(EMBEDDING_LENGTH + 2 * encoder_dim, decoder_dim, 1,
+                               batch_first=True)
+        # key-end
+        self.output_linear = nn.Linear(decoder_dim, EMBEDDING_LENGTH)
+```
+
+关键设计要点：
+- **Encoder** 使用**双向 LSTM**，充分利用上下文信息。隐变量通道数为 `2 × encoder_dim`
+- **Decoder** 输入维度 = `EMBEDDING_LENGTH`（上一轮输出）+ `2 × encoder_dim`（注意力上下文）
+- **`attention_linear`** 将 `[s(t-1); a(t')]` 映射为一个标量对齐分数
+
+### 4.2 前向传播：注意力循环
+
+```python title="chapters/sequence_models/attention/main.py" showLineNumbers
+    def forward(self, x, n_output=OUTPUT_LENGTH):
+        batch, n_sequence = x.shape[0:2]
+        x = self.drop(self.embedding(x))
+        a, _ = self.encoder(x)
+
+        prev_s = x.new_zeros(batch, 1, self.decoder_dim)
+        prev_y = x.new_zeros(batch, 1, EMBEDDING_LENGTH)
+        y = x.new_empty(batch, n_output, EMBEDDING_LENGTH)
+
+        for i_output in range(n_output):
+            # key-start
+            # Step 1: 计算对齐分数 e(t,t') 和注意力权重 α(t,t')
+            repeat_s = prev_s.repeat(1, n_sequence, 1)
+            attention_input = torch.cat((repeat_s, a), 2)
+            attention_input = attention_input.reshape(batch * n_sequence, -1)
+            alpha = F.softmax(self.attention_linear(attention_input), -1)
+
+            # Step 2: 上下文向量 c(t) = Σ α(t,t') · a(t')
+            c = torch.sum(a * alpha.reshape(batch, n_sequence, 1), 1).unsqueeze(1)
+
+            # Step 3: Decoder 使用 [y(t-1); c(t)] 生成当前输出
+            decoder_input = torch.cat((prev_y, c), 2)
+            prev_s, _ = self.decoder(decoder_input, tmp_states)
+            prev_y = self.output_linear(prev_s)
+            y[:, i_output] = prev_y.squeeze(1)
+            # key-end
+        return y
+```
+
+**维度追踪**（以默认配置为例）：
+- `a`: `[batch, n_sequence, 64]`（双向 LSTM，`2 × 32 = 64`）
+- `prev_s`: `[batch, 1, 32]`，`repeat_s`: `[batch, n_sequence, 32]`
+- `attention_input`: `[batch × n_sequence, 64 + 32]`
+- `alpha`: `[batch × n_sequence, 1]` → `[batch, n_sequence]`
+- `c`: `[batch, 1, 64]`（Encoder 隐变量的加权平均）
+
+### 4.3 Padding Mask
+
+同一 batch 中日期字符串长度不同。使用 `pack_padded_sequence` 让双向 LSTM 跳过 padding：
 
 ```python
 packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True,
                               enforce_sorted=False)
 packed_a, _ = self.encoder(packed)
-a, _ = pad_packed_sequence(packed_a, batch_first=True,
-                           total_length=n_sequence)
-scores = scores.masked_fill(padding_mask, float('-inf'))
+a, _ = pad_packed_sequence(packed_a, batch_first=True, total_length=n_sequence)
 ```
 
-## 3. 解码循环
+之后将 padding 位置的对齐分数设为 `-inf`，确保 softmax 后其注意力权重为 0。
 
-每一步重复上一 Decoder 状态，与全部 Encoder 状态拼接计算对齐分数。得到上下文向量后，Decoder 产生下一字符的 logits，并把它作为下一步输入。
+---
 
-## 4. 运行
+## 5. 训练与运行
 
 ```bash
-uv run python chapters/sequence_models/attention/main.py
+# 无额外数据依赖，首次运行自动生成数据
+uv run python -m chapters.sequence_models.attention.main
 ```
 
-首次运行会生成训练与测试日期数据。脚本自动选择 CUDA 或 CPU，并输出完整日期字符串匹配准确率。
+模型训练 30 个 epoch，在测试集上可达 98% 的日期格式准确率。
 
-该实现用于解释 Attention，Decoder 不使用 teacher forcing，也没有 beam search，因此不代表生产级序列转换系统。
+---
+
+## 6. 与后续章节的关系
+
+注意力模型是 [Transformer](./transformer) 的前身。Transformer 将 Attention 从"Decoder 对 Encoder 的关注"推广为三种并行计算的自注意力机制（Self-Attention），彻底摆脱了 RNN 的循环结构。理解本章的 Encoder-Decoder Attention 是学习 Transformer 的关键一步。
+
+---
 
 ## 参考资料
 
 - Bahdanau, D., Cho, K., & Bengio, Y. (2015). [Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473). *ICLR 2015*.
-- 本项目源码：[chapters/sequence_models/attention/](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/attention)。
+- 周弈帆（2022-09-21）。[吴恩达《深度学习专项》笔记（十六）：序列模型与注意力机制](https://zhouyifan.net/2022/09/21/DLS-note-16/)。
+- 周弈帆（2022-09-21）。[PyTorch 注意力模型实现详解（以简单的机器翻译为例）](https://zhouyifan.net/2022/09/21/DLS-note-16-2/)。
+- 完整公式推导：[`derivations/formulas.md`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/attention/derivations/formulas.md)
+- 本项目源码：[`chapters/sequence_models/attention/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/attention)
