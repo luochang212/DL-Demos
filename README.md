@@ -17,7 +17,7 @@ uv sync --group dev
 ## 运行示例
 
 ```bash
-uv run python -m chapters.fundamentals.shallow_network.points_classification
+uv run python -m chapters.fundamentals.shallow_network.code.points_classification
 uv run python chapters/sequence_models/transformer/train.py
 uv run python chapters/cv/style_transfer/style_transfer.py --steps 50
 ```
