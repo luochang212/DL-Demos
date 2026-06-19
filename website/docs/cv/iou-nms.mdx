@@ -14,11 +14,15 @@ keywords: [目标检测, Bounding Box, IoU, NMS, Non-Maximum Suppression]
 
 本项目统一使用：
 
-$$b=(x_1,y_1,x_2,y_2)$$
+$$
+b=(x_1,y_1,x_2,y_2)
+$$
 
 其中 $(x_1,y_1)$ 是左上角，$(x_2,y_2)$ 是右下角。宽高与面积为：
 
-$$w=\max(x_2-x_1,0),\qquad h=\max(y_2-y_1,0),\qquad A=wh$$
+$$
+w=\max(x_2-x_1,0),\qquad h=\max(y_2-y_1,0),\qquad A=wh
+$$
 
 使用 `max(..., 0)` 可以让不相交区域的面积保持为零。
 
@@ -26,8 +30,10 @@ $$w=\max(x_2-x_1,0),\qquad h=\max(y_2-y_1,0),\qquad A=wh$$
 
 交并比（Intersection over Union）定义为：
 
-$$\mathrm{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}
-=\frac{|A\cap B|}{|A|+|B|-|A\cap B|}$$
+$$
+\mathrm{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}
+=\frac{|A\cap B|}{|A|+|B|-|A\cap B|}
+$$
 
 IoU 越接近 1，两个框越相似；完全不相交时为 0。两个框都没有面积时并集也为零，源码将结果定义为 0，避免除零。
 
