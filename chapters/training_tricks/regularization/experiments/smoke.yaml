@@ -1,3 +1,0 @@
-name: regularization_smoke
-description: Minimal regularized network forward/backward smoke run.
-data: synthetic

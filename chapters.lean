@@ -4,3 +4,4 @@ import chapters.generative_models.ddim.derivations.ddim
 import chapters.generative_models.pixelcnn.derivations.pixelcnn
 import chapters.generative_models.vqvae.derivations.vqvae
 import chapters.training_tricks.initialization.derivations.initialization
+import chapters.training_tricks.regularization.derivations.regularization
