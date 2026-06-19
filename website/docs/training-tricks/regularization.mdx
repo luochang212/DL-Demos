@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**过拟合**：为什么网络越大越容易「记住」训练数据
 - 掌握 **Weight Decay**（L2 正则化）：在损失函数中惩罚大权重
 - 掌握 **Dropout**：训练时随机丢弃神经元，提高泛化能力
-- 读懂 [`chapters/training_tricks/regularization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/regularization/main.py) 的纯 NumPy 实现
+- 读懂 [`chapters/training_tricks/regularization/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/regularization/code/main.py) 的纯 NumPy 实现
 :::
 
 > 💡 本章代码使用纯 NumPy 手写，与上一章共享网络框架，重点在正则化相关的改动。
@@ -87,7 +87,7 @@ $$
 
 ### 3.1 网络初始化：添加正则化选项
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
 class DeepNetwork(BaseRegressionModel):
 
     def __init__(self,
@@ -110,7 +110,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.2 前向传播：Dropout 实现
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
     def forward(self, X, train_mode=True):
         A = X
         self.A_cache[0] = A
@@ -141,7 +141,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.3 反向传播：复用 Dropout mask
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
     def backward(self, Y):
         # ...
         for i in range(self.num_layer - 1, -1, -1):
@@ -160,7 +160,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.4 梯度更新：Weight Decay 实现
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
     def gradient_descent(self, learning_rate):
         for i in range(self.num_layer):
             # key-start
@@ -178,7 +178,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.5 损失函数：Weight Decay 的惩罚项
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
     def loss(self, Y: np.ndarray, Y_hat: np.ndarray) -> np.ndarray:
         # key-start
         if self.weight_decay:
@@ -194,7 +194,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.6 主函数：三种设置对比
 
-```python title="chapters/training_tricks/regularization/main.py" showLineNumbers
+```python title="chapters/training_tricks/regularization/code/main.py" showLineNumbers
 def main():
     train_X, train_Y = generate_points(400)
     plot_X = generate_plot_set()

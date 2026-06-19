@@ -11,7 +11,7 @@ keywords: [Attention, Bahdanau, 注意力机制, Encoder-Decoder, 对齐分数, 
 :::tip 本章要点
 - 理解 **Encoder-Decoder 瓶颈**：定长向量无法保留长序列的全部信息
 - 掌握 **注意力机制的核心公式**：对齐分数 → softmax → 上下文向量
-- 读懂 [`chapters/sequence_models/attention/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/attention/main.py) 中注意力模型的逐行实现
+- 读懂 [`chapters/sequence_models/attention/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/attention/code/main.py) 中注意力模型的逐行实现
 - 了解注意力与后续 Transformer 中 Self-Attention 的联系
 :::
 
@@ -104,7 +104,7 @@ formatted = format_date(date_obj, format='d MMM YYY', locale='en')  # 变体格�
 
 ### 4.1 模型结构总览
 
-```python title="chapters/sequence_models/attention/main.py" showLineNumbers
+```python title="chapters/sequence_models/attention/code/main.py" showLineNumbers
 class AttentionModel(nn.Module):
     def __init__(self, embeding_dim=32, encoder_dim=32, decoder_dim=32, dropout_rate=0.5):
         super().__init__()
@@ -127,7 +127,7 @@ class AttentionModel(nn.Module):
 
 ### 4.2 前向传播：注意力循环
 
-```python title="chapters/sequence_models/attention/main.py" showLineNumbers
+```python title="chapters/sequence_models/attention/code/main.py" showLineNumbers
     def forward(self, x, n_output=OUTPUT_LENGTH):
         batch, n_sequence = x.shape[0:2]
         x = self.drop(self.embedding(x))

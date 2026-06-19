@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**退化问题**：为什么网络更深反而表现更差
 - 掌握**残差连接**（skip connection）的数学形式和直觉
 - 区分 **Identity Block** 和 **Convolution Block**
-- 读懂 [`chapters/cv/resnet/tf_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/resnet/tf_main.py) 的 ResNet18/50 风格简化实现
+- 读懂 [`chapters/cv/resnet/code/tf_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/resnet/code/tf_main.py) 的 ResNet18/50 风格简化实现
 :::
 
 > 💡 本章代码使用 TensorFlow/Keras 实现，与本项目其他教程的 PyTorch 风格不同。
@@ -97,7 +97,7 @@ $$
 
 ### 3.1 Identity Block（2 层，ResNet18 用）
 
-```python title="chapters/cv/resnet/tf_main.py" showLineNumbers
+```python title="chapters/cv/resnet/code/tf_main.py" showLineNumbers
 def identity_block_2(x, f, use_shortcut=True):
     _, _, _, C = x.shape
     x_shortcut = x
@@ -118,7 +118,7 @@ def identity_block_2(x, f, use_shortcut=True):
 
 ### 3.2 Convolution Block（2 层，ResNet18 用）
 
-```python title="chapters/cv/resnet/tf_main.py" showLineNumbers
+```python title="chapters/cv/resnet/code/tf_main.py" showLineNumbers
 def convolution_block_2(x, f, filters, s: int, use_shortcut=True):
     x_shortcut = x
     # key-start
@@ -144,7 +144,7 @@ def convolution_block_2(x, f, filters, s: int, use_shortcut=True):
 
 ### 3.3 ResNet18 风格简化结构
 
-```python title="chapters/cv/resnet/tf_main.py" showLineNumbers
+```python title="chapters/cv/resnet/code/tf_main.py" showLineNumbers
 def init_model(input_shape=(224, 224, 3), model_name='ResNet18', use_shortcut=True):
     input = layers.Input(input_shape)
     x = layers.Conv2D(64, 7, (2, 2), padding='same')(input)
@@ -176,7 +176,7 @@ def init_model(input_shape=(224, 224, 3), model_name='ResNet18', use_shortcut=Tr
 
 ResNet50 用 **Bottleneck** 结构：1×1 → 3×3 → 1×1，先降通道再恢复，减少计算量。
 
-```python title="chapters/cv/resnet/tf_main.py" showLineNumbers
+```python title="chapters/cv/resnet/code/tf_main.py" showLineNumbers
 def identity_block_3(x, f, filters1, filters2, use_shortcut=True):
     x_shortcut = x
     # key-start

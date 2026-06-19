@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**卷积运算**：滑动窗口、填充、步幅的数学定义
 - 用 NumPy 手写 **2D 卷积的前向传播**和**反向传播**
 - 理解 **池化层**和 **BatchNorm** 的作用
-- 读懂 [`chapters/cv/basic_cnn/pt_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/basic_cnn/pt_main.py) 的 PyTorch 猫狗分类实现
+- 读懂 [`chapters/cv/basic_cnn/code/pt_main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/cv/basic_cnn/code/pt_main.py) 的 PyTorch 猫狗分类实现
 :::
 
 ---
@@ -152,7 +152,7 @@ def conv2d_backward(dZ, cache, stride, padding):
 
 ### 3.3 PyTorch 猫狗分类网络
 
-```python title="chapters/cv/basic_cnn/pt_main.py" showLineNumbers
+```python title="chapters/cv/basic_cnn/code/pt_main.py" showLineNumbers
 def init_model(device='cpu'):
     model = nn.Sequential(
         # highlight-start

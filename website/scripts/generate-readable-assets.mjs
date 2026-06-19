@@ -14,6 +14,8 @@ const includeRoots = [
 const readablePatterns = [
   /\/code\/.*\.(py|md)$/u,
   /\/derivations\/.*\.(md|lean)$/u,
+  // Chapter-level files that haven't been migrated to code/ subdirectory yet
+  /\/chapters\/[^/]+\/[^/]+\/[^/]+\.(py|ipynb)$/u,
 ];
 
 const ignoredSegments = new Set([

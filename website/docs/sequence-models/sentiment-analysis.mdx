@@ -16,7 +16,7 @@ keywords: [情感分析, GloVe, 词向量, GRU, IMDB, NLP, PyTorch]
 - 理解 **GloVe 词向量**：如何把词语编码成有意义的实数向量
 - 掌握**文本分类流程**：分词 → 词嵌入 → GRU 编码 → 分类
 - 理解 **变长序列处理**：`pad_sequence` 和 `collate_fn`
-- 读懂 [`chapters/sequence_models/sentiment_analysis/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/sentiment_analysis/main.py) 的完整实现
+- 读懂 [`chapters/sequence_models/sentiment_analysis/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/sequence_models/sentiment_analysis/code/main.py) 的完整实现
 :::
 
 ---
@@ -89,7 +89,7 @@ RNN 从左到右处理每个词，最后取**每条序列真实末尾的隐藏�
 
 ### 3.1 数据加载与预处理
 
-```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/code/main.py" showLineNumbers
 GLOVE_DIM = 100
 GLOVE = GloVe(name='6B', dim=GLOVE_DIM)
 
@@ -114,7 +114,7 @@ class IMDBDataset(Dataset):
 
 不同影评长度不同，无法直接组成 batch。用 `pad_sequence` 填充到同一长度：
 
-```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/code/main.py" showLineNumbers
 def get_dataloader(dir='data/aclImdb'):
     # key-start
     def collate_fn(batch):
@@ -132,7 +132,7 @@ def get_dataloader(dir='data/aclImdb'):
 
 ### 3.3 分类模型
 
-```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/code/main.py" showLineNumbers
 class RNN(torch.nn.Module):
     def __init__(self, hidden_units=64, dropout_rate=0.5):
         super().__init__()
@@ -159,7 +159,7 @@ class RNN(torch.nn.Module):
 
 ### 3.4 训练与评估
 
-```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/code/main.py" showLineNumbers
 # 训练
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 citerion = nn.BCELoss()
@@ -183,7 +183,7 @@ for x, lengths, y in test_dataloader:
 
 ### 3.5 推理：对新文本做情感判断
 
-```python title="chapters/sequence_models/sentiment_analysis/main.py" showLineNumbers
+```python title="chapters/sequence_models/sentiment_analysis/code/main.py" showLineNumbers
 tokenizer = get_tokenizer('basic_english')
 article = 'U.S. stock indexes fell Tuesday, driven by expectations for ' \
     'tighter Federal Reserve policy...'

@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 - 理解**对称性问题**：为什么全零初始化会让网络退化
 - 分析**方差传递**：信号在网络前向传播时的方差变化
 - 掌握 **He 初始化**：为什么 `√(2/n)` 是 ReLU 网络的最佳选择
-- 读懂 [`chapters/training_tricks/initialization/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/initialization/main.py) 的纯 NumPy 实现
+- 读懂 [`chapters/training_tricks/initialization/code/main.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/initialization/code/main.py) 的纯 NumPy 实现
 :::
 
 > 💡 本章代码使用纯 NumPy 手写前向传播和反向传播，不依赖 PyTorch，帮助理解底层原理。
@@ -105,7 +105,7 @@ $$
 
 ### 3.2 三种初始化的实现
 
-```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+```python title="chapters/training_tricks/initialization/code/main.py" showLineNumbers
 class DeepNetwork(BaseRegressionModel):
 
     def __init__(self,
@@ -135,7 +135,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.3 前向传播
 
-```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+```python title="chapters/training_tricks/initialization/code/main.py" showLineNumbers
     def forward(self, X, train_mode=True):
         A = X
         self.A_cache[0] = A
@@ -153,7 +153,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.4 反向传播
 
-```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+```python title="chapters/training_tricks/initialization/code/main.py" showLineNumbers
     def backward(self, Y):
         dA = 0
         # key-start
@@ -176,7 +176,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.5 梯度下降
 
-```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+```python title="chapters/training_tricks/initialization/code/main.py" showLineNumbers
     def gradient_descent(self, learning_rate):
         for i in range(self.num_layer):
             self.W[i] -= learning_rate * self.dW_cache[i]
@@ -185,7 +185,7 @@ class DeepNetwork(BaseRegressionModel):
 
 ### 3.6 主函数：三种初始化对比
 
-```python title="chapters/training_tricks/initialization/main.py" showLineNumbers
+```python title="chapters/training_tricks/initialization/code/main.py" showLineNumbers
 def main():
     train_X, train_Y = generate_points(400)
     plot_X = generate_plot_set()

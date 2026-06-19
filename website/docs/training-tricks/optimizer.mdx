@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 - 掌握 **动量**：用指数移动平均平滑梯度方向
 - 掌握 **RMSProp**：自适应学习率，对不同参数区别对待
 - 掌握 **Adam**：Momentum + RMSProp + 偏差校正，实战首选
-- 读懂 [`chapters/training_tricks/advanced_optimizer/optimizer.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/advanced_optimizer/optimizer.py) 的纯 NumPy 实现
+- 读懂 [`chapters/training_tricks/advanced_optimizer/code/optimizer.py`](https://github.com/luochang212/DL-Demos/blob/master/chapters/training_tricks/advanced_optimizer/code/optimizer.py) 的纯 NumPy 实现
 :::
 
 > 💡 本章代码使用纯 NumPy 从零实现四种优化器，不依赖 PyTorch 的 `torch.optim`，帮助理解底层算法。
@@ -113,7 +113,7 @@ $$
 
 ### 3.1 基类：统一的优化器接口
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 class BaseOptimizer(metaclass=abc.ABCMeta):
 
     def __init__(self,
@@ -150,7 +150,7 @@ class BaseOptimizer(metaclass=abc.ABCMeta):
 
 ### 3.2 学习率调度
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 def const_lr(learning_rate_zero: float, epoch: int) -> float:
     return learning_rate_zero
 
@@ -165,7 +165,7 @@ def get_hyperbola_func(decay_rate: float):
 
 ### 3.3 SGD
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 class GradientDescent(BaseOptimizer):
 
     def step(self):
@@ -178,7 +178,7 @@ class GradientDescent(BaseOptimizer):
 
 ### 3.4 Momentum
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 class Momentum(BaseOptimizer):
 
     def __init__(self, param_dict, learning_rate, beta: float = 0.9, ...):
@@ -200,7 +200,7 @@ class Momentum(BaseOptimizer):
 
 ### 3.5 RMSProp
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 class RMSProp(BaseOptimizer):
 
     def __init__(self, param_dict, learning_rate, beta: float = 0.9,
@@ -231,7 +231,7 @@ class RMSProp(BaseOptimizer):
 
 ### 3.6 Adam
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
 class Adam(BaseOptimizer):
 
     def __init__(self, param_dict, learning_rate,
@@ -267,7 +267,7 @@ class Adam(BaseOptimizer):
 
 所有优化器都实现了 `save()` 和 `load()`，可以保存和恢复优化器状态（包括动量、二阶矩等）：
 
-```python title="chapters/training_tricks/advanced_optimizer/optimizer.py" showLineNumbers
+```python title="chapters/training_tricks/advanced_optimizer/code/optimizer.py" showLineNumbers
     def save(self) -> Dict:
         state_dict = super().save()
         state_dict['v_dict'] = self.v_dict
