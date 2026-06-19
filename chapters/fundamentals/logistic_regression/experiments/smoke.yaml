@@ -1,3 +1,0 @@
-name: logistic_regression_smoke
-description: Minimal binary logistic regression train-step smoke run.
-data: synthetic

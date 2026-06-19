@@ -14,7 +14,7 @@ uv run pytest chapters/fundamentals/logistic_regression/tests -q
 ### 完整训练（需要猫狗数据集）
 
 ```bash
-uv run python -m chapters.fundamentals.logistic_regression.main
+uv run python -m chapters.fundamentals.logistic_regression.code.main
 ```
 
 ### 代码入口
