@@ -12,3 +12,4 @@ import chapters.training_tricks.regularization.derivations.regularization
 import chapters.training_tricks.advanced_optimizer.derivations.advanced_optimizer
 import chapters.cv.basic_cnn.derivations.basic_cnn
 import chapters.cv.resnet.derivations.resnet
+import chapters.cv.style_transfer.derivations.style_transfer

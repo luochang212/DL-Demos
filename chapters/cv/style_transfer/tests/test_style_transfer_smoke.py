@@ -1,6 +1,6 @@
 import torch
 
-from chapters.cv.style_transfer.style_transfer import (
+from chapters.cv.style_transfer.code.style_transfer import (
     ContentLoss,
     Normalization,
     StyleLoss,
