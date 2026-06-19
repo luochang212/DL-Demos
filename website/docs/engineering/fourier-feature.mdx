@@ -36,7 +36,7 @@ import TabItem from '@theme/TabItem';
 
 ### 2.1 频谱偏置的 NTK 解释
 
-Neural Tangent Kernel（NTK）理论给出了频谱偏置的数学解释。
+Neural Tangent Kernel（NTK）理论给出了频谱偏置的数学解释。完整符号推导见 [`derivations/formulas.md`](https://github.com/luochang212/DL-Demos/blob/master/chapters/engineering/fourier_feature/derivations/formulas.md)。
 
 无限宽 MLP 的训练动态可以用 NTK 核函数 $K$ 描述：
 
@@ -210,6 +210,8 @@ Fourier Feature 不仅是一个有趣的实验，它在实际研究中有广泛�
 ## 6. 延伸阅读
 
 - 📄 [Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains（Tancik et al.，2020）](https://arxiv.org/abs/2006.10739)
+- 📄 [Random Features for Large-Scale Kernel Machines（Rahimi & Recht，2007）](https://proceedings.neurips.cc/paper/2007/file/013a006f03dbc5392effeb8f18fda755-Paper.pdf)
+- 📄 [Neural Tangent Kernel: Convergence and Generalization in Neural Networks（Jacot et al.，2018）](https://arxiv.org/abs/1806.07572)
 - 📄 [NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis（Mildenhall et al.，2020）](https://arxiv.org/abs/2003.08934)
 - 🔗 [本章源码：`chapters/engineering/fourier_feature/`](https://github.com/luochang212/DL-Demos/tree/master/chapters/engineering/fourier_feature)
 - ➡️ **下一章**：[分布式训练 — PyTorch DDP 实战](./distributed)

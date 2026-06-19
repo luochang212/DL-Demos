@@ -33,7 +33,13 @@ print('MLP and FourierFeature imported successfully')
 
 - Jupyter notebook 内嵌显示图像输出，不产生持久文件。
 
+## 推导
+
+完整符号推导在 [`derivations/formulas.md`](derivations/formulas.md)（NTK → 频谱偏置 → Fourier 特征映射 → Random Features → scale 参数）。
+
 ## 参考资料
 
 - Tancik, M., et al. (2020). [Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains](https://arxiv.org/abs/2006.10739).
+- Rahimi, A. & Recht, B. (2007). [Random Features for Large-Scale Kernel Machines](https://proceedings.neurips.cc/paper/2007/file/013a006f03dbc5392effeb8f18fda755-Paper.pdf).
+- Jacot, A., Gabriel, F., & Hongler, C. (2018). [Neural Tangent Kernel: Convergence and Generalization in Neural Networks](https://arxiv.org/abs/1806.07572).
 - Mildenhall, B., et al. (2020). [NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis](https://arxiv.org/abs/2003.08934).
