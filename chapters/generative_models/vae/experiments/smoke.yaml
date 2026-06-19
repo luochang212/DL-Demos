@@ -1,8 +1,0 @@
-name: vae_smoke
-description: Minimal VAE forward/backward smoke run with synthetic 64x64 RGB data.
-device: auto
-batch_size: 16
-image_shape: [3, 64, 64]
-steps: 5
-checkpoint: work_dirs/vae/model.pth
-output: work_dirs/vae/tmp.jpg

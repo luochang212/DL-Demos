@@ -1,5 +1,0 @@
-name: vqvae_smoke
-description: Minimal VQVAE reconstruction and PixelCNN prior smoke run.
-device: cpu
-image_shape: [1, 28, 28]
-output: work_dirs/vqvae/smoke.jpg
