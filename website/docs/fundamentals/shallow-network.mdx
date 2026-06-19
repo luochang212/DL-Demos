@@ -2,52 +2,183 @@
 id: shallow-network
 title: 浅层神经网络 — 学习非线性边界
 sidebar_label: 2. 浅层神经网络
-description: 用一个 ReLU 隐藏层理解前向传播、缓存和链式法则。
+description: 用一个 ReLU 隐藏层理解前向传播、激活函数、缓存和链式法则，从逻辑回归升级到非线性分类。
 ---
 
 # 浅层神经网络 — 学习非线性边界
 
-Logistic Regression 只能画一条线。加入一个隐藏层后，网络可以组合多个线性分割，学习非线性决策边界。
+上一章我们实现了 Logistic Regression，它在猫狗分类上只有 57% 的准确率——几乎和瞎猜差不多。原因很简单：它只能画一条直线。
 
-## 1. 前向传播
+加入一个隐藏层后，网络可以组合多个线性分割，学习非线性的决策边界。
 
-$$Z^{[1]}=W^{[1]}X+b^{[1]},\quad A^{[1]}=\mathrm{ReLU}(Z^{[1]})$$
+## 1. 网络结构：从一层到两层
 
-$$Z^{[2]}=W^{[2]}A^{[1]}+b^{[2]},\quad A^{[2]}=\sigma(Z^{[2]})$$
+### 1.1 单样本视角
 
-训练时必须缓存 $X$、$Z^{[1]}$、$A^{[1]}$ 和 $A^{[2]}$，反向传播会复用这些中间结果。
+Logistic Regression 的计算是：
 
-## 2. 反向传播
+$$\hat{y} = a = \sigma(w^T x + b)$$
 
-反向传播从输出误差开始，按链式法则逐层向输入方向计算：
+浅层神经网络在此基础上插入了一个隐藏层：
 
-$$dZ^{[2]}=A^{[2]}-Y,\qquad dA^{[1]}=(W^{[2]})^TdZ^{[2]}$$
+$$
+\begin{aligned}
+a^{[1]} &= g^{[1]}(W^{[1]} x + b^{[1]}) \\
+\hat{y} = a^{[2]} &= g^{[2]}(W^{[2]} a^{[1]} + b^{[2]})
+\end{aligned}
+$$
 
-$$dZ^{[1]}=dA^{[1]}\odot \mathrm{ReLU}'(Z^{[1]})$$
+这里 $W^{[1]} \in \mathbb{R}^{n_1 \times n_x}$ 是矩阵（每行是一个神经元的权重），$b^{[1]} \in \mathbb{R}^{n_1 \times 1}$。上标 $[l]$ 表示第 $l$ 层，$n_1$ 是隐藏层神经元个数。
 
-对应代码位于 `chapters/fundamentals/shallow_network/model.py`。
+直观理解：第一层的每个神经元都像一个小型 Logistic Regression，各自学一个线性边界。第二层把这些边界组合起来，形成弯曲的决策边界。
 
-## 3. 代码解析
+### 1.2 批量化
+
+把 $m$ 个样本的列向量横向堆叠成矩阵 $X \in \mathbb{R}^{n_x \times m}$：
+
+$$
+\begin{aligned}
+A^{[1]} &= g^{[1]}(W^{[1]} X + b^{[1]}) \\
+A^{[2]} &= g^{[2]}(W^{[2]} A^{[1]} + b^{[2]})
+\end{aligned}
+$$
+
+$b^{[1]}$ 通过 NumPy 广播加到每一列上。
+
+## 2. 激活函数：为什么非线性是必须的
+
+假设我们不用激活函数，即 $g(z) = z$：
+
+$$
+\begin{aligned}
+\hat{y} &= W^{[2]}(W^{[1]} x + b^{[1]}) + b^{[2]} \\
+&= (W^{[2]} W^{[1]}) x + (W^{[2]} b^{[1]} + b^{[2]})
+\end{aligned}
+$$
+
+把 $W^{[2]} W^{[1]}$ 看作新的 $W$，$W^{[2]} b^{[1]} + b^{[2]}$ 看作新的 $b$——**无论堆多少层，没有激活函数的网络永远等价于单层**，只能拟合线性函数。
+
+激活函数打破了这种线性，让深层网络具备表达任意复杂函数的能力。
+
+### 常用激活函数
+
+| 函数 | 公式 | 值域 | 特点 |
+|---|---|---|---|
+| sigmoid | $\frac{1}{1+e^{-z}}$ | $(0, 1)$ | 输出层用，深层易饱和 |
+| tanh | $\frac{e^z - e^{-z}}{e^z + e^{-z}}$ | $(-1, 1)$ | 数学上严格优于 sigmoid |
+| ReLU | $\max(0, z)$ | $[0, \infty)$ | **默认首选**，梯度不消失 |
+| Leaky ReLU | $\max(kz, z), k<1$ | $(-\infty, \infty)$ | 负数区域有微小梯度 |
+
+**选择原则**：隐藏层默认用 ReLU（梯度稳定、计算简单）；二分类输出层用 sigmoid（输出概率）。
+
+> ReLU 在 $z=0$ 处不可导？编程时直接令 $0$ 处导数为 $1$（右极限），不影响优化。
+
+## 3. 参数初始化：为什么不能全零
+
+Logistic Regression 可以用零初始化，因为只有一个神经元。但在隐藏层中，如果 $W^{[1]}$ 全为零，每个神经元的输出完全相同，反向传播时每个神经元的梯度也完全相同——**所有神经元永远同步更新，等价于只用一个神经元**。
+
+解决方法：**随机初始化**。每个神经元的 $W$ 取不同的随机值，配以很小的幅度：
 
 ```python
-Z1 = np.dot(self.W1, X) + self.b1
-A1 = relu(Z1)
-Z2 = np.dot(self.W2, A1) + self.b2
-A2 = sigmoid(Z2)
+W1 = np.random.randn(n_1, n_x) * 0.01
 ```
 
-`forward` 在训练模式下保存缓存，`backward` 只消费缓存并产生梯度，`gradient_descent` 再统一更新参数。分离这三个职责后，每一步都可以独立验证。
+乘以 $0.01$ 是因为小的初始值让激活函数工作在非饱和区，梯度不会太小。$b$ 仍然可以零初始化。
 
-## 4. 实验
+## 4. 梯度推导：反向传播的链式法则
+
+### 4.1 输出层（同 Logistic Regression）
+
+第二层用 sigmoid，梯度公式与上一章完全相同：
+
+$$\frac{\partial L}{\partial Z^{[2]}} = A^{[2]} - Y$$
+
+$$\frac{\partial L}{\partial W^{[2]}} = \frac{1}{m} dZ^{[2]} A^{[1]T}, \quad
+\frac{\partial L}{\partial b^{[2]}} = \frac{1}{m} \sum dZ^{[2]}$$
+
+### 4.2 隐藏层
+
+梯度从输出层逐层回传：
+
+$$\frac{\partial L}{\partial A^{[1]}} = W^{[2]T} dZ^{[2]}$$
+
+$$\frac{\partial L}{\partial Z^{[1]}} = dA^{[1]} \odot g^{[1]'}(Z^{[1]})$$
+
+其中 $\odot$ 表示逐元素乘法，$g^{[1]'}$ 是 ReLU 的导数：
+
+$$
+\text{relu}'(z) = \begin{cases} 1 & z > 0 \\ 0 & z < 0 \end{cases}
+$$
+
+最后：
+
+$$\frac{\partial L}{\partial W^{[1]}} = \frac{1}{m} dZ^{[1]} X^T, \quad
+\frac{\partial L}{\partial b^{[1]}} = \frac{1}{m} \sum dZ^{[1]}$$
+
+完整的推导步骤见 [derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/shallow_network/derivations/formulas.md)。
+
+## 5. 代码解析
+
+### 5.1 正向传播
+
+```python
+def forward(self, X, train_mode=True):
+    Z1 = np.dot(self.W1, X) + self.b1    # (n_1, m)
+    A1 = relu(Z1)                        # ReLU 激活
+    Z2 = np.dot(self.W2, A1) + self.b2   # (1, m)
+    A2 = sigmoid(Z2)                     # sigmoid → 概率
+    if train_mode:
+        self.X_cache = X                  # 缓存供反向传播使用
+        self.Z1_cache = Z1
+        self.A1_cache = A1
+        self.A2_cache = A2
+    return A2
+```
+
+训练模式下缓存中间结果（$X$, $Z^{[1]}$, $A^{[1]}$, $A^{[2]}$），反向传播会复用这些值。
+
+### 5.2 反向传播
+
+```python
+def backward(self, Y):
+    dZ2 = self.A2_cache - Y                          # 输出层梯度
+    dW2 = np.dot(dZ2, self.A1_cache.T) / self.m_cache
+    db2 = np.sum(dZ2, axis=1, keepdims=True) / self.m_cache
+
+    dA1 = np.dot(self.W2.T, dZ2)                    # 梯度回传
+    dZ1 = dA1 * relu_de(self.Z1_cache)              # ReLU 的链式法则
+    dW1 = np.dot(dZ1, self.X_cache.T) / self.m_cache
+    db1 = np.sum(dZ1, axis=1, keepdims=True) / self.m_cache
+```
+
+**关键细节**：`db2` 和 `db1` 的求和必须加 `keepdims=True`。它保持维度为 $(n, 1)$ 而非 $(n,)$，确保后续的广播运算正确——$(n, m)$ 减去 $(n,)$ 会报错，但减去 $(n, 1)$ 会正确广播。
+
+### 5.3 代码设计：抽象基类
+
+本模块使用 `BaseRegressionModel` 抽象基类统一二分类模型的接口：
+
+- `forward(X, train_mode)` — 前向传播
+- `backward(Y)` — 反向传播
+- `gradient_descent(lr)` — 参数更新
+- `loss(Y_hat, Y)` — 交叉熵损失（所有子类共用）
+- `evaluate(X, Y)` — 准确率评估（所有子类共用）
+
+`LogisticRegression` 和 `ShallowNetwork` 都继承这个基类，只需实现各自的前向、反向和梯度下降逻辑。训练循环因此完全通用——换模型只需替换实例，不用改训练代码。
+
+> 这个 OOP 设计受周弈帆的[《吴恩达深度学习专项笔记（三）》](https://zhouyifan.net/2022/05/23/DLS-note-3/)启发。
+
+## 6. 实验
 
 ```bash
 uv run python -m chapters.fundamentals.shallow_network.points_classification
 ```
 
-脚本对比 Logistic Regression 与不同隐藏单元数量的浅层网络。隐藏单元增加会提高表达能力，也会增加过拟合和优化成本。
+脚本在二维点集上对比 Logistic Regression 与不同隐藏单元数的浅层网络。增加隐藏单元会提高表达能力，也会增加过拟合风险。
 
 ## 参考资料
 
 - Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). [Learning representations by back-propagating errors](https://www.nature.com/articles/323533a0). *Nature*, 323(6088), 533–536.
-- Nair, V., & Hinton, G. E. (2010). Rectified linear units improve restricted Boltzmann machines. In *ICML*.
+- Nair, V., & Hinton, G. E. (2010). Rectified linear units improve restricted Boltzmann machines. In *ICML 2010*.
+- 周弈帆（2022-05-23）。[吴恩达《深度学习专项》笔记+代码实战（三）：「浅度」神经网络](https://zhouyifan.net/2022/05/23/DLS-note-3/)。
+- 完整公式推导：[derivations/formulas.md](https://github.com/luochang212/DL-Demos/blob/master/chapters/fundamentals/shallow_network/derivations/formulas.md)
 - 本项目源码：[chapters/fundamentals/shallow_network/](https://github.com/luochang212/DL-Demos/tree/master/chapters/fundamentals/shallow_network)。
