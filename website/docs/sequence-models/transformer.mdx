@@ -58,3 +58,9 @@ uv run python chapters/sequence_models/transformer/translate.py
 ```
 
 默认实现使用贪心解码，没有 beam search、学习率 warmup 或 KV cache，重点是展示 Transformer 数据流。
+
+## 参考资料
+
+- Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [Attention Is All You Need](https://arxiv.org/abs/1706.03762). *NeurIPS 2017*.
+- 本章 Attention 教程讲解的 Bahdanau 注意力机制，见：[Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473)。
+- 本项目源码：[chapters/sequence_models/transformer/](https://github.com/luochang212/DL-Demos/tree/master/chapters/sequence_models/transformer)。
