@@ -26,7 +26,10 @@ chapter.
   thermodynamics diffusion paper when discussing the origin of diffusion
   probabilistic models.
 - Zhou Yifan's blog at `https://zhouyifan.net/archives/` is an approved
-  reference source for improving the generative model tutorials.
+  reference source for improving tutorial chapters across all categories
+  (generative models, fundamentals, CV, sequence models, etc.).
+- When adding blog references, verify the article exists and is relevant;
+  blog references supplement original method papers, not replace them.
 - Relevant examples include VAE, KL divergence, diffusion models, DDIM, and
   VQ-VAE articles.
 - If tutorial text, explanation structure, intuition, or terminology is informed
@@ -206,15 +209,15 @@ implementation of this pipeline.
 
 ## Validation SOP
 
-Every generative model migration must pass three levels of validation.
+Every chapter improvement must pass three levels of validation.
 
 ### 1. Static Quality
 
 Run the narrow check first:
 
 ```powershell
-uv run ruff check chapters/generative_models/<chapter>
-uv run ruff format --check chapters/generative_models/<chapter>
+uv run ruff check chapters/<category>/<chapter>
+uv run ruff format --check chapters/<category>/<chapter>
 ```
 
 Before final commit, run the broader check:
@@ -231,7 +234,7 @@ Only run `ruff format` on files intentionally touched by the migration.
 Each chapter must have a CPU smoke test under:
 
 ```text
-chapters/generative_models/<chapter>/tests/
+chapters/<category>/<chapter>/tests/
 ```
 
 The smoke test must:
@@ -247,7 +250,7 @@ The smoke test must:
 Run:
 
 ```powershell
-uv run pytest chapters/generative_models/<chapter>/tests -q
+uv run pytest chapters/<category>/<chapter>/tests -q
 uv run pytest chapters -q
 ```
 
@@ -286,6 +289,114 @@ npm run build
 Run this from `website/`.
 
 Docs must reference paths under `chapters/`; do not link to removed legacy paths.
+
+## Non-Generative Chapter Improvement
+
+The Chapter Improvement Pipeline applies to all chapters, but non-generative
+chapters (fundamentals, cv, sequence_models, training_tricks, engineering) follow
+a lighter variant.  Formula derivations and Lean verification are optional for
+chapters whose primary teaching value is in code implementation rather than
+probabilistic derivation.
+
+### Adapted Pipeline (Non-Generative)
+
+1. **Research & References** — ensure every website doc has a "参考资料" section
+   citing the original method paper.  Fundamentals chapters cite foundational
+   work (Cox 1958 for logistic regression, Rumelhart et al. 1986 for
+   backpropagation, etc.).  Applied chapters cite both the original method and
+   the code-framework paper where relevant.
+2. **Code Canonicalization** — if a chapter only has Jupyter notebooks, extract
+   the core model classes into `code/model.py`.  Keep imports self-contained.
+3. **Smoke Test** — write a CPU smoke test that instantiates the model, runs
+   forward pass, computes loss, and runs backward on synthetic data.  See
+   [Smoke Test Patterns](#smoke-test-patterns) for handling optional
+   dependencies.
+4. **README** — every chapter (and each topic subdirectory) must have a README
+   with the runnable smoke command, any real-data commands, and
+   data/checkpoint requirements.
+5. **Validate** — run smoke tests, `ruff check`, `ruff format --check`, and
+   `npm run build` from `website/`.  Commit each chapter improvement separately.
+
+### Smoke Test Patterns
+
+When a chapter depends on libraries that are not in the default dependency set
+(e.g. `tensorflow` for resnet, `torchtext` for sentiment_analysis), use one of
+these patterns:
+
+**Pattern A — skip on missing dependency:**
+
+```python
+pytest.importorskip('tensorflow', reason='TensorFlow not installed')
+```
+
+Use when the test can exercise the real model classes while the dependency is
+not part of the standard `uv sync` install.
+
+**Pattern B — mock the dependency:**
+
+```python
+import sys
+from unittest.mock import MagicMock
+
+sys.modules['torchtext'] = MagicMock()
+sys.modules['torchtext.data'] = MagicMock()
+sys.modules['torchtext.vocab'] = MagicMock()
+```
+
+Use when the model class itself does not use the dependency but a module-level
+import would trigger a download or fail.  The mocks must be in `sys.modules`
+*before* importing from the chapter.
+
+**Pattern C — extract model to avoid the dependency:**
+
+When the module-level code has a hard dependency on a heavy library, extract the
+pure model class into `code/model.py` and write the smoke test against the
+extracted module.  The Jupyter notebook or legacy script can import from `code/`
+after extraction.
+
+### Jupyter Notebook Chapters
+
+If a chapter's canonical implementation lives only in `.ipynb` files:
+
+1. Extract the core model classes into `code/model.py` as regular Python modules.
+2. Write smoke tests that import from `code/model.py`.
+3. The notebooks remain as reference experiments — they may import from `code/`
+   or keep their inline definitions.
+4. Add a `README.md` documenting both the smoke test command and the notebook
+   launch command.
+
+## Current Chapter State (2026-06-19)
+
+All 22 topics across 6 chapter categories have been verified to pass smoke
+tests, ruff checks, and website build.
+
+### Completion Summary
+
+| Category | Topics | Code | Smoke Test | README | References |
+|---|---|---|---|---|---|
+| generative_models | 5 | ✅ | ✅ | ✅ | ✅ + formulas |
+| training_tricks | 3 | ✅ | ✅ | ✅ | ✅ |
+| fundamentals | 4 | ✅ | ✅ | ✅ | ✅ |
+| sequence_models | 4 | ✅ | ✅ | ✅ | ✅ |
+| cv | 4 | ✅ | ✅ ⚠️ | ✅ | ✅ |
+| engineering | 2 | ✅ | ✅ | ✅ | ✅ |
+
+⚠️ resnet smoke test requires TensorFlow (skipped when unavailable).
+
+### Future Work
+
+- **Formula derivations**: Consider adding `formulas.md` and Lean verification
+  for transformer (attention math), basic_cnn (convolution backprop), and
+  advanced_optimizer (SGD/Momentum/Adam update rules).
+- **Zhou Yifan blog references**: When blog access is restored, check for
+  articles on attention, transformer, CNN basics, and optimization that could
+  improve non-generative tutorial chapters.
+- **resnet PyTorch migration**: The current resnet implementation is
+  TensorFlow-only.  Consider adding a PyTorch version to match the rest of the
+  project.
+- **smoke test coverage**: sentiment_analysis and resnet smoke tests use
+  dependency mocking/skipping.  When those dependencies are promoted to the
+  default install, remove the mocks.
 
 ## Dependency Version Control
 
