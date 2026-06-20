@@ -8,8 +8,8 @@ const sidebars = {
     },
     {
       type: 'doc',
-      id: 'getting-started/environment',
-      label: '🧰 环境、运行与验证',
+      id: 'getting-started/index',
+      label: '🚀 开始指南',
     },
     {
       type: 'category',

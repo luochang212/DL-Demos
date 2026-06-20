@@ -1,0 +1,58 @@
+---
+id: index
+title: 开始指南
+sidebar_label: 🚀 开始指南
+description: 从安装环境到跑通第一个示例，快速开始 DL-Demos 的学习。
+slug: /getting-started/
+---
+
+import Link from '@docusaurus/Link';
+
+# 开始指南
+
+这一页帮你把项目跑起来。如果还不确定要学什么，先看[项目简介](/)；如果已经准备好，跟着下面几步走。
+
+## 1. 你需要先准备什么
+
+- **Python 3.13** —— 项目默认版本
+- **[uv](https://docs.astral.sh/uv/)** —— 解析、锁定并运行依赖的包管理器
+
+不要求 GPU。每章自带的 smoke test 用合成数据，CPU 就能跑；只有完整训练才需要对应数据集（甚至 GPU）。
+
+## 2. 安装环境
+
+```bash
+git clone https://github.com/luochang212/DL-Demos.git
+cd DL-Demos
+uv sync --group dev
+```
+
+`uv sync` 会按 `uv.lock` 自动创建虚拟环境并锁定全部依赖——不要用全局 Python 直接跑示例，也不要手动维护虚拟环境。
+
+## 3. 跑通第一个示例
+
+先用一章的 smoke test 验证环境是否就绪（CPU、合成数据、几秒完成）：
+
+```bash
+uv run pytest chapters/fundamentals/shallow_network -q
+```
+
+看到测试通过，说明环境可用。想直接跑一个完整训练并查看可视化结果，可以执行（会训练 4 个模型并弹出结果窗口）：
+
+```bash
+uv run python -m chapters.fundamentals.shallow_network.code.points_classification
+```
+
+> 每一章在 `chapters/<分类>/<章节>/code/` 下都有自己的入口，具体命令与数据要求见各章节文档与 README。
+
+## 4. 下一步学什么
+
+<Link to="/fundamentals/logistic-regression">从 Logistic Regression 开始</Link>，建立激活函数、损失函数与梯度更新的完整认识；或回到 <Link to="/">项目简介</Link>，按学习路线选择入口。
+
+## 给开发者：质量检查与提交
+
+修改代码后的质量检查与提交流程（`ruff`、`pytest`、`npm run build`、`pre-commit` 等）见仓库的 [README](https://github.com/luochang212/DL-Demos/blob/master/README.md) 与 [AGENTS.md](https://github.com/luochang212/DL-Demos/blob/master/AGENTS.md)，此处不再重复。
+
+## 部分示例需要额外环境
+
+默认环境不包含 TensorFlow 和已停止维护的 `torchtext`（ResNet 的 TensorFlow 实现、情感分析的 torchtext 实现）。它们作为教学对照保留，但不属于默认环境的可运行性承诺——遇到相关章节时按其 README 单独安装。
