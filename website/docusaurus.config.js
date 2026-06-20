@@ -6,7 +6,7 @@ import rehypeKatex from 'rehype-katex';
 const config = {
   title: 'DL-Demos 深度学习教程',
   tagline: '从原理到代码，深度学习经典算法的逐行解析',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/logo.svg',
 
   url: 'https://luochang212.github.io',
   baseUrl: '/DL-Demos/',
@@ -66,6 +66,20 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      image: 'img/og-image.jpg',
+      metadata: [
+        {
+          name: 'keywords',
+          content:
+            '深度学习, PyTorch, 机器学习, 神经网络, 深度学习教程, 从零实现, CNN, ResNet, VAE, DDPM, Transformer',
+        },
+        {
+          name: 'description',
+          content:
+            'DL-Demos 是一套深度学习经典算法的 PyTorch 从零实现教程，配以完整的数学推导与逐行代码解析，覆盖基础神经网络、训练技巧、CNN/视觉、序列模型与生成式模型。',
+        },
+        {name: 'twitter:card', content: 'summary_large_image'},
+      ],
       navbar: {
         title: 'DL-Demos',
         logo: {
@@ -109,6 +123,20 @@ const config = {
         maxHeadingLevel: 4,
       },
     }),
+
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: {type: 'application/ld+json'},
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'DL-Demos 深度学习教程',
+        url: 'https://luochang212.github.io/DL-Demos/',
+        description: '深度学习经典算法的 PyTorch 从零实现教程',
+      }),
+    },
+  ],
 };
 
 export default config;
