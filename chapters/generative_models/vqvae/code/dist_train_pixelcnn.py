@@ -96,7 +96,9 @@ if __name__ == '__main__':
     )
 
     # 3. Train Generative model (Gated PixelCNN in our project)
-    vqvae.load_state_dict(torch.load(cfg['vqvae_path']))
+    vqvae.load_state_dict(
+        torch.load(cfg['vqvae_path'], map_location='cpu', weights_only=True)
+    )
     vqvae.to(device)
     gen_model.to(device)
     gen_model = DistributedDataParallel(gen_model, device_ids=[device])

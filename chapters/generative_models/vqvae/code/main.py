@@ -253,8 +253,18 @@ def main():
 
     cfg = get_cfg(args.c)
 
-    requested_device = f'cuda:{args.d}' if torch.cuda.is_available() else 'cpu'
-    device = resolve_device(requested_device)
+    # Use the device resolved from --device flag (args.d is kept for backward
+    # compatibility but no longer overrides --device)
+    if args.d != 0:
+        import warnings
+
+        warnings.warn(
+            'The -d argument is deprecated. Use --device instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        device = resolve_device(f'cuda:{args.d}')
+    # else: device is already resolved from --device above
 
     img_shape = cfg['img_shape']
 
