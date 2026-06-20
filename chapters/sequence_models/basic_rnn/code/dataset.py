@@ -5,7 +5,7 @@ from chapters.sequence_models.basic_rnn.code.constant import (
     EMBEDDING_LENGTH,
     LETTER_MAP,
 )
-from chapters.sequence_models.basic_rnn.read_imdb import (
+from chapters.sequence_models.basic_rnn.code.read_imdb import (
     read_imdb_vocab,
     read_imdb_words,
 )
