@@ -24,7 +24,7 @@ def get_activation_func(name):
     elif name == 'relu':
         return relu
     else:
-        raise KeyError(f'No such activavtion function {name}')
+        raise KeyError(f'No such activation function {name}')
 
 
 def get_activation_de_func(name):
@@ -33,4 +33,4 @@ def get_activation_de_func(name):
     elif name == 'relu':
         return relu_de
     else:
-        raise KeyError(f'No such activavtion function {name}')
+        raise KeyError(f'No such activation function {name}')

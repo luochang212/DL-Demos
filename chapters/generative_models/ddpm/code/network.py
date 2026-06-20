@@ -33,10 +33,10 @@ class ResidualBlock(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv2d(in_c, out_c, 3, 1, 1)
         self.bn1 = nn.BatchNorm2d(out_c)
-        self.actvation1 = nn.ReLU()
+        self.activation1 = nn.ReLU()
         self.conv2 = nn.Conv2d(out_c, out_c, 3, 1, 1)
         self.bn2 = nn.BatchNorm2d(out_c)
-        self.actvation2 = nn.ReLU()
+        self.activation2 = nn.ReLU()
         if in_c != out_c:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_c, out_c, 1), nn.BatchNorm2d(out_c)
@@ -47,11 +47,11 @@ class ResidualBlock(nn.Module):
     def forward(self, input):
         x = self.conv1(input)
         x = self.bn1(x)
-        x = self.actvation1(x)
+        x = self.activation1(x)
         x = self.conv2(x)
         x = self.bn2(x)
         x += self.shortcut(input)
-        x = self.actvation2(x)
+        x = self.activation2(x)
         return x
 
 

@@ -35,13 +35,13 @@ def init_model(device='cpu'):
     def weights_init(m):
         if isinstance(m, nn.Conv2d):
             torch.nn.init.xavier_normal_(m.weight)
-            m.bias.data.fill_(0)
+            nn.init.zeros_(m.bias)
         elif isinstance(m, nn.BatchNorm2d):
-            m.weight.data.normal_(1.0, 0.02)
-            m.bias.data.fill_(0)
+            nn.init.normal_(m.weight, 1.0, 0.02)
+            nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
             torch.nn.init.xavier_normal_(m.weight)
-            m.bias.data.fill_(0)
+            nn.init.zeros_(m.bias)
 
     model.apply(weights_init)
 
