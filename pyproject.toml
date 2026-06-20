@@ -7,7 +7,7 @@ name = "dl-demos"
 version = "0.1.0"
 description = "Educational deep learning implementations and tutorials"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "babel>=2.16",
     "einops>=0.8",
@@ -20,8 +20,8 @@ dependencies = [
     "regex>=2024.11",
     "requests>=2.32",
     "six>=1.17",
-    "torch>=2.7",
-    "torchvision>=0.22",
+    "torch>=2.5",
+    "torchvision>=0.20",
     "tqdm>=4.67",
 ]
 
@@ -32,11 +32,16 @@ dev = [
     "ruff>=0.13",
 ]
 
+[[tool.uv.index]]
+name = "tencent-pypi"
+url = "https://mirrors.cloud.tencent.com/pypi/simple"
+default = true
+
 [tool.setuptools.packages.find]
 include = ["chapters*"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
