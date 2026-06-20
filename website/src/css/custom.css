@@ -43,3 +43,192 @@
   margin: 0 calc(-1 * var(--ifm-pre-padding));
   padding: 0 var(--ifm-pre-padding);
 }
+
+/* ── 学习首页：紧凑的技术编辑风格 ───────────────────────────── */
+.course-home-intro {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 3rem;
+  padding: 2.5rem clamp(1.5rem, 5vw, 3.75rem) 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-top: 4px solid var(--ifm-color-primary);
+  background:
+    linear-gradient(90deg, var(--ifm-color-emphasis-100) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(var(--ifm-color-emphasis-100) 1px, transparent 1px) 0 0 / 32px 32px,
+    var(--ifm-background-surface-color);
+}
+
+.course-home-intro::after {
+  position: absolute;
+  top: -5rem;
+  right: -4rem;
+  width: 15rem;
+  height: 15rem;
+  border: 2.5rem solid color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.course-home-eyebrow {
+  margin-bottom: 1rem;
+  color: var(--ifm-color-primary-dark);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.course-home-intro h1 {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  margin-bottom: 1rem;
+  font-size: clamp(2rem, 5vw, 3.35rem);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+}
+
+.course-home-lead {
+  max-width: 680px;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 1.08rem;
+  line-height: 1.85;
+}
+
+.course-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 2.25rem;
+}
+
+.course-home-source {
+  margin-left: 0.35rem;
+  font-weight: 600;
+}
+
+.course-home-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 calc(-1 * clamp(1.5rem, 5vw, 3.75rem));
+  padding: 0 clamp(1.5rem, 5vw, 3.75rem);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  background: color-mix(in srgb, var(--ifm-background-color) 82%, transparent);
+}
+
+.course-home-stats div { padding: 1.1rem 0; }
+.course-home-stats div + div { padding-left: 1.5rem; border-left: 1px solid var(--ifm-color-emphasis-200); }
+.course-home-stats dt { font-size: 1.25rem; font-weight: 800; }
+.course-home-stats dd { margin: 0; color: var(--ifm-color-emphasis-600); font-size: 0.8rem; }
+
+.course-home-tabs { margin-top: 1.5rem; }
+.course-home-tabs .tabs { border-bottom: 1px solid var(--ifm-color-emphasis-200); }
+.course-home-tabs .tabs__item { border-radius: 0; font-weight: 700; }
+
+.course-home-path {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 1.5rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.course-home-path a {
+  position: relative;
+  min-width: 0;
+  padding: 1.25rem;
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+
+.course-home-path a + a { border-left: 1px solid var(--ifm-color-emphasis-200); }
+.course-home-path a:hover { background: var(--ifm-color-emphasis-100); }
+.course-home-path strong { display: block; margin-bottom: 0.65rem; color: var(--ifm-color-primary-dark); font-size: 0.82rem; }
+.course-home-path span { color: var(--ifm-color-emphasis-700); font-size: 0.82rem; line-height: 1.5; }
+
+.course-home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.course-home-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0 1rem;
+  padding: 1.2rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.course-home-card:hover { border-color: var(--ifm-color-primary); text-decoration: none; transform: translateY(-2px); }
+.course-home-card > span { grid-row: 1 / 4; color: var(--ifm-color-emphasis-400); font-family: var(--ifm-font-family-monospace); font-size: 0.75rem; }
+.course-home-card h3 { margin: 0; font-size: 1rem; }
+.course-home-card p { grid-column: 2 / 4; margin: 0.35rem 0 0.8rem; color: var(--ifm-color-emphasis-700); font-size: 0.84rem; }
+.course-home-card b { grid-column: 2 / 4; color: var(--ifm-color-primary-dark); font-size: 0.78rem; }
+
+.course-home-run {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 2rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+.course-home-run h3 { margin-top: 0; }
+.course-home-run .theme-code-block { margin: 0; }
+
+.course-home-starts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin: 1.5rem 0 3rem;
+  padding: 1px;
+  background: var(--ifm-color-emphasis-200);
+}
+
+.course-home-starts a {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  padding: 1.4rem;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+.course-home-starts a:hover { background: var(--ifm-color-emphasis-100); text-decoration: none; }
+.course-home-starts small { margin-bottom: auto; color: var(--ifm-color-primary-dark); font-weight: 700; }
+.course-home-starts strong { margin: 1.5rem 0 0.4rem; font-size: 1.05rem; }
+.course-home-starts span { color: var(--ifm-color-emphasis-700); font-size: 0.84rem; line-height: 1.55; }
+
+.course-home-values {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem 2rem;
+  margin: 1.5rem 0 2.5rem;
+}
+.course-home-values div { display: grid; grid-template-columns: 6rem 1fr; border-top: 2px solid var(--ifm-color-emphasis-300); padding-top: 0.9rem; }
+.course-home-values span { color: var(--ifm-color-emphasis-700); font-size: 0.88rem; line-height: 1.65; }
+
+@media (max-width: 996px) {
+  .course-home-path { grid-template-columns: 1fr; }
+  .course-home-path a + a { border-top: 1px solid var(--ifm-color-emphasis-200); border-left: 0; }
+}
+
+@media (max-width: 700px) {
+  .course-home-intro { padding-top: 1.75rem; }
+  .course-home-intro h1 br { display: none; }
+  .course-home-source { width: 100%; margin: 0.25rem 0 0; }
+  .course-home-stats { grid-template-columns: 1fr; }
+  .course-home-stats div + div { padding-left: 0; border-top: 1px solid var(--ifm-color-emphasis-200); border-left: 0; }
+  .course-home-grid,
+  .course-home-run,
+  .course-home-starts,
+  .course-home-values { grid-template-columns: 1fr; }
+  .course-home-values div { grid-template-columns: 5rem 1fr; }
+}

@@ -1,0 +1,95 @@
+---
+id: intro
+title: DL-Demos 深度学习教程
+sidebar_label: 🏠 学习首页
+description: 从公式推导到可运行代码，系统学习深度学习经典模型
+slug: /
+hide_title: true
+hide_table_of_contents: true
+pagination_next: null
+---
+
+import Link from '@docusaurus/Link';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<header className="course-home-intro">
+  <div className="course-home-eyebrow">DL-DEMOS · TUTORIAL &amp; CODE</div>
+  <h1>从公式推导到可运行代码，<br />真正弄懂深度学习</h1>
+  <p className="course-home-lead">
+    沿着「论文公式 → 算法直觉 → 从零实现 → 运行验证」的链条，系统学习经典深度学习模型。
+  </p>
+  <div className="course-home-actions">
+    <Link className="button button--primary" to="/fundamentals/logistic-regression">开始学习</Link>
+    <Link className="button button--secondary" to="/getting-started/environment">配置环境</Link>
+    <Link className="course-home-source" href="https://github.com/luochang212/DL-Demos">查看 GitHub →</Link>
+  </div>
+  <dl className="course-home-stats">
+    <div><dt>22</dt><dd>个教程主题</dd></div>
+    <div><dt>6</dt><dd>条学习路线</dd></div>
+    <div><dt>CPU</dt><dd>可运行 Smoke Test</dd></div>
+  </dl>
+</header>
+
+## 选择你的学习方式
+
+不必从目录中猜起点。根据当前目标，选择最适合你的入口。
+
+<Tabs className="course-home-tabs" groupId="home-learning-mode">
+  <TabItem value="systematic" label="系统学习" default>
+    <div className="course-home-path">
+      <Link to="/fundamentals"><strong>01 · 基础神经网络</strong><span>前向传播、反向传播与分类损失</span></Link>
+      <Link to="/training-tricks"><strong>02 · 训练技巧</strong><span>初始化、正则化与优化算法</span></Link>
+      <Link to="/cv"><strong>03 · 视觉与序列</strong><span>CNN、RNN、Attention 与 Transformer</span></Link>
+      <Link to="/generative-models"><strong>04 · 生成模型</strong><span>从 VAE 到扩散与离散表示</span></Link>
+      <Link to="/engineering"><strong>05 · 工程实践</strong><span>表示能力与分布式训练</span></Link>
+    </div>
+  </TabItem>
+
+  <TabItem value="topics" label="按主题浏览">
+    <div className="course-home-grid">
+      <Link className="course-home-card" to="/fundamentals"><span>01</span><h3>基础神经网络</h3><p>Logistic Regression、浅层网络、深层 MLP 与多分类</p><b>4 章 →</b></Link>
+      <Link className="course-home-card" to="/training-tricks"><span>02</span><h3>训练技巧</h3><p>参数初始化、正则化与优化器的原理和实现</p><b>3 章 →</b></Link>
+      <Link className="course-home-card" to="/cv"><span>03</span><h3>CNN 与视觉</h3><p>卷积、ResNet、风格迁移、IoU 与 NMS</p><b>4 章 →</b></Link>
+      <Link className="course-home-card" to="/sequence-models"><span>04</span><h3>序列模型</h3><p>RNN、情感分析、Attention 与 Transformer</p><b>4 章 →</b></Link>
+      <Link className="course-home-card" to="/generative-models"><span>05</span><h3>生成模型</h3><p>VAE、DDPM、DDIM、PixelCNN 与 VQVAE</p><b>5 章 →</b></Link>
+      <Link className="course-home-card" to="/engineering"><span>06</span><h3>工程实践</h3><p>Fourier Feature 与 PyTorch 分布式训练</p><b>2 章 →</b></Link>
+    </div>
+  </TabItem>
+
+  <TabItem value="run" label="运行与验证">
+    <div className="course-home-run">
+      <div>
+        <h3>先把项目跑起来</h3>
+        <p>默认环境使用 Python 3.13 与 PyTorch。章节测试使用合成输入，不要求下载完整数据集。</p>
+        <Link to="/getting-started/environment">查看完整环境与验证说明 →</Link>
+      </div>
+
+```bash
+git clone https://github.com/luochang212/DL-Demos.git
+cd DL-Demos
+uv sync --group dev
+uv run pytest chapters -q
+```
+    </div>
+  </TabItem>
+</Tabs>
+
+## 从这里开始
+
+<div className="course-home-starts">
+  <Link to="/fundamentals/logistic-regression"><small>第一次系统学习</small><strong>从 Logistic Regression 开始</strong><span>建立激活函数、损失函数与梯度更新的完整认识。</span></Link>
+  <Link to="/sequence-models/attention"><small>已有神经网络基础</small><strong>理解 Attention 与 Transformer</strong><span>从对齐分数出发，逐步走到多头自注意力。</span></Link>
+  <Link to="/generative-models"><small>关注生成式模型</small><strong>比较五类生成方法</strong><span>先建立方法地图，再进入 VAE、扩散和离散表示。</span></Link>
+</div>
+
+## 这里不只给出代码
+
+<div className="course-home-values">
+  <div><strong>公式推导</strong><span>补全关键符号与代数过程，网页正文保持可读。</span></div>
+  <div><strong>从零实现</strong><span>把核心机制落实到可读、可运行的章节代码。</span></div>
+  <div><strong>重复验证</strong><span>每章提供窄范围测试和真实入口，验证模型与输出路径。</span></div>
+  <div><strong>原始资料</strong><span>链接方法论文和实际采用的教程参考，区分来源与扩展。</span></div>
+</div>
+
+> 本仓库 fork 自 [SingleZombie/DL-Demos](https://github.com/SingleZombie/DL-Demos)。当前分支在继承演示代码的基础上，补充章节化教程、推导、测试与验证流程。
