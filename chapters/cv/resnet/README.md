@@ -1,18 +1,18 @@
 # ResNet — 残差网络
 
 残差网络（Residual Network）教程。从残差连接的梯度流原理出发，覆盖
-Identity Block、Convolution Block、Bottleneck 三种核心模块的 TensorFlow 实现。
-
-> **注意**：当前实现为 TensorFlow/Keras（legacy）。PyTorch 迁移是未来工作计划。
+BasicBlock、Bottleneck 两种核心模块，支持 ResNet-18/34/50/101/152。
 
 ## 目录结构
 
 - `code/` — 规范实现
-  - `code/tf_main.py` — ResNet-18 / ResNet-50 的 TensorFlow 实现（identity_block、convolution_block、bottleneck）
+  - `code/model.py` — PyTorch ResNet 模型（BasicBlock, Bottleneck, ResNet）
+  - `code/main.py` — 训练/评估 CLI（支持烟雾模式和完整训练）
+  - `code/tf_main.py` — 遗留 TensorFlow/Keras 参考实现
 - `derivations/` — 完整公式推导与 Lean 形式化验证
   - `derivations/formulas.md` — 残差块公式、梯度流分析、瓶颈块推导
   - `derivations/resnet.lean` — Identity shortcut 恒等映射、梯度非零、通道匹配
-- `tests/` — CPU 烟雾测试（TensorFlow 不可用时自动跳过）
+- `tests/` — CPU 烟雾测试（PyTorch）
 
 ## 运行命令
 
@@ -22,32 +22,33 @@ Identity Block、Convolution Block、Bottleneck 三种核心模块的 TensorFlow
 uv run pytest chapters/cv/resnet/tests -q
 ```
 
-### 完整训练（需要猫狗数据集 + TensorFlow 环境）
+### 烟雾模式训练（合成数据，2 个 epoch）
 
 ```bash
-uv run python -m chapters.cv.resnet.code.tf_main
+uv run python -m chapters.cv.resnet.code.main --smoke
 ```
 
-### 代码入口
+### 完整训练（需要猫狗数据集）
 
 ```bash
-uv run python -c "
-from chapters.cv.resnet.code.tf_main import init_model
-print('ResNet imported')
-"
+# ResNet-18
+uv run python -m chapters.cv.resnet.code.main --model resnet18 --epochs 20
+
+# ResNet-50（带 torchvision 预训练权重）
+uv run python -m chapters.cv.resnet.code.main --model resnet50 --epochs 20 --pretrained
 ```
 
 ## 数据与依赖
 
 - 完整训练需要猫狗数据集，放在 `data/archive/dataset/` 下。
 - 数据加载复用 `chapters.cv.basic_cnn.code.dataset`。
-- 烟雾测试在无 TensorFlow 时自动跳过（`pytest.importorskip`）。
-- TensorFlow 环境需单独配置（不在默认 `uv sync` 依赖中）。
+- 可选依赖 `torchvision` 用于预训练权重加载（`--pretrained` 标志）。
+- TensorFlow 遗留代码 (`code/tf_main.py`) 需单独配置 TF 环境。
 
 ## 输出位置
 
+- 检查点保存至 `work_dirs/resnet/`。
 - 训练日志输出至 stdout。
-- 无检查点保存（教学实现）。
 
 ## 参考资料
 
