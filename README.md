@@ -35,7 +35,7 @@ cd website && npm run build
 
 - 基础神经网络：Logistic Regression、浅层网络、深层 MLP、多分类
 - 训练技巧：初始化、正则化、优化器
-- CNN 与视觉：卷积、ResNet、Style Transfer、NMS、YOLO
+- CNN 与视觉：卷积、ResNet、Style Transfer、NMS
 - 序列模型：RNN、情感分析、Attention、Transformer
 - 生成模型：VAE、DDPM、DDIM、PixelCNN、VQVAE
 - 工程实践：Fourier Feature、PyTorch DDP
