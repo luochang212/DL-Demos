@@ -18,8 +18,8 @@ uv sync --group dev
 
 ```bash
 uv run python -m chapters.fundamentals.shallow_network.code.points_classification
-uv run python chapters/sequence_models/transformer/train.py
-uv run python chapters/cv/style_transfer/style_transfer.py --steps 50
+uv run python chapters/sequence_models/transformer/code/main.py --mode smoke
+uv run python chapters/cv/style_transfer/code/style_transfer.py --steps 50
 ```
 
 ## 质量检查
