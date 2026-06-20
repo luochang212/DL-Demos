@@ -1,23 +1,24 @@
 from typing import List
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
-class MulticlassClassificationNet:
+class MulticlassClassificationNet(nn.Module):
     def __init__(self, neuron_cnt: List[int]):
+        super().__init__()
         self.num_layer = len(neuron_cnt) - 1
         self.neuron_cnt = neuron_cnt
-        self.W = []
-        self.b = []
+        self.W = nn.ParameterList()
+        self.b = nn.ParameterList()
         for i in range(self.num_layer):
             new_W = torch.empty(neuron_cnt[i + 1], neuron_cnt[i])
             new_b = torch.zeros(neuron_cnt[i + 1], 1)
-            torch.nn.init.kaiming_normal_(new_W, nonlinearity='relu')
-            self.W.append(torch.nn.Parameter(new_W))
-            self.b.append(torch.nn.Parameter(new_b))
-        self.trainable_vars = self.W + self.b
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+            nn.init.kaiming_normal_(new_W, nonlinearity='relu')
+            self.W.append(nn.Parameter(new_W))
+            self.b.append(nn.Parameter(new_b))
+        self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, X):
         A = X
@@ -27,7 +28,6 @@ class MulticlassClassificationNet:
                 A = Z
             else:
                 A = F.relu(Z)
-
         return A
 
     def loss(self, Y, Y_hat):
@@ -47,11 +47,21 @@ class MulticlassClassificationNet:
 
 
 def train(
-    model: MulticlassClassificationNet, X, Y, step, learning_rate, print_interval=100
+    model: MulticlassClassificationNet,
+    X,
+    Y,
+    step,
+    learning_rate,
+    print_interval=100,
+    device=None,
 ):
-    optimizer = torch.optim.Adam(model.trainable_vars, learning_rate)
+    if device is not None:
+        model.to(device)
+        X = X.to(device)
+        Y = Y.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), learning_rate)
     for s in range(step):
-        Y_hat = model.forward(X)
+        Y_hat = model(X)
         cost = model.loss(Y, Y_hat)
         optimizer.zero_grad()
         cost.backward()

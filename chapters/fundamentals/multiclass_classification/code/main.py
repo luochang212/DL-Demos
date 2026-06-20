@@ -35,7 +35,7 @@ def main():
     model = MulticlassClassificationNet(neuron_list)
     train(model, train_X_pt, train_Y_pt, 5000, 0.001, 1000)
 
-    plot_result = model.forward(torch.Tensor(plot_X))
+    plot_result = model.forward(torch.tensor(plot_X))
     plot_result = torch.argmax(plot_result, 0).numpy()
     plot_result = np.expand_dims(plot_result, 0)
 
